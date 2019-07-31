@@ -3,8 +3,10 @@
 .gradle/
 .idea/
 .ipynb_checkpoints/
+*.json
 *.log
 .nfs*
+build
 ca-certificates/
 !ca-certificates/README.txt
 data/

@@ -118,10 +118,11 @@ see [MultiVideoGridJob](flinkprocessor/src/main/java/io/pravega/example/videopro
 
 ## Building and Running the Video Samples
 
-In the steps below, sections noted with **(Nautilus SDK Desktop)** should only be performed
-in a Nautilus SDK Desktop in a Kubernetes deployment of Nautilus.
-Sections noted with **(Local)** should only be performed in a local workstation deployment
-of Pravega.
+In the steps below, sections noted with **(Nautilus SDK Desktop)** apply only to a
+Nautilus SDK Desktop in a Kubernetes deployment of Nautilus.
+Sections noted with **(Local)** apply to a local workstation deployment of Pravega (standalone or Docker).
+Sections noted with **(External)** apply to a local workstation running IntelliJ that
+connects to Pravega running in an external Kubernetes deployment of Nautilus.
 
 ### Download this Repository
 
@@ -131,18 +132,18 @@ git clone https://github.com/pravega/video-samples
 cd video-samples
 ```
 
-### (Local) Install Operating System
+### (Local, External) Install Operating System
 
-Install Ubuntu 16.04 LTS. Other operating systems can also be used but the commands below have only been tested
+Install Ubuntu 18.04 LTS. Other operating systems can also be used but the commands below have only been tested
 on this version.
 
-### (Local) Install Java 8
+### (Local, External) Install Java 8
 
 ```
 apt-get install openjdk-8-jdk
 ```
 
-### (Local, Optional) Install IntelliJ
+### (Local, External, Optional) Install IntelliJ
 
 Install from <https://www.jetbrains.com/idea>.
 Enable the Lombok plugin.
@@ -177,7 +178,7 @@ You can view the Pravega logs with `docker-compose logs --follow`.
 
 You can view the stream files stored on HDFS with `docker-compose exec hdfs hdfs dfs -ls -h -R /`.
 
-## (Local) Install Pravega Client and Pravega Flink Connector Libraries
+### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries
 
 This step is required when using pre-release versions of Pravega and/or Nautilus.
 It will install required libraries in the local Maven repository.
@@ -207,7 +208,46 @@ If necessary, edit the file `gradle.properties` to include the following line.
 includePravegaCredentials=true
 ```
 
-## Running the Examples
+### (External) Configure Nautilus Authentication
+
+Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib directory.
+
+```
+PRAVEGA_CREDENTIALS_VERSION=0.5.0-2305.31c34b9-0.11.10-001.e597251
+sudo apt install maven
+mvn install:install-file \
+-Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
+-DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
+-Dversion=${PRAVEGA_CREDENTIALS_VERSION} -Dpackaging=jar
+```
+
+Obtain the Pravega authentication credentials.
+```
+kubectl get secret examples-pravega -n examples -o jsonpath="{.data.keycloak\.json}" | base64 -d > ${HOME}/keycloak.json
+chmod go-rw ${HOME}/keycloak.json
+```
+
+When running the example applications, you must set the following environment variables.
+This can be done by setting the IntelliJ run configurations. If you set this in IntelliJ,
+you must manually replace `${HOME}` with your actual home directory.
+```
+export pravega_client_auth_method=Bearer
+export pravega_client_auth_loadDynamic=true
+export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
+```
+
+### Determine the Pravega Controller URL
+
+- Local:
+  `tcp://127.0.0.1:9090`
+
+- Nautilus SDK Desktop or a Flink job running in Nautilus:
+  `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
+
+- External:
+  (provided by the Nautilus administrator)
+
+### Running the Examples in IntelliJ
 
 Run the Flink video data generator job using the following parameters:
 ```
@@ -220,8 +260,6 @@ tcp://127.0.0.1:9090
 --output-stream
 examples/video1
 ```
-
-Note: In Nautilus, use the controller `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`.
 
 Next, run a streaming Flink job that reads all video streams and combines them into a single video stream
 where each image is composed of the input images in a square grid. 
