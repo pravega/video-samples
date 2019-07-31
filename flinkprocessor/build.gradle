@@ -1,0 +1,69 @@
+plugins {
+    id "com.github.johnrengelman.shadow" version "1.2.4"
+}
+
+apply plugin: "java"
+apply plugin: "maven"
+apply plugin: "application"
+
+group = "io.pravega.example.video"
+version = samplesVersion
+archivesBaseName = "video-flinkprocessor"
+description = "video-flinkprocessor"
+mainClassName = "io.pravega.example.video.flinkprocessor.ApplicationMain"
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url "https://repository.apache.org/snapshots"
+    }
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots"
+    }
+}
+
+dependencies {
+    compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
+    compile "ch.qos.logback:logback-classic:${logbackVersion}"
+    compile "ch.qos.logback:logback-core:${logbackVersion}"
+    compile "net.logstash.logback:logstash-logback-encoder:${logstashLogbackEncoderVersion}"
+    compile "io.pravega:pravega-connectors-flink_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
+    compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
+    compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
+    compile "org.apache.flink:flink-ml_${flinkScalaVersion}:${flinkVersion}"
+    compile "org.apache.flink:flink-table_${flinkScalaVersion}:${flinkVersion}"
+    compile "org.apache.flink:flink-json:${flinkVersion}"
+    compile "io.pravega:pravega-client:${pravegaVersion}"
+
+    if (includePravegaCredentials.toBoolean()) {
+        compile "io.pravega:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+    }
+
+    testCompile "org.apache.flink:flink-test-utils_${flinkScalaVersion}:${flinkVersion}"
+    testCompile "junit:junit:${junitVersion}"
+}
+
+shadowJar {
+    dependencies {
+        exclude(dependency("org.scala-lang:scala-library"))
+        exclude(dependency("org.scala-lang:scala-reflect"))
+        exclude(dependency("org.scala-lang:scala-compiler"))
+    }
+
+    zip64 true
+}
+
+distributions {
+    main {
+        baseName = archivesBaseName
+        contents {
+            into("lib") {
+                from shadowJar
+                from(project.configurations.shadow)
+            }
+        }
+    }
+}
