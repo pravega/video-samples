@@ -11,7 +11,7 @@
 package io.pravega.example.videoprocessor;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ChunkedVideoFrameSerializationSchema implements SerializationSchema<ChunkedVideoFrame> {
 

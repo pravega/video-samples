@@ -46,6 +46,7 @@ dependencies {
     compile "org.apache.flink:flink-ml_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-table_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-json:${flinkVersion}"
+    compile "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
 
     if (includePravegaCredentials.toBoolean()) {
