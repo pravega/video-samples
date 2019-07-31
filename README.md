@@ -297,6 +297,14 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 ![grid-sample](images/grid-sample.png)
 
+### Running the Examples in Nautilus
+
+```
+kubectl port-forward service/repo 9090:80 --namespace examples &
+./gradlew publish
+scripts/deploy-k8s-components.sh
+```
+
 # References
 
 - <http://pravega.io/>

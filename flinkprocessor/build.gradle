@@ -9,12 +9,13 @@
  *
  */
 plugins {
-    id "com.github.johnrengelman.shadow" version "1.2.4"
+    id 'com.github.johnrengelman.shadow' version '2.0.3'
 }
 
 apply plugin: "java"
 apply plugin: "maven"
 apply plugin: "application"
+apply plugin: "maven-publish"
 
 group = "io.pravega.example.video"
 version = samplesVersion
@@ -75,6 +76,24 @@ distributions {
                 from shadowJar
                 from(project.configurations.shadow)
             }
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            credentials {
+                username "nautilus"
+                password "password"
+            }
+            url = "http://localhost:9090/maven2"
+        }
+    }
+
+    publications {
+        shadow(MavenPublication) { publication ->
+            project.shadow.component(publication)
         }
     }
 }

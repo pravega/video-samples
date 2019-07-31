@@ -1,0 +1,42 @@
+{{- $tm := .Values.flink.cluster.taskManager -}}
+{{- $numClusters := .Values.flink.cluster.replica -}}
+{{- range $clusterNum, $e := until (int $numClusters) }}
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: "FlinkCluster"
+metadata:
+  name: {{ $.Release.Name }}-flink-cluster-{{ $clusterNum }}
+  labels:
+    name: {{ $.Release.Name }}-flink-cluster-{{ $clusterNum }}
+spec:
+  flinkVersion: 1.7.2
+
+  zookeeperUrl: zookeeper-client:2181
+
+  # Specify Storage Options
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 5Gi
+
+  # Specify Manager Resources
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    cpu: 250m
+
+  taskManager:
+    replicas: {{ $tm.replicas }}
+    memory: {{ $tm.memory }}
+    cpu: {{ $tm.cpu }}
+    numberOfTaskSlots: {{ $tm.taskSlots }}
+---
+{{- end }}
