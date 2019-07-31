@@ -3,6 +3,8 @@
 
 ## Overview
 
+![grid-sample](images/grid-sample.png)
+
 This project demonstrates methods to store, process, and read video with Pravega and Flink.
 
 The Pravega Event API is limited to 1 MiB events. 
@@ -251,6 +253,11 @@ tcp://127.0.0.1:9090
 examples/grid1
 ```
 This will write a subset of images to `/tmp/camera*.png`.
+
+Below shows the example output from 4 camera feeds.
+Note that image backgrounds are filled with random bytes to make them incompressible for testing purposes.
+
+![grid-sample](images/grid-sample.png)
 
 # References
 

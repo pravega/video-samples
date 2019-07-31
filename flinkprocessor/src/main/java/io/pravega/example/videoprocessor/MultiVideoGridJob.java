@@ -80,7 +80,7 @@ public class MultiVideoGridJob extends AbstractJob {
             inVideoFramesWithTimestamps.printToErr();
 
             // Resize all input images. This will be performed in parallel.
-            int imageWidth = 50;
+            int imageWidth = 100;
             int imageHeight = imageWidth;
             DataStream<VideoFrame> resizedVideoFrames = inVideoFramesWithTimestamps.map(frame -> {
                 ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
