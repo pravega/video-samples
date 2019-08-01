@@ -35,8 +35,6 @@ public abstract class AbstractJob implements Runnable {
 
     public void createStream(AppConfiguration.StreamConfig streamConfig) {
         try(StreamManager streamManager = StreamManager.create(appConfiguration.getPravegaConfig().getClientConfig())) {
-            // create the requested scope (if necessary) TODO: must remove createScope in Nautilus
-//            streamManager.createScope(streamConfig.stream.getScope());
             // create the requested stream
             StreamConfiguration streamConfiguration = StreamConfiguration.builder()
                     .scalingPolicy(ScalingPolicy.byDataRate(streamConfig.targetRate, streamConfig.scaleFactor, streamConfig.minNumSegments))

@@ -174,6 +174,11 @@ export HOST_IP=x.x.x.x
 docker-compose up -d
 ```
 
+You must also create the Pravega scope. This can be performed using the REST API.
+```
+curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:10080/v1/scopes
+```
+
 You can view the Pravega logs with `docker-compose logs --follow`.
 
 You can view the stream files stored on HDFS with `docker-compose exec hdfs hdfs dfs -ls -h -R /`.
