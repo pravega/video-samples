@@ -47,7 +47,9 @@ public class VideoDataGeneratorJob extends AbstractJob {
             double framesPerSec = 1.0;
             DataStream<Tuple2<Integer,Long>> frameNumbers = env.fromCollection(
                     new FrameNumberIterator(framesPerSec),
-                    TypeInformation.of(new TypeHint<Tuple2<Integer,Long>>(){}));
+                    TypeInformation.of(new TypeHint<Tuple2<Integer,Long>>(){}))
+                    .uid("frameNumbers")
+                    .name("frameNumbers");
 
             // Generate a stream of video frames.
             int[] cameras = new int[]{0, 1, 2, 3};
@@ -69,13 +71,18 @@ public class VideoDataGeneratorJob extends AbstractJob {
                                 out.collect(frame);
                             }
                         }
-                    });
-            videoFrames.printToErr();
+                    })
+                    .uid("videoFrames")
+                    .name("videoFrames");
+            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Split video frames into chunks of 1 MB or less. We must account for base-64 encoding, header fields, and JSON. Use 0.5 MB to be safe.
             int chunkSizeBytes = 10*1024;
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames.flatMap(new VideoFrameChunker(chunkSizeBytes));
-            chunkedVideoFrames.printToErr();
+            DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames
+                    .flatMap(new VideoFrameChunker(chunkSizeBytes))
+                    .uid("VideoFrameChunker")
+                    .name("VideoFrameChunker");
+            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
@@ -85,10 +92,13 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .withEventRouter(frame -> String.format("%d", frame.camera))
                     .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
                     .build();
-            chunkedVideoFrames.addSink(flinkPravegaWriter);
+            chunkedVideoFrames
+                    .addSink(flinkPravegaWriter)
+                    .uid("output-sink")
+                    .name("output-sink");
 
             log.info("Executing {} job", jobName);
-            env.execute();
+            env.execute(jobName);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

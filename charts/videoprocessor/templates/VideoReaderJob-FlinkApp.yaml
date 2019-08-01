@@ -9,7 +9,7 @@ metadata:
     release: {{ $.Release.Name }}
 spec:
   flinkVersion: 1.7.2
-  mavenCoordinate: {{ .Values.flink.applications.coordination.group }}:{{ .Values.flink.applications.coordination.artifact }}:{{ .Values.flink.applications.coordination.version }}
+  mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
 
   parallelism: {{ .Values.VideoReaderJob.parallelism }}
 
@@ -21,17 +21,9 @@ spec:
     - name: scope
       value: {{ $.Release.Namespace }}
     - name: input-stream
-      value: "grid1"
+      value: {{ .Values.MultiVideoGridJob.output.stream }}
     - name: input-minNumSegments
-      value: "6"
-
-    # Flink Job Parameters
-#    - name: job.checkpointInterval
-#      value: "60000"
-#    - name: job.disableCheckpoint
-#      value: "false"
-#    - name: job.disableOperatorChaining
-#      value: "true"
-#    - name: rebalance
-#      value: "false"
+      value: {{ .Values.MultiVideoGridJob.output.minNumSegments }}
+    - name: enableOperatorChaining
+      value: "false"
 {{- end }}

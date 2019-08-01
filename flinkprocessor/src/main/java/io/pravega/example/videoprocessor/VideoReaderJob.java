@@ -52,43 +52,56 @@ public class VideoReaderJob extends AbstractJob {
                     .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = env.addSource(flinkPravegaReader);
-            chunkedVideoFrames.printToErr();
+            DataStream<ChunkedVideoFrame> chunkedVideoFrames = env
+                    .addSource(flinkPravegaReader)
+                    .uid("input-source")
+                    .name("input-source");
+            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             DataStream<VideoFrame> videoFrames = chunkedVideoFrames
                     .keyBy("camera", "ssrc", "timestamp", "frameNumber")
                     .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
                     .trigger(new ChunkedVideoFrameTrigger())
-                    .process(new ChunkedVideoFrameReassembler());
-//            videoFrames.printToErr();
+                    .process(new ChunkedVideoFrameReassembler())
+                    .uid("ChunkedVideoFrameReassembler")
+                    .name("ChunkedVideoFrameReassembler");
+//            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Write some frames to files for viewing.
             videoFrames
                     .filter(frame -> frame.frameNumber < 20)
+                    .uid("write-file-filter")
                     .map(frame -> {
-                        try (FileOutputStream fos = new FileOutputStream(String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber))) {
+                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
+                        log.info("Writing frame to {}", fileName);
+                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
                             fos.write(frame.data);
                         }
                         return 0;
-                    });
+                    })
+                    .uid("write-file-map")
+                    .name("write-file-map");
 
             // Parse image file and obtain metadata.
-            DataStream<String> frameInfo = videoFrames.map(frame -> {
-                InputStream inStream = new ByteArrayInputStream(frame.data);
-                BufferedImage inImage = ImageIO.read(inStream);
-                return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
-                        frame.camera,
-                        frame.frameNumber,
-                        inImage.getWidth(),
-                        inImage.getHeight(),
-                        inImage.getColorModel().getNumColorComponents(),
-                        frame.data.length,
-                        inImage.toString());
-            });
-            frameInfo.printToErr();
+            DataStream<String> frameInfo = videoFrames
+                    .map(frame -> {
+                        InputStream inStream = new ByteArrayInputStream(frame.data);
+                        BufferedImage inImage = ImageIO.read(inStream);
+                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
+                                frame.camera,
+                                frame.frameNumber,
+                                inImage.getWidth(),
+                                inImage.getHeight(),
+                                inImage.getColorModel().getNumColorComponents(),
+                                frame.data.length,
+                                inImage.toString());
+                    })
+                    .uid("frameInfo")
+                    .name("frameInfo");
+            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
 
             log.info("Executing {} job", jobName);
-            env.execute();
+            env.execute(jobName);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

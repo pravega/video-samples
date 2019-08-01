@@ -1,16 +1,16 @@
 flink:
   cluster:
-    replica: 1
+    replicas: 1
     taskManager:
-      replicas: 2
+      replicas: 1
       memory: 1024M
       cpu: 900m
       taskSlots: 3
-  applications:
-    coordination:
-      group: io.pravega.example.video
-      artifact: flinkprocessor
-      version: 0.1.0
+
+mavenCoordinate:
+  group: io.pravega.example.video
+  artifact: flinkprocessor
+  version: 0.1.0
 
 VideoDataGeneratorJob:
   enabled: true
@@ -19,6 +19,12 @@ VideoDataGeneratorJob:
 MultiVideoGridJob:
   enabled: true
   parallelism: 2
+  input:
+    stream: video1
+    minNumSegments: 6
+  output:
+    stream: grid1
+    minNumSegments: 3
 
 VideoReaderJob:
   enabled: true

@@ -1,5 +1,5 @@
 {{- $tm := .Values.flink.cluster.taskManager -}}
-{{- $numClusters := .Values.flink.cluster.replica -}}
+{{- $numClusters := .Values.flink.cluster.replicas -}}
 {{- range $clusterNum, $e := until (int $numClusters) }}
 apiVersion: flink.nautilus.dellemc.com/v1beta1
 kind: "FlinkCluster"

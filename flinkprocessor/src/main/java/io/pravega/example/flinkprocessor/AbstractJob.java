@@ -59,17 +59,17 @@ public abstract class AbstractJob implements Runnable {
         if (parallelism > 0) {
             env.setParallelism(parallelism);
         }
-        if (appConfiguration.isDisableOperatorChaining()) {
+        if (!appConfiguration.isEnableOperatorChaining()) {
             env.disableOperatorChaining();
         }
-        if(!appConfiguration.isDisableCheckpoint()) {
+        if(appConfiguration.isEnableCheckpoint()) {
             long checkpointInterval = appConfiguration.getCheckpointInterval();
             env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE);
         }
         log.info("Parallelism={}, MaxParallelism={}", env.getParallelism(), env.getMaxParallelism());
         // We can't use MemoryStateBackend because it can't store our large state.
-        if (env.getStateBackend() == null || env.getStateBackend() instanceof MemoryStateBackend) {
-            log.warn("Using FsStateBackend");
+        if (env.getStateBackend() != null && env.getStateBackend() instanceof MemoryStateBackend) {
+            log.warn("Using FsStateBackend instead of MemoryStateBackend");
             env.setStateBackend(new FsStateBackend("file:///tmp/flink-state", true));
         }
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);

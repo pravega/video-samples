@@ -25,8 +25,8 @@ public class AppConfiguration {
     private final String jobClass;
     private final int parallelism;
     private final long checkpointInterval;
-    private final boolean disableCheckpoint;
-    private final boolean disableOperatorChaining;
+    private final boolean enableCheckpoint;
+    private final boolean enableOperatorChaining;
     private final boolean enableRebalance;
 
     public AppConfiguration(String[] args) {
@@ -41,8 +41,8 @@ public class AppConfiguration {
         jobClass = params.get("jobClass");
         parallelism = params.getInt("parallelism", 0);
         checkpointInterval = params.getLong("checkpointInterval", 10000);     // milliseconds
-        disableCheckpoint = params.getBoolean("disableCheckpoint", false);
-        disableOperatorChaining = params.getBoolean("disableOperatorChaining", false);
+        enableCheckpoint = params.getBoolean("enableCheckpoint", true);
+        enableOperatorChaining = params.getBoolean("enableOperatorChaining", true);
         enableRebalance = params.getBoolean("rebalance", false);
     }
 
@@ -70,12 +70,12 @@ public class AppConfiguration {
         return checkpointInterval;
     }
 
-    public boolean isDisableCheckpoint() {
-        return disableCheckpoint;
+    public boolean isEnableCheckpoint() {
+        return enableCheckpoint;
     }
 
-    public boolean isDisableOperatorChaining() {
-        return disableOperatorChaining;
+    public boolean isEnableOperatorChaining() {
+        return enableOperatorChaining;
     }
 
     public boolean isEnableRebalance() {

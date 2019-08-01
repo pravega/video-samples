@@ -299,11 +299,52 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 ### Running the Examples in Nautilus
 
+1. You must make the Maven repo in Nautilus available to your development workstation.
 ```
 kubectl port-forward service/repo 9090:80 --namespace examples &
+```
+
+
+2. Build and publish your application JAR file.
+```
 ./gradlew publish
 scripts/deploy-k8s-components.sh
 ```
+
+3. Use Helm to start your Flink cluster and Flink applications.
+```
+scripts/deploy-k8s-components.sh
+```
+
+Note: If you make changes to the source code, you may redeploy your application by repeating steps 2 to 3.
+
+Note: You may use the script `scripts/uninstall.sh` to delete your Flink application and cluster.
+
+### Viewing Logs in Nautilus
+
+When Flink applications write to stdout, stderr, or use slf4j logging, the output will be
+available in one of several locations.
+
+Output written by the driver (e.g. directly called by `main()`) will be available in the job's log
+and can be viewed with the following command.
+```
+kubectl logs jobs/video-data-generator-job-app-v1-1 -n examples | less
+```
+
+Output written by operators (e.g. `map()`) will be available a Flink task manager log
+and can be viewed with the following command.
+```
+kubectl logs examples-videoprocessor-flink-cluster-0-taskmanager-0 -n examples -c server | less
+```
+
+When troubleshooting application issues, you should also review the Flink job manager log,
+which can be viewed with the following command.
+```
+kubectl logs examples-videoprocessor-flink-cluster-0-jobmanager-0 -n examples -c server | less
+```
+
+You may use the kubectl `--follow` and `--tail` flags.
+You may also use the Kubernetes UI to view these logs.
 
 # References
 
