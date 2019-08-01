@@ -21,7 +21,7 @@ group = "io.pravega.example.video"
 version = samplesVersion
 archivesBaseName = "video-flinkprocessor"
 description = "video-flinkprocessor"
-mainClassName = "io.pravega.example.video.flinkprocessor.ApplicationMain"
+mainClassName = "io.pravega.example.flinkprocessor.ApplicationMain"
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
@@ -47,7 +47,6 @@ dependencies {
     compile "org.apache.flink:flink-ml_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-table_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-json:${flinkVersion}"
-    compile "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
 
     if (includePravegaCredentials.toBoolean()) {
@@ -65,6 +64,7 @@ shadowJar {
         exclude(dependency("org.scala-lang:scala-compiler"))
     }
 
+    classifier = ""
     zip64 true
 }
 
