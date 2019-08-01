@@ -15,3 +15,11 @@ flink:
 VideoDataGeneratorJob:
   enabled: true
   parallelism: 1
+
+MultiVideoGridJob:
+  enabled: true
+  parallelism: 2
+
+VideoReaderJob:
+  enabled: true
+  parallelism: 2

@@ -39,7 +39,7 @@ public class AppConfiguration {
         outputStreamConfig = new StreamConfig(pravegaConfig,"output-", params);
 
         jobClass = params.get("jobClass");
-        parallelism = params.getInt("parallelism", 1);
+        parallelism = params.getInt("parallelism", 0);
         checkpointInterval = params.getLong("checkpointInterval", 10000);     // milliseconds
         disableCheckpoint = params.getBoolean("disableCheckpoint", false);
         disableOperatorChaining = params.getBoolean("disableOperatorChaining", false);
