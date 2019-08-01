@@ -2,7 +2,7 @@
 set -ex
 
 ROOT_DIR=$(dirname $0)/..
-NAMESPACE=examples
+NAMESPACE=${NAMESPACE:-examples}
 
 helm  del --purge \
 ${NAMESPACE}-videoprocessor
