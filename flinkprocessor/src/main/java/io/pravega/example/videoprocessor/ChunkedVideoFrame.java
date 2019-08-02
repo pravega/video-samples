@@ -19,9 +19,9 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgn
  * VideoFrame.data contains the chunk of data.
  */
 public class ChunkedVideoFrame extends VideoFrame {
-    // 0-based chunk index
+    // 0-based chunk index. The first chunk of each frame has chunkIndex 0.
     public short chunkIndex;
-    // Number of chunks minus 1
+    // Number of chunks minus 1.
     public short finalChunkIndex;
 
     public ChunkedVideoFrame() {

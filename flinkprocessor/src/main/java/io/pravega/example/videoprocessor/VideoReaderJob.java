@@ -16,7 +16,7 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,20 +52,34 @@ public class VideoReaderJob extends AbstractJob {
                     .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = env
+            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
+//            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
-            DataStream<VideoFrame> videoFrames = chunkedVideoFrames
-                    .keyBy("camera", "ssrc", "timestamp", "frameNumber")
-                    .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
-                    .trigger(new ChunkedVideoFrameTrigger())
-                    .process(new ChunkedVideoFrameReassembler())
+            // Assign timestamps and watermarks based on timestamp in each chunk.
+            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                    .assignTimestampsAndWatermarks(
+                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
+                                @Override
+                                public long extractTimestamp(ChunkedVideoFrame element) {
+                                    return element.timestamp.getTime();
+                                }
+                            })
+                    .uid("assignTimestampsAndWatermarks")
+                    .name("assignTimestampsAndWatermarks");
+//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
+
+            // Reassemble whole video frames from chunks.
+            boolean failOnError = false;
+            DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
+                    .keyBy("camera")
+                    .window(new ChunkedVideoFrameWindowAssigner())
+                    .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
-//            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
+            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Write some frames to files for viewing.
             videoFrames

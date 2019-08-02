@@ -21,6 +21,7 @@ import java.util.Map;
 /**
  * Combines multiple images into a square grid of images.
  * Images must be the correct size.
+ * See example output in /images/grid-sample.png.
  */
 public class ImageGridBuilder {
     private final int imageWidth;

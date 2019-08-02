@@ -15,11 +15,13 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.runtime.state.filesystem.FsStateBackend;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,11 +67,19 @@ public abstract class AbstractJob implements Runnable {
             env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE);
         }
         log.info("Parallelism={}, MaxParallelism={}", env.getParallelism(), env.getMaxParallelism());
+
         // We can't use MemoryStateBackend because it can't store our large state.
-        if (env.getStateBackend() != null && env.getStateBackend() instanceof MemoryStateBackend) {
+        if (env instanceof LocalStreamEnvironment && (env.getStateBackend() == null || env.getStateBackend() instanceof MemoryStateBackend)) {
             log.warn("Using FsStateBackend instead of MemoryStateBackend");
             env.setStateBackend(new FsStateBackend("file:///tmp/flink-state", true));
         }
+
+        // Stop immediately on any errors.
+        if (env instanceof LocalStreamEnvironment) {
+            log.warn("Using noRestart restart strategy");
+            env.setRestartStrategy(RestartStrategies.noRestart());
+        }
+
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         return env;
     }

@@ -15,10 +15,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 
 import java.io.IOException;
 
+/**
+ * Deserializes ChunkedVideoFrame from JSON.
+ */
 public class ChunkedVideoFrameDeserializationSchema extends AbstractDeserializationSchema<ChunkedVideoFrame> {
-
-    private static final long serialVersionUID = 3505365087654130819L;
-
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
