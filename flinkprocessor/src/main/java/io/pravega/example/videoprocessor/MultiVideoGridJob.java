@@ -81,7 +81,7 @@ public class MultiVideoGridJob extends AbstractJob {
 //            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Reassemble whole video frames from chunks.
-            boolean failOnError = true;
+            boolean failOnError = false;
             DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())

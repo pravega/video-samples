@@ -72,7 +72,7 @@ public class VideoReaderJob extends AbstractJob {
 //            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Reassemble whole video frames from chunks.
-            boolean failOnError = true;
+            boolean failOnError = false;
             DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())

@@ -11,6 +11,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Collection;
 import java.util.Collections;
 
+/**
+ * A class that assigns ChunkedVideoFrame instances to windows distinguished by camera, ssrc, and timestamp.
+ */
 public class ChunkedVideoFrameWindowAssigner extends WindowAssigner<ChunkedVideoFrame, VideoFrameWindow> {
     private static Logger log = LoggerFactory.getLogger(ChunkedVideoFrameWindowAssigner.class);
     private static final long serialVersionUID = 1L;

@@ -88,7 +88,7 @@ public class VideoFrameWindow extends Window {
     // ------------------------------------------------------------------------
 
     /**
-     * The serializer used to write the TimeWindow type.
+     * The serializer used to write the VideoFrameWindow type.
      */
     public static class Serializer extends TypeSerializerSingleton<VideoFrameWindow> {
         private static final long serialVersionUID = 1L;

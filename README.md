@@ -21,7 +21,7 @@ Note: If you are storing a video **transport stream**, such as Real-time Transpo
 HTTP Live Streaming, or MPEG Transport Stream (broadcast video), these are already packetized into
 small packets of 188 or 1500 bytes. These can be stored in Pravega as-is. However, due to the complexity
 involved in decoding such transport streams, it is often easier to store individual video frames
-as ordinary images as described in this project.
+as ordinary images using the methods described in this project.
 
 ## Writing Video to Pravega
 
@@ -31,7 +31,7 @@ instances.
 A `ChunkedVideoFrame` is a subclass of `VideoFrame` and it adds two 16-bit integers,
 `ChunkIndex` and `FinalChunkIndex`.
 `ChunkIndex` is a 0-based counter for this `ChunkedVideoFrame` within the `VideoFrame`.
-`FinalChunkIndex` is the value of the final/maximum `ChunkIndex` and is equal to the number
+`FinalChunkIndex` is the value of the last `ChunkIndex` for this `VideoFrame` and is equal to the number
 of chunks minus 1.
 For example, a 1.5 MiB image can be split into three 0.5 MiB chunks with {ChunkIndex, FinalChunkIndex} pairs of
 {0,2}, {1,2}, {2,2}.
@@ -47,11 +47,11 @@ However, because it requires base-64 encoding for byte arrays, it has a 33% stor
 compared to more efficient encodings such as Avro and Protobuf.
 
 If a non-transactional Pravega writer were to fail while writing chunks of video, this could result in only some
-of the chunks being written. Although this can easily be detected by the reassembly process, this could cause high
+of the chunks being written. Although this can easily be handled by the reassembly process, this could cause high
 memory usage for the state of the reassembly process. To avoid this, Pravega transactions can be used to keep
 chunks for the same image within a single transaction.
 
-For an example of a Flink video writer job, see 
+For an example of a Flink video writer job, see
 [VideoDataGeneratorJob](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/VideoDataGeneratorJob.java).
 
 ## Reading Video from Pravega
@@ -62,29 +62,26 @@ and deserializes it.
 Next, a series of Flink operations is performed.
 ```java
 DataStream<VideoFrame> videoFrames = chunkedVideoFrames
-        .keyBy("camera", "ssrc", "timestamp", "frameNumber")
-        .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
-        .trigger(new ChunkedVideoFrameTrigger())
-        .process(new ChunkedVideoFrameReassembler());
+    .keyBy("camera")
+    .window(new ChunkedVideoFrameWindowAssigner())
+    .process(new ChunkedVideoFrameReassembler());
 ```
 
-The `keyBy` function defines the attributes of `ChunkedVideoFrame` that uniquely identify a single frame.
-As new events are read from Pravega from multiple Flink tasks in parallel, events with identical
-values of these attributes will be grouped together and handled by the same task.
+The `keyBy` function enables parallel execution of different cameras.
+As new events are read from Pravega from multiple Flink tasks in parallel, events
+from the same camera will be grouped together and handled by the same task.
 
-The `window` function applies a **session** window to each group of `ChunkedVideoFrame`.
-Each session window will automatically timeout after 10 seconds of inactivity. This means that if
-a non-transactional Pravega writer wrote only 2 of 3 chunks, these chunks would be purged from the
-Flink state after 10 seconds, thus freeing memory.
-
-The `ChunkedVideoFrameTrigger` trigger function simply watches for
+The `window` function groups `ChunkedVideoFrame` instances by camera and timestamp.
+It also defines a default trigger function that watches for
 `ChunkedVideoFrame` instances where `ChunkIndex` equals `FinalChunkIndex`. 
 When this occurs, it returns
 `FIRE_AND_PURGE` which tells it to call the `process` function and then it purges the
-video frame from the state. 
-Under normal conditions, the session window 10-second timeout never occurs
-because `ChunkedVideoFrameTrigger` purges the state immediately upon the final chunk being received.
+video frame from the state.
 
+Flink watermarks are used during reassembly to purge the state of video frames with missing chunks.
+If a non-transactional Pravega writer wrote only 2 of 3 chunks, these chunks would be purged from the
+Flink state after 1 second, thus freeing memory.
+ 
 The `ChunkedVideoFrameReassembler` process function concatenates the byte arrays from all `ChunkedVideoFrame` instances
 and outputs `VideoFrame` instances.
 It checks for missing chunks and out-of-order chunks. 

@@ -29,6 +29,7 @@ public class VideoFrame {
     public int ssrc;
     // Event time of this frame. We use Timestamp to have nanosecond precision for high-speed cameras.
     public Timestamp timestamp;
+    // Sequential frame number. This can be used to identify any missing frames.
     public int frameNumber;
     // PNG-encoded image.
     public byte[] data;

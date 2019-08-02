@@ -85,7 +85,7 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .name("VideoFrameChunker");
 
             // Drop some chunks (for testing).
-            boolean dropChunks = false;
+            boolean dropChunks = true;
             if (dropChunks) {
                 chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera == 0 && (f.frameNumber + 1) % 10 == 0 && f.chunkIndex == f.finalChunkIndex));
             }

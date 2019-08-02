@@ -18,6 +18,7 @@ import java.util.Iterator;
 /**
  * An Iterator that returns sequential frame numbers and timestamps.
  * Elements are rate limited at the specified framesPerSec.
+ * Used to generate sample video data.
  */
 public class FrameNumberIterator implements Iterator<Tuple2<Integer,Long>>, Serializable {
     private double framesPerSec;
