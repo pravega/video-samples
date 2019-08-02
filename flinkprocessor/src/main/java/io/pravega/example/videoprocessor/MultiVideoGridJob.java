@@ -118,7 +118,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .setParallelism(1)
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
-            outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
+            outVideoFrames.printToErr().setParallelism(1).uid("outVideoFrames-print").name("outVideoFrames-print");
 
             // Split output video frames into chunks of 1 MB or less.
             DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
@@ -126,7 +126,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .setParallelism(1)
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
-//            outChunkedVideoFrames.printToErr().uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
+//            outChunkedVideoFrames.printToErr().setParallelism(1).uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
 
 //            // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()

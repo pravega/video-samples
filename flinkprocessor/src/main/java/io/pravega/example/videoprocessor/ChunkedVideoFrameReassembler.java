@@ -37,53 +37,59 @@ public class ChunkedVideoFrameReassembler extends ProcessWindowFunction<ChunkedV
         }
         ChunkedVideoFrame firstChunk = it.next();
 
-        // Validate that chunks are in order and we have all of them.
-        short expectedChunkIndex = 0;
-        int totalSize = 0;
-        for (ChunkedVideoFrame chunk: elements) {
-            Preconditions.checkState(chunk.camera == context.window().getCamera());
-            Preconditions.checkState(chunk.ssrc == context.window().getSsrc());
-            Preconditions.checkState(chunk.timestamp.equals(context.window().getTimestamp()));
-            if (chunk.finalChunkIndex != firstChunk.finalChunkIndex) {
-                throw new ChunkSequenceException(MessageFormat.format(
-                        "finalChunkIndex ({0}) does not match that of first chunk ({1}); window={2}, elements={3}",
-                        chunk.finalChunkIndex, firstChunk.finalChunkIndex, context.window(), elements));
+        try {
+
+            // Validate that chunks are in order and we have all of them.
+            short expectedChunkIndex = 0;
+            int totalSize = 0;
+            for (ChunkedVideoFrame chunk : elements) {
+                Preconditions.checkState(chunk.camera == context.window().getCamera());
+                Preconditions.checkState(chunk.ssrc == context.window().getSsrc());
+                Preconditions.checkState(chunk.timestamp.equals(context.window().getTimestamp()));
+                if (chunk.finalChunkIndex != firstChunk.finalChunkIndex) {
+                    throw new ChunkSequenceException(MessageFormat.format(
+                            "finalChunkIndex ({0}) does not match that of first chunk ({1}); window={2}, elements={3}",
+                            chunk.finalChunkIndex, firstChunk.finalChunkIndex, context.window(), elements));
+                }
+                if (chunk.chunkIndex < 0 || chunk.chunkIndex > firstChunk.finalChunkIndex) {
+                    throw new ChunkSequenceException(MessageFormat.format(
+                            "chunkIndex ({0}) is not between 0 and finalChunkIndex ({1}); window={2}, elements={3}",
+                            chunk.chunkIndex, firstChunk.finalChunkIndex, context.window(), elements));
+                }
+                if (chunk.chunkIndex != expectedChunkIndex) {
+                    throw new ChunkSequenceException(MessageFormat.format(
+                            "chunkIndex ({0}) does not match the expected value ({1}); window={2}, elements={3}",
+                            chunk.chunkIndex, expectedChunkIndex, context.window(), elements));
+                }
+                expectedChunkIndex++;
+                totalSize += chunk.data.length;
             }
-            if (chunk.chunkIndex < 0 || chunk.chunkIndex > firstChunk.finalChunkIndex) {
+            if (expectedChunkIndex != firstChunk.finalChunkIndex + 1) {
                 throw new ChunkSequenceException(MessageFormat.format(
-                        "chunkIndex ({0}) is not between 0 and finalChunkIndex ({1}); window={2}, elements={3}",
-                        chunk.chunkIndex, firstChunk.finalChunkIndex, context.window(), elements));
+                        "Number of chunks received ({0}) does not match expected value ({1}); window={2}, elements={3}",
+                        expectedChunkIndex, firstChunk.finalChunkIndex + 1, context.window(), elements));
             }
-            if (chunk.chunkIndex != expectedChunkIndex) {
-                throw new ChunkSequenceException(MessageFormat.format(
-                        "chunkIndex ({0}) does not match the expected value ({1}); window={2}, elements={3}",
-                        chunk.chunkIndex, expectedChunkIndex, context.window(), elements));
-            }
-            expectedChunkIndex++;
-            totalSize += chunk.data.length;
-        }
-        if (expectedChunkIndex != firstChunk.finalChunkIndex + 1) {
-            throw new ChunkSequenceException(MessageFormat.format(
-                    "Number of chunks received ({0}) does not match expected value ({1}); window={2}, elements={3}",
-                    expectedChunkIndex, firstChunk.finalChunkIndex + 1, context.window(), elements));
-        }
 
 //        int totalSize = StreamSupport.stream(elements.spliterator(), false).mapToInt((e) -> e.data.length).sum();
-        VideoFrame videoFrame = new VideoFrame();
-        videoFrame.camera = firstChunk.camera;
-        videoFrame.ssrc = firstChunk.ssrc;
-        videoFrame.timestamp = firstChunk.timestamp;
-        videoFrame.frameNumber = firstChunk.frameNumber;
-        videoFrame.hash = firstChunk.hash;
+            VideoFrame videoFrame = new VideoFrame();
+            videoFrame.camera = firstChunk.camera;
+            videoFrame.ssrc = firstChunk.ssrc;
+            videoFrame.timestamp = firstChunk.timestamp;
+            videoFrame.frameNumber = firstChunk.frameNumber;
+            videoFrame.hash = firstChunk.hash;
 
-        // Concatenate chunk data.
-        ByteBuffer buf = ByteBuffer.allocate(totalSize);
-        for (ChunkedVideoFrame chunk: elements) {
-            buf.put(chunk.data);
+            // Concatenate chunk data.
+            ByteBuffer buf = ByteBuffer.allocate(totalSize);
+            for (ChunkedVideoFrame chunk : elements) {
+                buf.put(chunk.data);
+            }
+            buf.flip();
+            videoFrame.data = buf.array();
+            videoFrame.validateHash();
+            out.collect(videoFrame);
+        } catch (ChunkSequenceException e) {
+            log.warn("process:", e);
+//            throw(e);
         }
-        buf.flip();
-        videoFrame.data = buf.array();
-        videoFrame.validateHash();
-        out.collect(videoFrame);
     }
 }
