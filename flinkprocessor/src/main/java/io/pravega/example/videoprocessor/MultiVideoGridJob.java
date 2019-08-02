@@ -115,16 +115,16 @@ public class MultiVideoGridJob extends AbstractJob {
 //            });
 
             // Resize all input images. This will be performed in parallel.
-            int imageWidth = 100;
+            int imageWidth = 50;
             int imageHeight = imageWidth;
-//            DataStream<VideoFrame> resizedVideoFrames = inVideoFramesWithTimestamps.map(frame -> {
-//                ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
-//                frame.data = resizer.resize(frame.data);
-//                frame.hash = null;
-//                return frame;
-//            });
-////            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
-//
+            DataStream<VideoFrame> resizedVideoFrames = inVideoFramesWithTimestamps.map(frame -> {
+                ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
+                frame.data = resizer.resize(frame.data);
+                frame.hash = null;
+                return frame;
+            });
+//            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
+
 //            DataStream<VideoFrame> resizedVideoFramesWithTimestamps = resizedVideoFrames.assignTimestampsAndWatermarks(
 //                    new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(10000)) {
 //                        @Override
@@ -139,7 +139,7 @@ public class MultiVideoGridJob extends AbstractJob {
             // To maintain ordering in the output images, we use parallelism of 1 for all subsequent operations.
             int camera = 1000;
             int ssrc = new Random().nextInt();
-            DataStream<VideoFrame> outVideoFrames = inVideoFramesWithTimestamps
+            DataStream<VideoFrame> outVideoFrames = resizedVideoFrames
                     .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(500)))
                     .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc))
                     .setParallelism(1)
@@ -147,26 +147,27 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ImageAggregator");
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
-//            // Split video frames into chunks of 1 MB or less.
-//            DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
-//                    .flatMap(new VideoFrameChunker())
-//                    .setParallelism(1)
-//                    .uid("VideoFrameChunker")
-//                    .name("VideoFrameChunker");
-//
+            // Split video frames into chunks of 1 MB or less.
+            DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
+                    .flatMap(new VideoFrameChunker())
+                    .setParallelism(1)
+                    .uid("VideoFrameChunker")
+                    .name("VideoFrameChunker");
+            outChunkedVideoFrames.printToErr().uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
+
 //            // Write chunks to Pravega encoded as JSON.
-//            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
-//                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-//                    .forStream(appConfiguration.getOutputStreamConfig().stream)
-//                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
-//                    .withEventRouter(frame -> String.format("%d", frame.camera))
-//                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
-//                    .build();
-//            outChunkedVideoFrames
-//                    .addSink(flinkPravegaWriter)
-//                    .setParallelism(1)
-//                    .uid("output-sink")
-//                    .name("output-sink");
+            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+                    .withPravegaConfig(appConfiguration.getPravegaConfig())
+                    .forStream(appConfiguration.getOutputStreamConfig().stream)
+                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
+                    .withEventRouter(frame -> String.format("%d", frame.camera))
+                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
+                    .build();
+            outChunkedVideoFrames
+                    .addSink(flinkPravegaWriter)
+                    .setParallelism(1)
+                    .uid("output-sink")
+                    .name("output-sink");
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
