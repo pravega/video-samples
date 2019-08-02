@@ -15,6 +15,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * A class for storing a single video frame.
@@ -32,6 +34,8 @@ public class VideoFrame {
     public byte[] data;
     // Truncated SHA-1 hash of data. This is used to confirm that chunking and reassembly do not corrupt the data.
     public byte[] hash;
+    // Arbitrary user-defined key/value pairs.
+    public Map<String,String> tags;
 
     public VideoFrame() {
     }
@@ -43,6 +47,7 @@ public class VideoFrame {
         this.frameNumber = frame.frameNumber;
         this.data = frame.data;
         this.hash = frame.hash;
+        this.tags = frame.tags;
     }
 
     @Override
@@ -54,11 +59,18 @@ public class VideoFrame {
         }
         byte[] dataBytes = Arrays.copyOf(data, sizeToPrint);
         String dataStr = Arrays.toString(dataBytes);
+        String tagsStr = "null";
+        if (tags != null) {
+            tagsStr = tags.keySet().stream()
+                    .map(key -> key + "=" + tags.get(key))
+                    .collect(Collectors.joining(", ", "{", "}"));
+        }
         return "VideoFrame{" +
                 "camera=" + camera +
                 ", ssrc=" + ssrc +
                 ", timestamp=" + timestamp +
                 ", frameNumber=" + frameNumber +
+                ", tags=" + tagsStr +
                 ", hash=" + Arrays.toString(hash) +
                 ", data(" + data.length + ")=" + dataStr +
                 "}";

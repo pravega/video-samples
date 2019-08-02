@@ -72,13 +72,16 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("input-source")
                     .name("input-source");
 
-            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames.assignTimestampsAndWatermarks(
-                    new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
-                        @Override
-                        public long extractTimestamp(ChunkedVideoFrame element) {
-                            return element.timestamp.getTime();
-                        }
-                    });
+            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                    .assignTimestampsAndWatermarks(
+                        new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
+                            @Override
+                            public long extractTimestamp(ChunkedVideoFrame element) {
+                                return element.timestamp.getTime();
+                            }
+                        })
+                    .uid("assignTimestampsAndWatermarks")
+                    .name("assignTimestampsAndWatermarks");
 
             DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
@@ -104,12 +107,12 @@ public class MultiVideoGridJob extends AbstractJob {
 //            });
             inVideoFramesWithTimestamps.printToErr().uid("inVideoFramesWithTimestamps-print").name("inVideoFramesWithTimestamps-print");
 
-            inVideoFramesWithTimestamps.process(new ProcessFunction<VideoFrame, VideoFrame>() {
-                @Override
-                public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
-                    log.info("processElement: value={}, timestamp={}", value, ctx.timestamp());
-                }
-            });
+//            inVideoFramesWithTimestamps.process(new ProcessFunction<VideoFrame, VideoFrame>() {
+//                @Override
+//                public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
+//                    log.info("processElement: value={}, timestamp={}", value, ctx.timestamp());
+//                }
+//            });
 
             // Resize all input images. This will be performed in parallel.
             int imageWidth = 100;
@@ -140,7 +143,8 @@ public class MultiVideoGridJob extends AbstractJob {
                     .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(500)))
                     .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc))
                     .setParallelism(1)
-                    .uid("ImageAggregator");
+                    .uid("ImageAggregator")
+                    .name("ImageAggregator");
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
 //            // Split video frames into chunks of 1 MB or less.
@@ -211,14 +215,16 @@ public class MultiVideoGridJob extends AbstractJob {
             builder.addImages(accum.images);
             videoFrame.data = builder.getOutputImageBytes("png");
             videoFrame.hash = videoFrame.calculateHash();
+            videoFrame.tags = new HashMap<String,String>();
+            videoFrame.tags.put("numCameras", Integer.toString(accum.images.size()));
             frameNumber++;
-            log.info("getResult: videoFrame={}", videoFrame);
+            log.trace("getResult: videoFrame={}", videoFrame);
             return videoFrame;
         }
 
         @Override
         public ImageAggregatorAccum add(VideoFrame value, ImageAggregatorAccum accum) {
-            log.info("add: value={}", value);
+            log.trace("add: value={}", value);
             accum.images.put(value.camera, value.data);
             accum.timestamp = new Timestamp(max(accum.timestamp.getTime(), value.timestamp.getTime()));
             return accum;

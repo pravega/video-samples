@@ -23,7 +23,7 @@ public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, VideoFr
 
     @Override
     public TriggerResult onElement(ChunkedVideoFrame element, long timestamp, VideoFrameWindow window, TriggerContext ctx) {
-        log.info("onElement: element={}, timestamp={}, window={}, getCurrentWatermark={}", element, timestamp, window, ctx.getCurrentWatermark());
+        log.trace("onElement: element={}, timestamp={}, window={}, getCurrentWatermark={}", element, timestamp, window, ctx.getCurrentWatermark());
         if (element.chunkIndex == element.finalChunkIndex)
             return TriggerResult.FIRE_AND_PURGE;
         else if (window.maxTimestamp() <= ctx.getCurrentWatermark()) {
@@ -37,8 +37,7 @@ public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, VideoFr
 
     @Override
     public TriggerResult onEventTime(long time, VideoFrameWindow window, TriggerContext ctx) {
-        log.info("onEventTime: time={}, window={}", time, window);
-//        return TriggerResult.CONTINUE;
+        log.trace("onEventTime: time={}, window={}", time, window);
         return time == window.maxTimestamp() ?
                 TriggerResult.FIRE_AND_PURGE :
                 TriggerResult.CONTINUE;
