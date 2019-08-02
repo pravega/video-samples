@@ -62,6 +62,7 @@ public class MultiVideoGridJob extends AbstractJob {
             StreamCut startStreamCut = getStreamInfo(appConfiguration.getInputStreamConfig().stream).getTailStreamCut();
 //            StreamCut startStreamCut = StreamCut.UNBOUNDED;
 
+            // Read chunked video frames from Pravega.
             FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(appConfiguration.getPravegaConfig())
                     .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
@@ -72,6 +73,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("input-source")
                     .name("input-source");
 
+            // Assign timestamps and watermarks based on timestamp in each chunk.
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
                         new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
@@ -82,38 +84,16 @@ public class MultiVideoGridJob extends AbstractJob {
                         })
                     .uid("assignTimestampsAndWatermarks")
                     .name("assignTimestampsAndWatermarks");
+//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
+            // Reassemble whole video frames from chunks.
             DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
-//                    .keyBy("camera", "ssrc", "timestamp", "frameNumber")
-//                    .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
-//                    .trigger(new ChunkedVideoFrameTrigger())
                     .window(new ChunkedVideoFrameWindowAssigner())
                     .process(new ChunkedVideoFrameReassembler())
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
             inVideoFrames.printToErr().uid("inVideoFrames-print").name("inVideoFrames-print");
-
-//            DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps.map(VideoFrame::new);
-
-//            DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames;
-//            DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames.assignTimestampsAndWatermarks(
-//                    new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(1000)) {
-////                    new AscendingTimestampExtractor<VideoFrame>() {
-//                @Override
-//                public long extractTimestamp(VideoFrame element) {
-////                    public long extractAscendingTimestamp(VideoFrame element) {
-//                    return element.timestamp.getTime();
-//                }
-//            });
-//            inVideoFramesWithTimestamps.printToErr().uid("inVideoFramesWithTimestamps-print").name("inVideoFramesWithTimestamps-print");
-
-//            inVideoFramesWithTimestamps.process(new ProcessFunction<VideoFrame, VideoFrame>() {
-//                @Override
-//                public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
-//                    log.info("processElement: value={}, timestamp={}", value, ctx.timestamp());
-//                }
-//            });
 
             // Resize all input images. This will be performed in parallel.
             int imageWidth = 50;
@@ -140,7 +120,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ImageAggregator");
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
-            // Split video frames into chunks of 1 MB or less.
+            // Split output video frames into chunks of 1 MB or less.
             DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
                     .flatMap(new VideoFrameChunker())
                     .setParallelism(1)
