@@ -52,7 +52,7 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .name("frameNumbers");
 
             // Generate a stream of video frames.
-            int[] cameras = new int[]{0, 1, 2, 3};
+            int[] cameras = new int[]{0, 1};
             int ssrc = new Random().nextInt();
             int width = 100;
             int height = width;
@@ -77,12 +77,16 @@ public class VideoDataGeneratorJob extends AbstractJob {
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Split video frames into chunks of 1 MB or less. We must account for base-64 encoding, header fields, and JSON. Use 0.5 MB to be safe.
-//            int chunkSizeBytes = 10*1024;
-            int chunkSizeBytes = 512*1024;
+            int chunkSizeBytes = 10*1024;
+//            int chunkSizeBytes = 512*1024;
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames
                     .flatMap(new VideoFrameChunker(chunkSizeBytes))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
+
+            // Drop some chunks.
+            chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera==0 && (f.frameNumber+1)%10==0 && f.chunkIndex==f.finalChunkIndex));
+
             chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.

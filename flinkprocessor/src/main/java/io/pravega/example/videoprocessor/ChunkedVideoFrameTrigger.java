@@ -23,13 +23,19 @@ public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, VideoFr
 
     @Override
     public TriggerResult onElement(ChunkedVideoFrame element, long timestamp, VideoFrameWindow window, TriggerContext ctx) {
-        log.trace("onElement: element={}, timestamp={}, window={}, getCurrentWatermark={}", element, timestamp, window, ctx.getCurrentWatermark());
-        if (element.chunkIndex == element.finalChunkIndex)
+        if (element.chunkIndex == element.finalChunkIndex) {
+            log.info("onElement: FIRE_AND_PURGE; final chunk; element={}, timestamp={}, window={}, getCurrentWatermark={}",
+                    element, timestamp, window, ctx.getCurrentWatermark());
             return TriggerResult.FIRE_AND_PURGE;
+        }
         else if (window.maxTimestamp() <= ctx.getCurrentWatermark()) {
             // If the watermark is already past the window, fire immediately.
+            log.info("onElement: FIRE_AND_PURGE; watermark is past window; element={}, timestamp={}, window={}, getCurrentWatermark={}",
+                    element, timestamp, window, ctx.getCurrentWatermark());
             return TriggerResult.FIRE_AND_PURGE;
         } else {
+            log.info("onElement: CONTINUE; element={}, timestamp={}, window={}, getCurrentWatermark={}",
+                    element, timestamp, window, ctx.getCurrentWatermark());
             ctx.registerEventTimeTimer(window.maxTimestamp());
             return TriggerResult.CONTINUE;
         }
@@ -37,15 +43,18 @@ public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, VideoFr
 
     @Override
     public TriggerResult onEventTime(long time, VideoFrameWindow window, TriggerContext ctx) {
-        log.trace("onEventTime: time={}, window={}", time, window);
-        return time == window.maxTimestamp() ?
-                TriggerResult.FIRE_AND_PURGE :
-                TriggerResult.CONTINUE;
+        if (time == window.maxTimestamp()) {
+            log.info("onEventTime: FIRE_AND_PURGE; time={}, window={}", time, window);
+            return TriggerResult.FIRE_AND_PURGE;
+        } else {
+            log.info("onEventTime: CONTINUE; time={}, window={}", time, window);
+            return TriggerResult.CONTINUE;
+        }
     }
 
     @Override
     public TriggerResult onProcessingTime(long time, VideoFrameWindow window, TriggerContext ctx) {
-        log.info("onProcessingTime: time={}, window={}", time, window);
+        log.info("onProcessingTime: CONTINUE; time={}, window={}", time, window);
         return TriggerResult.CONTINUE;
     }
 

@@ -16,6 +16,8 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,52 +52,65 @@ public class VideoReaderJob extends AbstractJob {
                     .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = env
+            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
+            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
-            DataStream<VideoFrame> videoFrames = chunkedVideoFrames
+            // Assign timestamps and watermarks based on timestamp in each chunk.
+            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                    .assignTimestampsAndWatermarks(
+                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
+                                @Override
+                                public long extractTimestamp(ChunkedVideoFrame element) {
+                                    return element.timestamp.getTime();
+                                }
+                            })
+                    .uid("assignTimestampsAndWatermarks")
+                    .name("assignTimestampsAndWatermarks");
+//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
+
+            DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())
                     .process(new ChunkedVideoFrameReassembler())
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
-//            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
+            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
-            // Write some frames to files for viewing.
-            videoFrames
-                    .filter(frame -> frame.frameNumber < 20)
-                    .uid("write-file-filter")
-                    .map(frame -> {
-                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
-                        log.info("Writing frame to {}", fileName);
-                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
-                            fos.write(frame.data);
-                        }
-                        return 0;
-                    })
-                    .uid("write-file-map")
-                    .name("write-file-map");
-
-            // Parse image file and obtain metadata.
-            DataStream<String> frameInfo = videoFrames
-                    .map(frame -> {
-                        InputStream inStream = new ByteArrayInputStream(frame.data);
-                        BufferedImage inImage = ImageIO.read(inStream);
-                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
-                                frame.camera,
-                                frame.frameNumber,
-                                inImage.getWidth(),
-                                inImage.getHeight(),
-                                inImage.getColorModel().getNumColorComponents(),
-                                frame.data.length,
-                                inImage.toString());
-                    })
-                    .uid("frameInfo")
-                    .name("frameInfo");
-            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
+//            // Write some frames to files for viewing.
+//            videoFrames
+//                    .filter(frame -> frame.frameNumber < 20)
+//                    .uid("write-file-filter")
+//                    .map(frame -> {
+//                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
+//                        log.info("Writing frame to {}", fileName);
+//                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
+//                            fos.write(frame.data);
+//                        }
+//                        return 0;
+//                    })
+//                    .uid("write-file-map")
+//                    .name("write-file-map");
+//
+//            // Parse image file and obtain metadata.
+//            DataStream<String> frameInfo = videoFrames
+//                    .map(frame -> {
+//                        InputStream inStream = new ByteArrayInputStream(frame.data);
+//                        BufferedImage inImage = ImageIO.read(inStream);
+//                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
+//                                frame.camera,
+//                                frame.frameNumber,
+//                                inImage.getWidth(),
+//                                inImage.getHeight(),
+//                                inImage.getColorModel().getNumColorComponents(),
+//                                frame.data.length,
+//                                inImage.toString());
+//                    })
+//                    .uid("frameInfo")
+//                    .name("frameInfo");
+//            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
