@@ -86,10 +86,10 @@ public class VideoFrame {
         return Arrays.copyOf(md.digest(data), 6);
     }
 
-    public void validateHash() {
+    public void validateHash() throws DigestException {
         byte[] calculatedHash = calculateHash();
         if (!MessageDigest.isEqual(calculatedHash, hash)) {
-            throw new RuntimeException(new DigestException());
+            throw new DigestException();
         }
     }
 }

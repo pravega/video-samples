@@ -18,15 +18,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.security.DigestException;
 import java.text.MessageFormat;
 import java.util.Iterator;
-import java.util.stream.StreamSupport;
 
 /**
- * A ProcessWindowFunction that merges ChunkedVideoFrame instances to produce VideoFrame instances.
+ * A ProcessWindowFunction that concatenates ChunkedVideoFrame instances to produce VideoFrame instances.
  */
 public class ChunkedVideoFrameReassembler extends ProcessWindowFunction<ChunkedVideoFrame, VideoFrame, Tuple, VideoFrameWindow> {
     private static Logger log = LoggerFactory.getLogger(ChunkedVideoFrameReassembler.class);
+
+    private boolean failOnError = false;
+
+    /**
+     * @param failOnError If true, terminate the Flink task on any ignorable errors.
+     *                    If false, such errors are logged and the corresponding VideoFrame is not emitted.
+     */
+    public ChunkedVideoFrameReassembler withFailOnError(boolean failOnError) {
+        this.failOnError = failOnError;
+        return this;
+    }
+
+    public ChunkedVideoFrameReassembler withFailOnError() {
+        return withFailOnError(true);
+    }
 
     @Override
     public void process(Tuple key, Context context, Iterable<ChunkedVideoFrame> elements, Collector<VideoFrame> out) throws ChunkSequenceException {
@@ -38,7 +53,6 @@ public class ChunkedVideoFrameReassembler extends ProcessWindowFunction<ChunkedV
         ChunkedVideoFrame firstChunk = it.next();
 
         try {
-
             // Validate that chunks are in order and we have all of them.
             short expectedChunkIndex = 0;
             int totalSize = 0;
@@ -70,13 +84,7 @@ public class ChunkedVideoFrameReassembler extends ProcessWindowFunction<ChunkedV
                         expectedChunkIndex, firstChunk.finalChunkIndex + 1, context.window(), elements));
             }
 
-//        int totalSize = StreamSupport.stream(elements.spliterator(), false).mapToInt((e) -> e.data.length).sum();
-            VideoFrame videoFrame = new VideoFrame();
-            videoFrame.camera = firstChunk.camera;
-            videoFrame.ssrc = firstChunk.ssrc;
-            videoFrame.timestamp = firstChunk.timestamp;
-            videoFrame.frameNumber = firstChunk.frameNumber;
-            videoFrame.hash = firstChunk.hash;
+            VideoFrame videoFrame = new VideoFrame(firstChunk);
 
             // Concatenate chunk data.
             ByteBuffer buf = ByteBuffer.allocate(totalSize);
@@ -87,9 +95,11 @@ public class ChunkedVideoFrameReassembler extends ProcessWindowFunction<ChunkedV
             videoFrame.data = buf.array();
             videoFrame.validateHash();
             out.collect(videoFrame);
-        } catch (ChunkSequenceException e) {
-            log.warn("process:", e);
-//            throw(e);
+        } catch (ChunkSequenceException | DigestException e) {
+            if (failOnError) {
+                throw new RuntimeException(e);
+            }
+            log.warn("Unable to reassemble frame:", e);
         }
     }
 }

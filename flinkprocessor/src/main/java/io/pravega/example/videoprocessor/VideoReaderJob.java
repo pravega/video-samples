@@ -21,12 +21,6 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-
 /**
  * This job reads a video stream from Pravega and writes frame metadata to the console.
  */
@@ -56,7 +50,7 @@ public class VideoReaderJob extends AbstractJob {
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
+//            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
@@ -74,7 +68,7 @@ public class VideoReaderJob extends AbstractJob {
             DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())
-                    .process(new ChunkedVideoFrameReassembler())
+                    .process(new ChunkedVideoFrameReassembler().withFailOnError())
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
