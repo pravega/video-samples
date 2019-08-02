@@ -22,9 +22,10 @@ import java.util.Arrays;
 public class VideoFrame {
     // Unique ID for this video stream.
     public int camera;
-    // Random source identifier used to avoid corruption if multiple sources use the same camera frameNumber.
+    // Random source identifier used to avoid corruption if multiple sources use the same camera and timestamp.
     // See https://tools.ietf.org/html/rfc3550.
     public int ssrc;
+    // Event time of this frame. We use Timestamp to have nanosecond precision for high-speed cameras.
     public Timestamp timestamp;
     public int frameNumber;
     // PNG-encoded image.

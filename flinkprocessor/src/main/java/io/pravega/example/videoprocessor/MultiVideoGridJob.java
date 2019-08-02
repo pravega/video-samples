@@ -19,6 +19,7 @@ import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
@@ -67,18 +68,32 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("input-source")
                     .name("input-source");
 
-            DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
-                    .keyBy("camera", "ssrc", "timestamp", "frameNumber")
-                    .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
-                    .trigger(new ChunkedVideoFrameTrigger())
+            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames.assignTimestampsAndWatermarks(
+                    new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(10000)) {
+                        @Override
+                        public long extractTimestamp(ChunkedVideoFrame element) {
+                            return element.timestamp.getTime();
+                        }
+                    });
+
+            DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
+                    .keyBy("camera")
+//                    .keyBy("camera", "ssrc", "timestamp", "frameNumber")
+//                    .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
+//                    .trigger(new ChunkedVideoFrameTrigger())
+                    .window(new ChunkedVideoFrameWindowAssigner())
                     .process(new ChunkedVideoFrameReassembler())
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
+//            DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps.map(VideoFrame::new);
+
             DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames.assignTimestampsAndWatermarks(
                     new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(10000)) {
+//                    new AscendingTimestampExtractor<VideoFrame>() {
                 @Override
                 public long extractTimestamp(VideoFrame element) {
+//                    public long extractAscendingTimestamp(VideoFrame element) {
                     return element.timestamp.getTime();
                 }
             });
@@ -87,13 +102,21 @@ public class MultiVideoGridJob extends AbstractJob {
             // Resize all input images. This will be performed in parallel.
             int imageWidth = 100;
             int imageHeight = imageWidth;
-            DataStream<VideoFrame> resizedVideoFrames = inVideoFramesWithTimestamps.map(frame -> {
-                ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
-                frame.data = resizer.resize(frame.data);
-                frame.hash = null;
-                return frame;
-            });
-//            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
+//            DataStream<VideoFrame> resizedVideoFrames = inVideoFramesWithTimestamps.map(frame -> {
+//                ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
+//                frame.data = resizer.resize(frame.data);
+//                frame.hash = null;
+//                return frame;
+//            });
+////            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
+//
+//            DataStream<VideoFrame> resizedVideoFramesWithTimestamps = resizedVideoFrames.assignTimestampsAndWatermarks(
+//                    new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(10000)) {
+//                        @Override
+//                        public long extractTimestamp(VideoFrame element) {
+//                            return element.timestamp.getTime();
+//                        }
+//                    });
 
             // Aggregate resized images.
             // For each time window, we take the last image from each camera.
@@ -101,33 +124,33 @@ public class MultiVideoGridJob extends AbstractJob {
             // To maintain ordering in the output images, we use parallelism of 1 for all subsequent operations.
             int camera = 1000;
             int ssrc = new Random().nextInt();
-            DataStream<VideoFrame> outVideoFrames = resizedVideoFrames
+            DataStream<VideoFrame> outVideoFrames = inVideoFramesWithTimestamps
                     .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(500)))
                     .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc))
                     .setParallelism(1)
                     .uid("ImageAggregator");
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
-            // Split video frames into chunks of 1 MB or less.
-            DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
-                    .flatMap(new VideoFrameChunker())
-                    .setParallelism(1)
-                    .uid("VideoFrameChunker")
-                    .name("VideoFrameChunker");
-
-            // Write chunks to Pravega encoded as JSON.
-            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-                    .forStream(appConfiguration.getOutputStreamConfig().stream)
-                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
-                    .withEventRouter(frame -> String.format("%d", frame.camera))
-                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
-                    .build();
-            outChunkedVideoFrames
-                    .addSink(flinkPravegaWriter)
-                    .setParallelism(1)
-                    .uid("output-sink")
-                    .name("output-sink");
+//            // Split video frames into chunks of 1 MB or less.
+//            DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
+//                    .flatMap(new VideoFrameChunker())
+//                    .setParallelism(1)
+//                    .uid("VideoFrameChunker")
+//                    .name("VideoFrameChunker");
+//
+//            // Write chunks to Pravega encoded as JSON.
+//            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+//                    .withPravegaConfig(appConfiguration.getPravegaConfig())
+//                    .forStream(appConfiguration.getOutputStreamConfig().stream)
+//                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
+//                    .withEventRouter(frame -> String.format("%d", frame.camera))
+//                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
+//                    .build();
+//            outChunkedVideoFrames
+//                    .addSink(flinkPravegaWriter)
+//                    .setParallelism(1)
+//                    .uid("output-sink")
+//                    .name("output-sink");
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
@@ -144,6 +167,8 @@ public class MultiVideoGridJob extends AbstractJob {
     }
 
     public static class ImageAggregator implements AggregateFunction<VideoFrame, ImageAggregatorAccum, VideoFrame> {
+        private static Logger log = LoggerFactory.getLogger(ImageAggregator.class);
+
         private final int imageWidth;
         private final int imageHeight;
         private final int camera;
@@ -175,11 +200,13 @@ public class MultiVideoGridJob extends AbstractJob {
             videoFrame.data = builder.getOutputImageBytes("png");
             videoFrame.hash = videoFrame.calculateHash();
             frameNumber++;
+            log.info("getResult: videoFrame={}", videoFrame);
             return videoFrame;
         }
 
         @Override
         public ImageAggregatorAccum add(VideoFrame value, ImageAggregatorAccum accum) {
+            log.info("add: value={}", value);
             accum.images.put(value.camera, value.data);
             accum.timestamp = new Timestamp(max(accum.timestamp.getTime(), value.timestamp.getTime()));
             return accum;

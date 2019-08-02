@@ -12,40 +12,54 @@ package io.pravega.example.videoprocessor;
 
 import org.apache.flink.streaming.api.windowing.triggers.Trigger;
 import org.apache.flink.streaming.api.windowing.triggers.TriggerResult;
-import org.apache.flink.streaming.api.windowing.windows.Window;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * A Trigger that immediately fires when a final chunk is received.
+ * A Trigger that immediately fires when the last chunk for a frame is received.
  */
-public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, Window> {
+public class ChunkedVideoFrameTrigger extends Trigger<ChunkedVideoFrame, VideoFrameWindow> {
+    private static Logger log = LoggerFactory.getLogger(ChunkedVideoFrameTrigger.class);
+
     @Override
-    public TriggerResult onElement(ChunkedVideoFrame element, long timestamp, Window window, TriggerContext ctx) throws Exception {
-        // TODO: This assumes final chunk is last. Is ordering of chunks guaranteed?
+    public TriggerResult onElement(ChunkedVideoFrame element, long timestamp, VideoFrameWindow window, TriggerContext ctx) {
+        log.info("onElement: element={}, timestamp={}, window={}, getCurrentWatermark={}", element, timestamp, window, ctx.getCurrentWatermark());
         if (element.chunkIndex == element.finalChunkIndex)
             return TriggerResult.FIRE_AND_PURGE;
+        else if (window.maxTimestamp() <= ctx.getCurrentWatermark()) {
+            // If the watermark is already past the window, fire immediately.
+            return TriggerResult.FIRE_AND_PURGE;
+        } else {
+            ctx.registerEventTimeTimer(window.maxTimestamp());
+            return TriggerResult.CONTINUE;
+        }
+    }
+
+    @Override
+    public TriggerResult onEventTime(long time, VideoFrameWindow window, TriggerContext ctx) {
+        log.info("onEventTime: time={}, window={}", time, window);
+//        return TriggerResult.CONTINUE;
+        return time == window.maxTimestamp() ?
+                TriggerResult.FIRE_AND_PURGE :
+                TriggerResult.CONTINUE;
+    }
+
+    @Override
+    public TriggerResult onProcessingTime(long time, VideoFrameWindow window, TriggerContext ctx) {
+        log.info("onProcessingTime: time={}, window={}", time, window);
         return TriggerResult.CONTINUE;
     }
 
     @Override
-    public TriggerResult onProcessingTime(long time, Window window, TriggerContext ctx) throws Exception {
-        return TriggerResult.FIRE_AND_PURGE;
+    public void clear(VideoFrameWindow window, TriggerContext ctx) {
     }
 
-    @Override
-    public TriggerResult onEventTime(long time, Window window, TriggerContext ctx) throws Exception {
-        return TriggerResult.FIRE_AND_PURGE;
-    }
-
-    @Override
-    public void clear(Window window, TriggerContext ctx) throws Exception {
-    }
-
-    @Override
-    public boolean canMerge() {
-        return true;
-    }
-
-    @Override
-    public void onMerge(Window window, OnMergeContext ctx) throws Exception {
-    }
+//    @Override
+//    public boolean canMerge() {
+//        return true;
+//    }
+//
+//    @Override
+//    public void onMerge(VideoFrameWindow window, OnMergeContext ctx) {
+//    }
 }

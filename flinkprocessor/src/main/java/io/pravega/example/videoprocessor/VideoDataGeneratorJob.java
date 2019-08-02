@@ -77,7 +77,8 @@ public class VideoDataGeneratorJob extends AbstractJob {
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Split video frames into chunks of 1 MB or less. We must account for base-64 encoding, header fields, and JSON. Use 0.5 MB to be safe.
-            int chunkSizeBytes = 10*1024;
+//            int chunkSizeBytes = 10*1024;
+            int chunkSizeBytes = 512*1024;
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames
                     .flatMap(new VideoFrameChunker(chunkSizeBytes))
                     .uid("VideoFrameChunker")

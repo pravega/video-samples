@@ -59,9 +59,8 @@ public class VideoReaderJob extends AbstractJob {
             chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             DataStream<VideoFrame> videoFrames = chunkedVideoFrames
-                    .keyBy("camera", "ssrc", "timestamp", "frameNumber")
-                    .window(ProcessingTimeSessionWindows.withGap(Time.seconds(10)))
-                    .trigger(new ChunkedVideoFrameTrigger())
+                    .keyBy("camera")
+                    .window(new ChunkedVideoFrameWindowAssigner())
                     .process(new ChunkedVideoFrameReassembler())
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
