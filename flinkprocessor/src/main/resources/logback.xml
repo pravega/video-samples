@@ -39,7 +39,7 @@
     </appender>
 
     <!-- You can change the default log level below or set the Java system property at run time. -->
-    <root level="${root.log.level:-DEBUG}">
+    <root level="${root.log.level:-INFO}">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

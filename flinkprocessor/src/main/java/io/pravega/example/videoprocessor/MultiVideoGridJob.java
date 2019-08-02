@@ -17,13 +17,17 @@ import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +73,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("input-source");
 
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames.assignTimestampsAndWatermarks(
-                    new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(10000)) {
+                    new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
                         @Override
                         public long extractTimestamp(ChunkedVideoFrame element) {
                             return element.timestamp.getTime();
@@ -88,16 +92,24 @@ public class MultiVideoGridJob extends AbstractJob {
 
 //            DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps.map(VideoFrame::new);
 
-            DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames.assignTimestampsAndWatermarks(
-                    new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(10000)) {
-//                    new AscendingTimestampExtractor<VideoFrame>() {
+            DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames;
+//            DataStream<VideoFrame> inVideoFramesWithTimestamps = inVideoFrames.assignTimestampsAndWatermarks(
+//                    new BoundedOutOfOrdernessTimestampExtractor<VideoFrame>(Time.milliseconds(1000)) {
+////                    new AscendingTimestampExtractor<VideoFrame>() {
+//                @Override
+//                public long extractTimestamp(VideoFrame element) {
+////                    public long extractAscendingTimestamp(VideoFrame element) {
+//                    return element.timestamp.getTime();
+//                }
+//            });
+            inVideoFramesWithTimestamps.printToErr().uid("inVideoFramesWithTimestamps-print").name("inVideoFramesWithTimestamps-print");
+
+            inVideoFramesWithTimestamps.process(new ProcessFunction<VideoFrame, VideoFrame>() {
                 @Override
-                public long extractTimestamp(VideoFrame element) {
-//                    public long extractAscendingTimestamp(VideoFrame element) {
-                    return element.timestamp.getTime();
+                public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
+                    log.info("processElement: value={}, timestamp={}", value, ctx.timestamp());
                 }
             });
-            inVideoFramesWithTimestamps.printToErr().uid("inVideoFramesWithTimestamps-print").name("inVideoFramesWithTimestamps-print");
 
             // Resize all input images. This will be performed in parallel.
             int imageWidth = 100;

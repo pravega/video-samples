@@ -80,6 +80,10 @@ public abstract class AbstractJob implements Runnable {
             env.setRestartStrategy(RestartStrategies.noRestart());
         }
 
+        log.info("getAutoWatermarkInterval={}", env.getConfig().getAutoWatermarkInterval());
+        env.getConfig().setAutoWatermarkInterval(1000);
+        log.info("getAutoWatermarkInterval={}", env.getConfig().getAutoWatermarkInterval());
+
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         return env;
     }
