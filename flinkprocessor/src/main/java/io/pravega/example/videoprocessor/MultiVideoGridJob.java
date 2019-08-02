@@ -17,17 +17,11 @@ import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.api.common.functions.AggregateFunction;
-import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
-import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
-import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,10 +81,11 @@ public class MultiVideoGridJob extends AbstractJob {
 //            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Reassemble whole video frames from chunks.
+            boolean failOnError = true;
             DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())
-                    .process(new ChunkedVideoFrameReassembler())
+                    .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
             inVideoFrames.printToErr().uid("inVideoFrames-print").name("inVideoFrames-print");
@@ -128,7 +123,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("VideoFrameChunker");
 //            outChunkedVideoFrames.printToErr().setParallelism(1).uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
 
-//            // Write chunks to Pravega encoded as JSON.
+            // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(appConfiguration.getPravegaConfig())
                     .forStream(appConfiguration.getOutputStreamConfig().stream)

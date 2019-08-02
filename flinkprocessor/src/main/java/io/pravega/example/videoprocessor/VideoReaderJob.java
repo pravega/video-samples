@@ -21,6 +21,12 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+
 /**
  * This job reads a video stream from Pravega and writes frame metadata to the console.
  */
@@ -65,46 +71,48 @@ public class VideoReaderJob extends AbstractJob {
                     .name("assignTimestampsAndWatermarks");
 //            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
+            // Reassemble whole video frames from chunks.
+            boolean failOnError = true;
             DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
                     .keyBy("camera")
                     .window(new ChunkedVideoFrameWindowAssigner())
-                    .process(new ChunkedVideoFrameReassembler().withFailOnError())
+                    .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
-//            // Write some frames to files for viewing.
-//            videoFrames
-//                    .filter(frame -> frame.frameNumber < 20)
-//                    .uid("write-file-filter")
-//                    .map(frame -> {
-//                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
-//                        log.info("Writing frame to {}", fileName);
-//                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
-//                            fos.write(frame.data);
-//                        }
-//                        return 0;
-//                    })
-//                    .uid("write-file-map")
-//                    .name("write-file-map");
-//
-//            // Parse image file and obtain metadata.
-//            DataStream<String> frameInfo = videoFrames
-//                    .map(frame -> {
-//                        InputStream inStream = new ByteArrayInputStream(frame.data);
-//                        BufferedImage inImage = ImageIO.read(inStream);
-//                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
-//                                frame.camera,
-//                                frame.frameNumber,
-//                                inImage.getWidth(),
-//                                inImage.getHeight(),
-//                                inImage.getColorModel().getNumColorComponents(),
-//                                frame.data.length,
-//                                inImage.toString());
-//                    })
-//                    .uid("frameInfo")
-//                    .name("frameInfo");
-//            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
+            // Write some frames to files for viewing.
+            videoFrames
+                    .filter(frame -> frame.frameNumber < 20)
+                    .uid("write-file-filter")
+                    .map(frame -> {
+                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
+                        log.info("Writing frame to {}", fileName);
+                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
+                            fos.write(frame.data);
+                        }
+                        return 0;
+                    })
+                    .uid("write-file-map")
+                    .name("write-file-map");
+
+            // Parse image file and obtain metadata.
+            DataStream<String> frameInfo = videoFrames
+                    .map(frame -> {
+                        InputStream inStream = new ByteArrayInputStream(frame.data);
+                        BufferedImage inImage = ImageIO.read(inStream);
+                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
+                                frame.camera,
+                                frame.frameNumber,
+                                inImage.getWidth(),
+                                inImage.getHeight(),
+                                inImage.getColorModel().getNumColorComponents(),
+                                frame.data.length,
+                                inImage.toString());
+                    })
+                    .uid("frameInfo")
+                    .name("frameInfo");
+            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);

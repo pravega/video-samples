@@ -52,7 +52,7 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .name("frameNumbers");
 
             // Generate a stream of video frames.
-            int[] cameras = new int[]{0, 1};
+            int[] cameras = new int[]{0, 1, 2, 3};
             int ssrc = new Random().nextInt();
             int width = 100;
             int height = width;
@@ -84,10 +84,13 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
 
-            // Drop some chunks.
-            chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera==0 && (f.frameNumber+1)%10==0 && f.chunkIndex==f.finalChunkIndex));
+            // Drop some chunks (for testing).
+            boolean dropChunks = false;
+            if (dropChunks) {
+                chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera == 0 && (f.frameNumber + 1) % 10 == 0 && f.chunkIndex == f.finalChunkIndex));
+            }
 
-            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
+//            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
