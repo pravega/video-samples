@@ -87,7 +87,7 @@ publishing {
                 username "nautilus"
                 password "password"
             }
-            url = "http://localhost:9090/maven2"
+            url = "http://localhost:9092/maven2"
         }
     }
 

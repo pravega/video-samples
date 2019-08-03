@@ -215,8 +215,8 @@ includePravegaCredentials=true
 Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib directory.
 
 ```
-PRAVEGA_CREDENTIALS_VERSION=0.5.0-2305.31c34b9-0.11.10-001.e597251
 sudo apt install maven
+PRAVEGA_CREDENTIALS_VERSION=0.5.0-2306.a5a5cdf-0.11.10-002.985e705
 mvn install:install-file \
 -Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
 -DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
@@ -305,7 +305,6 @@ Note that image backgrounds are filled with random bytes to make them incompress
 ```
 kubectl port-forward service/repo 9090:80 --namespace examples &
 ```
-
 
 2. Build and publish your application JAR file.
 ```

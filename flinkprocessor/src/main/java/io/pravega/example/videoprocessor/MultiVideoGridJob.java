@@ -93,12 +93,15 @@ public class MultiVideoGridJob extends AbstractJob {
             // Resize all input images. This will be performed in parallel.
             int imageWidth = 50;
             int imageHeight = imageWidth;
-            DataStream<VideoFrame> resizedVideoFrames = inVideoFrames.map(frame -> {
-                ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
-                frame.data = resizer.resize(frame.data);
-                frame.hash = null;
-                return frame;
-            });
+            DataStream<VideoFrame> resizedVideoFrames = inVideoFrames
+                    .map(frame -> {
+                        ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
+                        frame.data = resizer.resize(frame.data);
+                        frame.hash = null;
+                        return frame;
+                    })
+                    .uid("ImageResizer")
+                    .name("ImageResizer");
 //            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
 
             // Aggregate resized images.
@@ -159,6 +162,7 @@ public class MultiVideoGridJob extends AbstractJob {
         private final int camera;
         private final int ssrc;
         // frameNumber is part of the state. There is only a single partition so this can be an ordinary instance variable.
+        // TODO: Store frameNumber in Flink state to maintain value across restarts.
         private int frameNumber;
 
         public ImageAggregator(int imageWidth, int imageHeight, int camera, int ssrc) {

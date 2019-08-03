@@ -19,11 +19,11 @@ spec:
     - name: jobClass
       value: "io.pravega.example.videoprocessor.VideoDataGeneratorJob"
     - name: scope
-      value: {{ $.Release.Namespace }}
+      value: {{ $.Release.Namespace | quote }}
     - name: output-stream
-      value: {{ .Values.MultiVideoGridJob.input.stream }}
+      value: {{ .Values.MultiVideoGridJob.input.stream | quote }}
     - name: output-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.input.minNumSegments }}
+      value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
     - name: enableOperatorChaining
       value: "false"
 {{- end }}
