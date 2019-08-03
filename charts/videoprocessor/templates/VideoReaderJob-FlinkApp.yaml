@@ -10,20 +10,23 @@ metadata:
 spec:
   flinkVersion: 1.7.2
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  mainClass: io.pravega.example.videoprocessor.VideoReaderJob
 
   parallelism: {{ .Values.VideoReaderJob.parallelism }}
 
   state: started
 
   parameters:
-    - name: jobClass
-      value: "io.pravega.example.videoprocessor.VideoReaderJob"
+    - name: enableOperatorChaining
+      value: {{ .Values.VideoReaderJob.enableOperatorChaining | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: input-stream
       value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
     - name: input-minNumSegments
       value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
-    - name: enableOperatorChaining
-      value: "false"
+    - name: startAtTail
+      value: {{ .Values.VideoReaderJob.startAtTail | quote }}
+    - name: maxOutOfOrdernessMs
+      value: {{ .Values.VideoReaderJob.maxOutOfOrdernessMs | quote }}
 {{- end }}
