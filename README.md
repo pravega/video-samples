@@ -251,10 +251,8 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
 
 ### Running the Examples in IntelliJ
 
-Run the Flink video data generator job using the following parameters:
+Run the Flink `VideoDataGeneratorJob` using the following parameters:
 ```
---jobClass
-io.pravega.example.videoprocessor.VideoDataGeneratorJob
 --controller
 tcp://127.0.0.1:9090
 --output-minNumSegments
@@ -265,10 +263,8 @@ examples/video1
 
 Next, run a streaming Flink job that reads all video streams and combines them into a single video stream
 where each image is composed of the input images in a square grid. 
-Run the Flink app with the following parameters:
+Run the Flink `MultiVideoGridJob` with the following parameters:
 ```
---jobClass
-io.pravega.example.videoprocessor.MultiVideoGridJob
 --controller
 tcp://127.0.0.1:9090
 --parallelism
@@ -281,7 +277,7 @@ examples/video1
 examples/grid1
 ```
 
-Run the Flink video reader job using the following parameters:
+Run the Flink `VideoReaderJob` using the following parameters:
 ```
 --jobClass
 io.pravega.example.videoprocessor.VideoReaderJob
