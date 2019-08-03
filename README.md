@@ -303,7 +303,7 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 1. You must make the Maven repo in Nautilus available to your development workstation.
 ```
-kubectl port-forward service/repo 9090:80 --namespace examples &
+kubectl port-forward service/repo 9092:80 --namespace examples &
 ```
 
 2. Build and publish your application JAR file.
