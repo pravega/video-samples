@@ -15,17 +15,31 @@ mavenCoordinate:
 VideoDataGeneratorJob:
   enabled: true
   parallelism: 1
+  enableOperatorChaining: "false"
+  numCameras: 4
+  imageWidth: 100
+  framesPerSec: 1.0
+  chunkSizeBytes: 10240
 
 MultiVideoGridJob:
   enabled: true
   parallelism: 2
+  enableOperatorChaining: "false"
   input:
     stream: video1
     minNumSegments: 6
   output:
     stream: grid1
     minNumSegments: 3
+  imageWidth: 75
+  framesPerSec: 1.0
+  chunkSizeBytes: 524288
+  startAtTail: "true"
+  maxOutOfOrdernessMs: 1000
 
 VideoReaderJob:
   enabled: true
   parallelism: 2
+  enableOperatorChaining: "false"
+  startAtTail: "true"
+  maxOutOfOrdernessMs: 1000

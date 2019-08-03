@@ -13,7 +13,6 @@ package io.pravega.example.videoprocessor;
 import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.example.flinkprocessor.AbstractJob;
-import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
@@ -33,23 +32,41 @@ import java.io.InputStream;
 public class VideoReaderJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(VideoReaderJob.class);
 
-    public VideoReaderJob(AppConfiguration appConfiguration) {
-        super(appConfiguration);
+    /**
+     * The entry point for Flink applications.
+     *
+     * @param args Command line arguments
+     */
+    public static void main(String... args) {
+        VideoAppConfiguration config = new VideoAppConfiguration(args);
+        log.info("config: {}", config);
+        VideoReaderJob job = new VideoReaderJob(config);
+        job.run();
+    }
+
+    public VideoReaderJob(VideoAppConfiguration config) {
+        super(config);
+    }
+
+    @Override
+    public VideoAppConfiguration getConfig() {
+        return (VideoAppConfiguration) super.getConfig();
     }
 
     public void run() {
         try {
             final String jobName = VideoReaderJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
-            createStream(appConfiguration.getInputStreamConfig());
+            createStream(getConfig().getInputStreamConfig());
 
-            // Start at the current tail.
-            StreamCut startStreamCut = getStreamInfo(appConfiguration.getInputStreamConfig().stream).getTailStreamCut();
-//            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            if (getConfig().isStartAtTail()) {
+                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
+            }
 
             FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-                    .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
@@ -61,7 +78,8 @@ public class VideoReaderJob extends AbstractJob {
             // Assign timestamps and watermarks based on timestamp in each chunk.
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
-                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
+                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
                                 @Override
                                 public long extractTimestamp(ChunkedVideoFrame element) {
                                     return element.timestamp.getTime();

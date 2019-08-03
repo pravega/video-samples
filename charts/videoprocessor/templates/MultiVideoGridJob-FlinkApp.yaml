@@ -10,14 +10,15 @@ metadata:
 spec:
   flinkVersion: 1.7.2
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  mainClass: io.pravega.example.videoprocessor.MultiVideoGridJob
 
   parallelism: {{ .Values.MultiVideoGridJob.parallelism }}
 
   state: started
 
   parameters:
-    - name: jobClass
-      value: "io.pravega.example.videoprocessor.MultiVideoGridJob"
+    - name: enableOperatorChaining
+      value: {{ .Values.MultiVideoGridJob.enableOperatorChaining | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: input-stream
@@ -28,6 +29,14 @@ spec:
       value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
     - name: output-minNumSegments
       value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
-    - name: enableOperatorChaining
-      value: "false"
+    - name: imageWidth
+      value: {{ .Values.MultiVideoGridJob.imageWidth | quote }}
+    - name: framesPerSec
+      value: {{ .Values.MultiVideoGridJob.framesPerSec | quote }}
+    - name: chunkSizeBytes
+      value: {{ .Values.MultiVideoGridJob.chunkSizeBytes | quote }}
+    - name: startAtTail
+      value: {{ .Values.MultiVideoGridJob.startAtTail | quote }}
+    - name: maxOutOfOrdernessMs
+      value: {{ .Values.MultiVideoGridJob.maxOutOfOrdernessMs | quote }}
 {{- end }}

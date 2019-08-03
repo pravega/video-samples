@@ -13,7 +13,6 @@ package io.pravega.example.videoprocessor;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
-import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -26,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.Timestamp;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 /**
  * This job simulates writing video from multiple cameras to Pravega.
@@ -33,28 +33,44 @@ import java.util.Random;
 public class VideoDataGeneratorJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(VideoDataGeneratorJob.class);
 
-    public VideoDataGeneratorJob(AppConfiguration appConfiguration) {
-        super(appConfiguration);
+    /**
+     * The entry point for Flink applications.
+     *
+     * @param args Command line arguments
+     */
+    public static void main(String... args) {
+        VideoAppConfiguration config = new VideoAppConfiguration(args);
+        log.info("config: {}", config);
+        VideoDataGeneratorJob job = new VideoDataGeneratorJob(config);
+        job.run();
+    }
+
+    public VideoDataGeneratorJob(VideoAppConfiguration config) {
+        super(config);
+    }
+
+    @Override
+    public VideoAppConfiguration getConfig() {
+        return (VideoAppConfiguration) super.getConfig();
     }
 
     public void run() {
         try {
             final String jobName = VideoDataGeneratorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
-            createStream(appConfiguration.getOutputStreamConfig());
+            createStream(getConfig().getOutputStreamConfig());
 
             // Generate a stream of sequential frame numbers along with timestamps.
-            double framesPerSec = 1.0;
             DataStream<Tuple2<Integer,Long>> frameNumbers = env.fromCollection(
-                    new FrameNumberIterator(framesPerSec),
+                    new FrameNumberIterator(getConfig().getFramesPerSec()),
                     TypeInformation.of(new TypeHint<Tuple2<Integer,Long>>(){}))
                     .uid("frameNumbers")
                     .name("frameNumbers");
 
             // Generate a stream of video frames.
-            int[] cameras = new int[]{0, 1, 2, 3};
+            int[] cameras = IntStream.range(0, getConfig().getNumCameras()).toArray();
             int ssrc = new Random().nextInt();
-            int width = 100;
+            int width = getConfig().getImageWidth();
             int height = width;
             DataStream<VideoFrame> videoFrames =
                     frameNumbers.flatMap(new FlatMapFunction<Tuple2<Integer,Long>, VideoFrame>() {
@@ -77,16 +93,13 @@ public class VideoDataGeneratorJob extends AbstractJob {
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Split video frames into chunks of 1 MB or less. We must account for base-64 encoding, header fields, and JSON. Use 0.5 MB to be safe.
-            int chunkSizeBytes = 10*1024;
-//            int chunkSizeBytes = 512*1024;
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames
-                    .flatMap(new VideoFrameChunker(chunkSizeBytes))
+                    .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
 
             // Drop some chunks (for testing).
-            boolean dropChunks = true;
-            if (dropChunks) {
+            if (getConfig().isDropChunks()) {
                 chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera == 0 && (f.frameNumber + 1) % 10 == 0 && f.chunkIndex == f.finalChunkIndex));
             }
 
@@ -94,8 +107,8 @@ public class VideoDataGeneratorJob extends AbstractJob {
 
             // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-                    .forStream(appConfiguration.getOutputStreamConfig().stream)
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getOutputStreamConfig().getStream())
                     .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
                     .withEventRouter(frame -> String.format("%d", frame.camera))
                     .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
@@ -111,5 +124,4 @@ public class VideoDataGeneratorJob extends AbstractJob {
             throw new RuntimeException(e);
         }
     }
-
 }

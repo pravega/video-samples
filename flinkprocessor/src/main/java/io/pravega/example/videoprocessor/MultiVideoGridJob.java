@@ -15,7 +15,6 @@ import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
-import io.pravega.example.flinkprocessor.AppConfiguration;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -41,25 +40,43 @@ import static java.lang.Math.max;
 public class MultiVideoGridJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(MultiVideoGridJob.class);
 
-    public MultiVideoGridJob(AppConfiguration appConfiguration) {
-        super(appConfiguration);
+    /**
+     * The entry point for Flink applications.
+     *
+     * @param args Command line arguments
+     */
+    public static void main(String... args) {
+        VideoAppConfiguration config = new VideoAppConfiguration(args);
+        log.info("config: {}", config);
+        MultiVideoGridJob job = new MultiVideoGridJob(config);
+        job.run();
+    }
+
+    public MultiVideoGridJob(VideoAppConfiguration config) {
+        super(config);
+    }
+
+    @Override
+    public VideoAppConfiguration getConfig() {
+        return (VideoAppConfiguration) super.getConfig();
     }
 
     public void run() {
         try {
             final String jobName = MultiVideoGridJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
-            createStream(appConfiguration.getInputStreamConfig());
-            createStream(appConfiguration.getOutputStreamConfig());
+            createStream(getConfig().getInputStreamConfig());
+            createStream(getConfig().getOutputStreamConfig());
 
-            // Start at the current tail.
-            StreamCut startStreamCut = getStreamInfo(appConfiguration.getInputStreamConfig().stream).getTailStreamCut();
-//            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            if (getConfig().isStartAtTail()) {
+                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
+            }
 
             // Read chunked video frames from Pravega.
             FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-                    .forStream(appConfiguration.getInputStreamConfig().stream, startStreamCut, StreamCut.UNBOUNDED)
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
@@ -70,7 +87,8 @@ public class MultiVideoGridJob extends AbstractJob {
             // Assign timestamps and watermarks based on timestamp in each chunk.
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
-                        new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(Time.milliseconds(1000)) {
+                        new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
                             @Override
                             public long extractTimestamp(ChunkedVideoFrame element) {
                                 return element.timestamp.getTime();
@@ -91,7 +109,7 @@ public class MultiVideoGridJob extends AbstractJob {
             inVideoFrames.printToErr().uid("inVideoFrames-print").name("inVideoFrames-print");
 
             // Resize all input images. This will be performed in parallel.
-            int imageWidth = 50;
+            int imageWidth = getConfig().getImageWidth();
             int imageHeight = imageWidth;
             DataStream<VideoFrame> resizedVideoFrames = inVideoFrames
                     .map(frame -> {
@@ -108,10 +126,11 @@ public class MultiVideoGridJob extends AbstractJob {
             // For each time window, we take the last image from each camera.
             // Then these images are combined in a square grid.
             // To maintain ordering in the output images, we use parallelism of 1 for all subsequent operations.
+            long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             int camera = 1000;
             int ssrc = new Random().nextInt();
             DataStream<VideoFrame> outVideoFrames = resizedVideoFrames
-                    .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(500)))
+                    .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc))
                     .setParallelism(1)
                     .uid("ImageAggregator")
@@ -128,8 +147,8 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Write chunks to Pravega encoded as JSON.
             FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(appConfiguration.getPravegaConfig())
-                    .forStream(appConfiguration.getOutputStreamConfig().stream)
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getOutputStreamConfig().getStream())
                     .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
                     .withEventRouter(frame -> String.format("%d", frame.camera))
                     .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)

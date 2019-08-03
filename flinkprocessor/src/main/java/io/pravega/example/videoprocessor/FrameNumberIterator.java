@@ -38,7 +38,7 @@ public class FrameNumberIterator implements Iterator<Tuple2<Integer,Long>>, Seri
 
     @Override
     public Tuple2<Integer,Long> next() {
-        long timeMs = t0 + (long) (frameNumber * framesPerSec * 1000);
+        long timeMs = t0 + (long) (frameNumber * 1000 / framesPerSec);
         long sleepMs = timeMs - System.currentTimeMillis();
         if (sleepMs > 0) {
             try {

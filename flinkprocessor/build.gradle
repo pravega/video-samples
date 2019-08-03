@@ -21,7 +21,8 @@ group = "io.pravega.example.video"
 version = samplesVersion
 archivesBaseName = "video-flinkprocessor"
 description = "video-flinkprocessor"
-mainClassName = "io.pravega.example.flinkprocessor.ApplicationMain"
+// The default main class.
+mainClassName = "io.pravega.example.videoprocessor.VideoReaderJob"
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
