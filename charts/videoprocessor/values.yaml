@@ -3,9 +3,9 @@ flink:
     replicas: 1
     taskManager:
       replicas: 1
-      memory: 1024M
+      memory: 4G
       cpu: 900m
-      taskSlots: 3
+      taskSlots: 6
 
 mavenCoordinate:
   group: io.pravega.example.video
