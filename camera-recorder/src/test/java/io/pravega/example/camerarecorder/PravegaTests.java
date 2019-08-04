@@ -10,14 +10,14 @@
  */
 package io.pravega.example.camerarecorder;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.ClientFactory;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
+import io.pravega.client.stream.impl.ByteBufferSerializer;
 import io.pravega.client.stream.impl.UTF8StringSerializer;
 import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacv.CanvasFrame;
-import org.bytedeco.javacv.Frame;
-import org.bytedeco.javacv.OpenCVFrameGrabber;
+import org.bytedeco.javacv.*;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_videoio.VideoCapture;
@@ -28,7 +28,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.sql.Timestamp;
+import java.util.concurrent.CompletableFuture;
 
 public class PravegaTests {
     private static Logger log = LoggerFactory.getLogger(PravegaTests.class);
@@ -84,26 +87,116 @@ public class PravegaTests {
         // DC1394FrameGrabber, FlyCapture2FrameGrabber, OpenKinectFrameGrabber,
         // PS3EyeFrameGrabber, VideoInputFrameGrabber, and FFmpegFrameGrabber.
         final OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
+//        final FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(WEBCAM_DEVICE_INDEX);
         grabber.setImageWidth(captureWidth);
         grabber.setImageHeight(captureHeight);
         grabber.setFrameRate(15.0);
-        log.info("getFrameRate={}", grabber.getFrameRate());
+//        log.info("getFrameRate={}", grabber.getFrameRate());
+
         grabber.start();
-        log.info("getFrameRate={}", grabber.getFrameRate());
+
+        log.info("actual frame rate={}", grabber.getFrameRate());
+
+        OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
 
         final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
-        Frame capturedFrame = null;
+        Frame capturedFrame;
+        int frameNumber = 0;
         while ((capturedFrame = grabber.grab()) != null)
         {
             long timestamp = System.currentTimeMillis();
-            log.info("timestamp={}, capturedFrame={}", timestamp, capturedFrame);
+            log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
+
+            Mat mat = converterToMat.convert(capturedFrame);
+            BytePointer pngBytePointer = new BytePointer();
+            opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
+            log.info("pngBytePointer={}", pngBytePointer);
+            byte[] pngByteArray = pngBytePointer.getStringBytes();
+            Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
 
             if (cFrame.isVisible())
             {
                 // Show our frame in the preview
                 cFrame.showImage(capturedFrame);
             }
+
             Thread.sleep(500);
+            frameNumber++;
         }
+    }
+
+    @Test
+    @Ignore
+    public void Test5() throws Exception {
+        final int WEBCAM_DEVICE_INDEX = 1;
+        final int captureWidth = 320;
+        final int captureHeight = 240;
+
+        final OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
+        grabber.setImageWidth(captureWidth);
+        grabber.setImageHeight(captureHeight);
+        grabber.setFrameRate(15.0);
+
+        grabber.start();
+
+        log.info("actual frame rate={}", grabber.getFrameRate());
+
+        OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
+
+        final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
+        Frame capturedFrame;
+        int frameNumber = 0;
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        final URI controllerURI = new URI("tcp://10.246.21.231:9090");
+        String scope = "examples";
+        String streamName = "video1";
+        try (ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+             EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
+                     streamName,
+                     new ByteBufferSerializer(),
+                     EventWriterConfig.builder().build())) {
+
+            while ((capturedFrame = grabber.grab()) != null)
+            {
+                long timestamp = System.currentTimeMillis();
+                log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
+
+                Mat mat = converterToMat.convert(capturedFrame);
+                BytePointer pngBytePointer = new BytePointer();
+                opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
+                log.info("pngBytePointer={}", pngBytePointer);
+                byte[] pngByteArray = pngBytePointer.getStringBytes();
+                Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
+
+                VideoFrame videoFrame = new VideoFrame();
+                videoFrame.camera = 0;
+                videoFrame.ssrc = 0;
+                videoFrame.timestamp = new Timestamp(timestamp);
+                videoFrame.frameNumber = frameNumber;
+                videoFrame.data = pngByteArray;
+                videoFrame.hash = videoFrame.calculateHash();
+                ChunkedVideoFrame chunkedVideoFrame = new ChunkedVideoFrame(videoFrame);
+
+                ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(chunkedVideoFrame));
+
+                CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
+
+                if (cFrame.isVisible())
+                {
+                    // Show our frame in the preview
+                    cFrame.showImage(capturedFrame);
+                }
+
+                Thread.sleep(3000);
+
+                future.get();
+
+                frameNumber++;
+            }
+
+        }
+
     }
 }
