@@ -1,12 +1,3 @@
-flink:
-  cluster:
-    replicas: 1
-    taskManager:
-      replicas: 1
-      memory: 4G
-      cpu: 900m
-      taskSlots: 6
-
 mavenCoordinate:
   group: io.pravega.example.video
   artifact: flinkprocessor
@@ -20,6 +11,11 @@ VideoDataGeneratorJob:
   imageWidth: 100
   framesPerSec: 1.0
   chunkSizeBytes: 10240
+  taskManager:
+    replicas: 1
+    memory: 2G
+    cpu: 250m
+    taskSlots: 2
 
 MultiVideoGridJob:
   enabled: true
@@ -34,12 +30,22 @@ MultiVideoGridJob:
   imageWidth: 75
   framesPerSec: 1.0
   chunkSizeBytes: 524288
-  startAtTail: "true"
+  startAtTail: "false"
   maxOutOfOrdernessMs: 1000
+  taskManager:
+    replicas: 1
+    memory: 16G
+    cpu: 1000m
+    taskSlots: 4
 
 VideoReaderJob:
   enabled: true
   parallelism: 2
   enableOperatorChaining: "false"
-  startAtTail: "true"
+  startAtTail: "false"
   maxOutOfOrdernessMs: 1000
+  taskManager:
+    replicas: 1
+    memory: 4G
+    cpu: 250m
+    taskSlots: 2

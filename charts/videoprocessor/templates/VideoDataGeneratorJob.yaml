@@ -1,21 +1,51 @@
 {{- if .Values.VideoDataGeneratorJob.enabled }}
 apiVersion: flink.nautilus.dellemc.com/v1beta1
-kind: "FlinkApplication"
+kind: FlinkCluster
 metadata:
-  name: "video-data-generator-job"
+  name: video-data-generator
+  labels:
+    name: video-data-generator
+spec:
+  flinkVersion: 1.7.2
+  zookeeperUrl: zookeeper-client:2181
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ ReadWriteOnce ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    cpu: 250m
+  taskManager:
+    replicas: {{ .Values.VideoDataGeneratorJob.taskManager.replicas }}
+    memory: {{ .Values.VideoDataGeneratorJob.taskManager.memory }}
+    cpu: {{ .Values.VideoDataGeneratorJob.taskManager.cpu }}
+    numberOfTaskSlots: {{ .Values.VideoDataGeneratorJob.taskManager.taskSlots }}
+---
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  name: video-data-generator
   labels:
     app: videoprocessor
     component: VideoDataGeneratorJob
     release: {{ $.Release.Name }}
 spec:
   flinkVersion: 1.7.2
+  clusterSelector:
+    name: video-data-generator
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
   mainClass: io.pravega.example.videoprocessor.VideoDataGeneratorJob
-
   parallelism: {{ .Values.VideoDataGeneratorJob.parallelism }}
-
   state: started
-
   parameters:
     - name: enableOperatorChaining
       value: {{ .Values.VideoDataGeneratorJob.enableOperatorChaining | quote }}

@@ -1,21 +1,51 @@
 {{- if .Values.MultiVideoGridJob.enabled }}
 apiVersion: flink.nautilus.dellemc.com/v1beta1
-kind: "FlinkApplication"
+kind: FlinkCluster
 metadata:
-  name: "multi-video-grid-job"
+  name: multi-video-grid
+  labels:
+    name: multi-video-grid
+spec:
+  flinkVersion: 1.7.2
+  zookeeperUrl: zookeeper-client:2181
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ ReadWriteOnce ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    cpu: 250m
+  taskManager:
+    replicas: {{ .Values.MultiVideoGridJob.taskManager.replicas }}
+    memory: {{ .Values.MultiVideoGridJob.taskManager.memory }}
+    cpu: {{ .Values.MultiVideoGridJob.taskManager.cpu }}
+    numberOfTaskSlots: {{ .Values.MultiVideoGridJob.taskManager.taskSlots }}
+---
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  name: multi-video-grid
   labels:
     app: videoprocessor
     component: MultiVideoGridJob
     release: {{ $.Release.Name }}
 spec:
   flinkVersion: 1.7.2
+  clusterSelector:
+    name: multi-video-grid
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
   mainClass: io.pravega.example.videoprocessor.MultiVideoGridJob
-
   parallelism: {{ .Values.MultiVideoGridJob.parallelism }}
-
   state: started
-
   parameters:
     - name: enableOperatorChaining
       value: {{ .Values.MultiVideoGridJob.enableOperatorChaining | quote }}

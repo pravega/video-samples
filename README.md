@@ -325,22 +325,22 @@ available in one of several locations.
 Output written by the driver (e.g. directly called by `main()`) will be available in the job's log
 and can be viewed with the following command.
 ```
-kubectl logs jobs/video-data-generator-job-app-v1-1 -n examples | less
+kubectl logs jobs/video-data-generator-app-v1-1 -n examples | less
 ```
 
-Output written by operators (e.g. `map()`) will be available a Flink task manager log
+Output written by operators (e.g. `map()`) will be available in the Flink task manager log
 and can be viewed with the following command.
 ```
-kubectl logs examples-videoprocessor-flink-cluster-0-taskmanager-0 -n examples -c server | less
+kubectl logs video-data-generator-taskmanager-0 -n examples -c server | less
 ```
 
 When troubleshooting application issues, you should also review the Flink job manager log,
 which can be viewed with the following command.
 ```
-kubectl logs examples-videoprocessor-flink-cluster-0-jobmanager-0 -n examples -c server | less
+kubectl logs video-data-generator-jobmanager-0 -n examples -c server | less
 ```
 
-You may use the kubectl `--follow` and `--tail` flags.
+You may want to use the kubectl logs `--follow`, `--tail`, and `--previous` flags.
 You may also use the Kubernetes UI to view these logs.
 
 # References
