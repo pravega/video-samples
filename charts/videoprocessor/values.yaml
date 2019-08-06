@@ -19,20 +19,20 @@ VideoDataGeneratorJob:
 
 MultiVideoGridJob:
   enabled: true
-  parallelism: 2
+  parallelism: 1
   enableOperatorChaining: "false"
   input:
     stream: video1
-    minNumSegments: 6
+    minNumSegments: 1
   output:
     stream: grid1
-    minNumSegments: 3
+    minNumSegments: 1
   imageWidth: 75
   framesPerSec: 1.0
   chunkSizeBytes: 524288
   startAtTail: "false"
   maxOutOfOrdernessMs: 1000
-  checkpointIntervalMs: 60000
+  checkpointIntervalMs: 300000
   taskManager:
     replicas: 1
     memory: 16G
@@ -41,7 +41,7 @@ MultiVideoGridJob:
 
 VideoReaderJob:
   enabled: true
-  parallelism: 2
+  parallelism: 1
   enableOperatorChaining: "false"
   startAtTail: "false"
   maxOutOfOrdernessMs: 1000

@@ -319,6 +319,11 @@ Note: You may use the script `scripts/uninstall.sh` to delete your Flink applica
 
 ### Viewing Logs in Nautilus
 
+To troubleshoot a failed job, begin with the following command.
+```
+kubectl describe FlinkApplication -n examples multi-video-grid
+```
+
 When Flink applications write to stdout, stderr, or use slf4j logging, the output will be
 available in one of several locations.
 
@@ -342,6 +347,25 @@ kubectl logs video-data-generator-jobmanager-0 -n examples -c server | less
 
 You may want to use the kubectl logs `--follow`, `--tail`, and `--previous` flags.
 You may also use the Kubernetes UI to view these logs.
+
+# Limitations
+
+As of Pravega 0.5.0, the watermarks feature ((Issue 3344)[https://github.com/pravega/pravega/issues/3344])
+is not yet available. This means a Flink application that requires watermarks,
+for instance, one that uses event time windows, must assign watermarks using
+`assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor(1000))`.
+This generally works well when reading the most recent events at the tail of the stream.
+However, it generally fails to produce accurate watermarks when performing non-tail reads
+such as when reprocessing historical events or restarting from old checkpoints.
+
+Either of the following methods may provide a workaround for this limitation.
+
+- Set minNumSegments to 1 and disable segment scaling.
+  With only a single segment, `BoundedOutOfOrdernessTimestampExtractor` will work as expected.
+  This will limit stream throughput.
+  
+- Use a Flink batch job for any historical processing.
+  Configure Flink streaming jobs to begin at the tail of the input Pravega stream(s).
 
 # References
 
