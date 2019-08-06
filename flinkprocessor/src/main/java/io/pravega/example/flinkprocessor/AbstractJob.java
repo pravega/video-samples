@@ -76,8 +76,9 @@ public abstract class AbstractJob implements Runnable {
             env.disableOperatorChaining();
         }
         if(getConfig().isEnableCheckpoint()) {
-            long checkpointInterval = getConfig().getCheckpointInterval();
+            long checkpointInterval = getConfig().getCheckpointIntervalMs();
             env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE);
+            env.getCheckpointConfig().setCheckpointTimeout(getConfig().getCheckpointIntervalMs() * 2);
         }
         log.info("Parallelism={}, MaxParallelism={}", env.getParallelism(), env.getMaxParallelism());
 

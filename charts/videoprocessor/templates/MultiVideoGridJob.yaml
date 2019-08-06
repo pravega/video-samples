@@ -69,4 +69,6 @@ spec:
       value: {{ .Values.MultiVideoGridJob.startAtTail | quote }}
     - name: maxOutOfOrdernessMs
       value: {{ .Values.MultiVideoGridJob.maxOutOfOrdernessMs | quote }}
+    - name: checkpointIntervalMs
+      value: {{ .Values.MultiVideoGridJob.checkpointIntervalMs | quote }}
 {{- end }}

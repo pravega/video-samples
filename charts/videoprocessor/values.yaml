@@ -32,6 +32,7 @@ MultiVideoGridJob:
   chunkSizeBytes: 524288
   startAtTail: "false"
   maxOutOfOrdernessMs: 1000
+  checkpointIntervalMs: 60000
   taskManager:
     replicas: 1
     memory: 16G

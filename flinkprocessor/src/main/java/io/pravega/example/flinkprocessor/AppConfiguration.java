@@ -29,7 +29,7 @@ public class AppConfiguration {
     private final StreamConfig inputStreamConfig;
     private final StreamConfig outputStreamConfig;
     private final int parallelism;
-    private final long checkpointInterval;
+    private final long checkpointIntervalMs;
     private final boolean enableCheckpoint;
     private final boolean enableOperatorChaining;
     private final boolean enableRebalance;
@@ -44,7 +44,7 @@ public class AppConfiguration {
         inputStreamConfig = new StreamConfig(getPravegaConfig(),"input-",  getParams());
         outputStreamConfig = new StreamConfig(getPravegaConfig(),"output-",  getParams());
         parallelism = getParams().getInt("parallelism", 0);
-        checkpointInterval = getParams().getLong("checkpointInterval", 10000);     // milliseconds
+        checkpointIntervalMs = getParams().getLong("checkpointIntervalMs", 10000);
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
         enableRebalance = getParams().getBoolean("rebalance", false);
@@ -59,7 +59,7 @@ public class AppConfiguration {
                 ", inputStreamConfig=" + inputStreamConfig +
                 ", outputStreamConfig=" + outputStreamConfig +
                 ", parallelism=" + parallelism +
-                ", checkpointInterval=" + checkpointInterval +
+                ", checkpointIntervalMs=" + checkpointIntervalMs +
                 ", enableCheckpoint=" + enableCheckpoint +
                 ", enableOperatorChaining=" + enableOperatorChaining +
                 ", enableRebalance=" + enableRebalance +
@@ -88,8 +88,8 @@ public class AppConfiguration {
         return parallelism;
     }
 
-    public long getCheckpointInterval() {
-        return checkpointInterval;
+    public long getCheckpointIntervalMs() {
+        return checkpointIntervalMs;
     }
 
     public boolean isEnableCheckpoint() {
