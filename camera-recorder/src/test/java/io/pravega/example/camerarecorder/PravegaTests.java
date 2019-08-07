@@ -11,9 +11,12 @@
 package io.pravega.example.camerarecorder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
-import io.pravega.client.stream.EventStreamWriter;
-import io.pravega.client.stream.EventWriterConfig;
+import io.pravega.client.EventStreamClientFactory;
+import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.admin.StreamManager;
+import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
 import io.pravega.client.stream.impl.UTF8StringSerializer;
 import org.bytedeco.javacpp.BytePointer;
@@ -31,18 +34,34 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class PravegaTests {
     private static Logger log = LoggerFactory.getLogger(PravegaTests.class);
 
+    final private ClientConfig clientConfig;
+    final private String scope = "examples";
+    final private String streamName = "video2";
+
+    public PravegaTests() throws Exception {
+        URI controllerURI = new URI("tcp://10.246.21.231:9090");
+        clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
+    }
+
+    private void createStream() {
+        try (StreamManager streamManager = StreamManager.create(clientConfig)) {
+            streamManager.createStream(scope, streamName, StreamConfiguration.builder().build());
+        }
+    }
+
     @Test
     @Ignore
     public void Test1() throws Exception {
-        final URI controllerURI = new URI("tcp://10.246.21.231:9090");
-        String scope = "examples";
-        String streamName = "video1";
-        try (ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+        createStream();
+        try (ClientFactory clientFactory = ClientFactory.withScope(scope, clientConfig);
              EventStreamWriter<String> pravegaWriter = clientFactory.createEventWriter(
                      streamName,
                      new UTF8StringSerializer(),
@@ -86,7 +105,7 @@ public class PravegaTests {
         // The available FrameGrabber classes include OpenCVFrameGrabber (opencv_videoio),
         // DC1394FrameGrabber, FlyCapture2FrameGrabber, OpenKinectFrameGrabber,
         // PS3EyeFrameGrabber, VideoInputFrameGrabber, and FFmpegFrameGrabber.
-        final OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
+        final FrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
 //        final FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(WEBCAM_DEVICE_INDEX);
         grabber.setImageWidth(captureWidth);
         grabber.setImageHeight(captureHeight);
@@ -127,16 +146,19 @@ public class PravegaTests {
 
     @Test
     @Ignore
-    public void Test5() throws Exception {
-        final int WEBCAM_DEVICE_INDEX = 1;
+    public void TestCameraToPravega5() throws Exception {
+        createStream();
+        final int WEBCAM_DEVICE_INDEX = 0;
         final int captureWidth = 320;
         final int captureHeight = 240;
 
-        final OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
+        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
+        log.info("creating grabber");
+        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
         grabber.setImageWidth(captureWidth);
         grabber.setImageHeight(captureHeight);
         grabber.setFrameRate(15.0);
-
+        log.info("starting grabber");
         grabber.start();
 
         log.info("actual frame rate={}", grabber.getFrameRate());
@@ -149,10 +171,8 @@ public class PravegaTests {
 
         ObjectMapper mapper = new ObjectMapper();
 
-        final URI controllerURI = new URI("tcp://10.246.21.231:9090");
-        String scope = "examples";
-        String streamName = "video1";
-        try (ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+        int ssrc = new Random().nextInt();
+        try (ClientFactory clientFactory = ClientFactory.withScope(scope, clientConfig);
              EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                      streamName,
                      new ByteBufferSerializer(),
@@ -171,8 +191,8 @@ public class PravegaTests {
                 Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
 
                 VideoFrame videoFrame = new VideoFrame();
-                videoFrame.camera = 0;
-                videoFrame.ssrc = 0;
+                videoFrame.camera = 100;
+                videoFrame.ssrc = ssrc;
                 videoFrame.timestamp = new Timestamp(timestamp);
                 videoFrame.frameNumber = frameNumber;
                 videoFrame.data = pngByteArray;
@@ -197,6 +217,69 @@ public class PravegaTests {
             }
 
         }
+    }
 
+    @Test
+    @Ignore
+    public void TestCameraToScreen6() throws Exception {
+        final int WEBCAM_DEVICE_INDEX = 0;
+        final int captureWidth = 320;
+        final int captureHeight = 240;
+        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
+        log.info("creating grabber");
+        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
+        grabber.setImageWidth(captureWidth);
+        grabber.setImageHeight(captureHeight);
+        grabber.setFrameRate(15.0);
+        log.info("starting grabber");
+        grabber.start();
+        log.info("actual frame rate={}", grabber.getFrameRate());
+        final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
+        Frame capturedFrame;
+        int frameNumber = 0;
+        while ((capturedFrame = grabber.grab()) != null) {
+            long timestamp = System.currentTimeMillis();
+            log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
+            if (cFrame.isVisible()) {
+                // Show our frame in the preview
+                cFrame.showImage(capturedFrame);
+            }
+            Thread.sleep(3000);
+            frameNumber++;
+        }
+    }
+    @Test
+    @Ignore
+    public void TestPravegaToScreen7() throws Exception {
+        final long timeoutMs = 1000;
+        ObjectMapper mapper = new ObjectMapper();
+        final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega");
+        OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
+        final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+        final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+                .stream(Stream.of(scope, streamName))
+                .build();
+        try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
+            readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+        }
+        try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
+             EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
+                     readerGroup,
+                     new ByteBufferSerializer(),
+                     ReaderConfig.builder().build())) {
+            for (;;) {
+                EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
+                if (event.getEvent() != null) {
+                    ChunkedVideoFrame chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
+                    log.info("chunkedVideoFrame={}", chunkedVideoFrame);
+                    VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
+                    videoFrame.validateHash();
+                    Mat pngMat = new Mat(new BytePointer(videoFrame.data));
+                    Mat mat = opencv_imgcodecs.imdecode(pngMat, 0);
+                    Frame frame = converter.convert(mat);
+                    cFrame.showImage(frame);
+                }
+            }
+        }
     }
 }
