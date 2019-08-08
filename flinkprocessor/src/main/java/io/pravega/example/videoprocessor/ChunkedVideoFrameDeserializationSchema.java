@@ -10,6 +10,7 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.example.video.ChunkedVideoFrame;
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;

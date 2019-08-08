@@ -13,6 +13,8 @@ package io.pravega.example.videoprocessor;
 import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.video.VideoFrame;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;

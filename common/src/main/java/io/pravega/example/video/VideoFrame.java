@@ -8,7 +8,7 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.camerarecorder;
+package io.pravega.example.video;
 
 import java.security.DigestException;
 import java.security.MessageDigest;

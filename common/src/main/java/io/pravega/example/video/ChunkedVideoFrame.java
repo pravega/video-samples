@@ -8,7 +8,7 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.videoprocessor;
+package io.pravega.example.video;
 
 /**
  * Allows a VideoFrame to be split into smaller chunks.

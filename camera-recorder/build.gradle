@@ -38,6 +38,8 @@ repositories {
 }
 
 dependencies {
+    compile project(":common")
+    
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "ch.qos.logback:logback-classic:${logbackVersion}"
     compile "ch.qos.logback:logback-core:${logbackVersion}"

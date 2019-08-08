@@ -13,6 +13,8 @@ package io.pravega.example.videoprocessor;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.video.VideoFrame;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;

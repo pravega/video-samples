@@ -20,6 +20,8 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
 import io.pravega.client.stream.impl.UTF8StringSerializer;
+import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.video.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.*;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
