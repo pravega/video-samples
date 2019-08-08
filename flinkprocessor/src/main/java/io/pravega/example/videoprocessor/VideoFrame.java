@@ -53,13 +53,17 @@ public class VideoFrame {
 
     @Override
     public String toString() {
-        int sizeToPrint = data.length;
-        int maxSizeToPrint = 10;
-        if (sizeToPrint > maxSizeToPrint) {
-            sizeToPrint = maxSizeToPrint;
+        String dataStr = "null";
+        int dataLength = 0;
+        if (data != null) {
+            dataLength = data.length;
+            int sizeToPrint = dataLength;
+            int maxSizeToPrint = 10;
+            if (sizeToPrint > maxSizeToPrint) {
+                sizeToPrint = maxSizeToPrint;
+            }
+            dataStr = Arrays.toString(Arrays.copyOf(data, sizeToPrint));
         }
-        byte[] dataBytes = Arrays.copyOf(data, sizeToPrint);
-        String dataStr = Arrays.toString(dataBytes);
         String tagsStr = "null";
         if (tags != null) {
             tagsStr = tags.keySet().stream()
@@ -73,7 +77,7 @@ public class VideoFrame {
                 ", frameNumber=" + frameNumber +
                 ", tags=" + tagsStr +
                 ", hash=" + Arrays.toString(hash) +
-                ", data(" + data.length + ")=" + dataStr +
+                ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }
 
