@@ -28,5 +28,7 @@ repositories {
 }
 
 dependencies {
+    compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
+    compile "io.pravega:pravega-client:${pravegaVersion}"    
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }

@@ -52,7 +52,7 @@ public class PravegaTests {
     final private String controllerURIStr = "tcp://nautilus-pravega-controller.vpn4-demo.nautilus-lab-uranium.com:9090";
 
     public PravegaTests() throws Exception {
-        URI controllerURI = new URI(controllerURIStr);
+        URI controllerURI = URI.create(controllerURIStr);
         clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
     }
 
@@ -255,6 +255,7 @@ public class PravegaTests {
             frameNumber++;
         }
     }
+
     @Test
     @Ignore
     public void TestPravegaToScreen7() throws Exception {
