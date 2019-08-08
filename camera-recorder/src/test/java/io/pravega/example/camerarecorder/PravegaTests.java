@@ -45,7 +45,7 @@ public class PravegaTests {
 
     final private ClientConfig clientConfig;
     final private String scope = "examples";
-    final private String streamName = "video1";
+    private String streamName = "video1";
 //    final private String controllerURIStr = "tcp://10.246.21.231:9090";
     final private String controllerURIStr = "tcp://nautilus-pravega-controller.vpn4-demo.nautilus-lab-uranium.com:9090";
 
@@ -155,9 +155,10 @@ public class PravegaTests {
         final int captureWidth = 320;
         final int captureHeight = 240;
 
-        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
+//        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
         log.info("creating grabber");
-        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
+//        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
+        final FrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
         grabber.setImageWidth(captureWidth);
         grabber.setImageHeight(captureHeight);
         grabber.setFrameRate(15.0);
@@ -191,10 +192,10 @@ public class PravegaTests {
                 opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
                 log.info("pngBytePointer={}", pngBytePointer);
                 byte[] pngByteArray = pngBytePointer.getStringBytes();
-                Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
+//                Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
 
                 VideoFrame videoFrame = new VideoFrame();
-                videoFrame.camera = 100;
+                videoFrame.camera = 8;
                 videoFrame.ssrc = ssrc;
                 videoFrame.timestamp = new Timestamp(timestamp);
                 videoFrame.frameNumber = frameNumber;
@@ -228,9 +229,10 @@ public class PravegaTests {
         final int WEBCAM_DEVICE_INDEX = 0;
         final int captureWidth = 320;
         final int captureHeight = 240;
-        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
+//        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
         log.info("creating grabber");
-        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
+//        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
+        final FrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
         grabber.setImageWidth(captureWidth);
         grabber.setImageHeight(captureHeight);
         grabber.setFrameRate(15.0);
@@ -254,6 +256,7 @@ public class PravegaTests {
     @Test
     @Ignore
     public void TestPravegaToScreen7() throws Exception {
+        streamName = "grid1";
         StreamInfo streamInfo;
         try (StreamManager streamManager = StreamManager.create(clientConfig)) {
             streamInfo = streamManager.getStreamInfo(scope, streamName);
