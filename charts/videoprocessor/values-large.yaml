@@ -1,0 +1,3 @@
+VideoDataGeneratorJob:
+  imageWidth: 424
+  chunkSizeBytes: 524288

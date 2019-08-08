@@ -7,4 +7,5 @@ NAMESPACE=${NAMESPACE:-examples}
 helm upgrade --install --timeout 600 --wait --debug \
 ${NAMESPACE}-videoprocessor \
 --namespace ${NAMESPACE} \
-${ROOT_DIR}/charts/videoprocessor
+${ROOT_DIR}/charts/videoprocessor \
+$@
