@@ -15,6 +15,7 @@ import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
@@ -44,10 +45,12 @@ public class PravegaTests {
 
     final private ClientConfig clientConfig;
     final private String scope = "examples";
-    final private String streamName = "video2";
+    final private String streamName = "video1";
+//    final private String controllerURIStr = "tcp://10.246.21.231:9090";
+    final private String controllerURIStr = "tcp://nautilus-pravega-controller.vpn4-demo.nautilus-lab-uranium.com:9090";
 
     public PravegaTests() throws Exception {
-        URI controllerURI = new URI("tcp://10.246.21.231:9090");
+        URI controllerURI = new URI(controllerURIStr);
         clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
     }
 
@@ -251,13 +254,17 @@ public class PravegaTests {
     @Test
     @Ignore
     public void TestPravegaToScreen7() throws Exception {
+        StreamInfo streamInfo;
+        try (StreamManager streamManager = StreamManager.create(clientConfig)) {
+            streamInfo = streamManager.getStreamInfo(scope, streamName);
+        }
         final long timeoutMs = 1000;
         ObjectMapper mapper = new ObjectMapper();
         final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega");
         OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
         final String readerGroup = UUID.randomUUID().toString().replace("-", "");
         final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
-                .stream(Stream.of(scope, streamName))
+                .stream(Stream.of(scope, streamName), streamInfo.getTailStreamCut(), StreamCut.UNBOUNDED)
                 .build();
         try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
             readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
