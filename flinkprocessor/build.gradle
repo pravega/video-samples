@@ -85,10 +85,10 @@ publishing {
     repositories {
         maven {
             credentials {
-                username "nautilus"
-                password "password"
+                username userName
+                password passWord
             }
-            url = "http://localhost:9092/maven2"
+            url projectRepoUrl
         }
     }
 
