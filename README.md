@@ -348,6 +348,41 @@ kubectl logs video-data-generator-jobmanager-0 -n examples -c server | less
 You may want to use the kubectl logs `--follow`, `--tail`, and `--previous` flags.
 You may also use the Kubernetes UI to view these logs.
 
+## Camera Recorder Application
+
+The Camera Recorder application reads images from a USB camera and writes them to
+a Pravega stream.
+It uses the same video encoding protocol as the Flink applications in this project.
+It currently does not support chunking so each image must be less than 1 MB after JSON encoding.
+
+To start it:
+```
+export PRAVEGA_CONTROLLER_URI=tcp://127.0.0.1:9090
+export OUTPUT_STREAM_NAME=video1
+./gradlew camera-recorder:run
+```
+
+See (AppConfiguration.java)[camera-recorder/src/main/java/io/pravega/example/camerarecorder/AppConfiguration.java]
+for more options.
+
+## Video Player Application
+
+The Video Player application reads images from a Pravega stream and displays
+them in a window on the screen.
+It uses the same video encoding protocol as the Flink applications in this project.
+It currently does not support images split over multiple chunks.
+
+To start it:
+```
+export PRAVEGA_CONTROLLER_URI=tcp://127.0.0.1:9090
+export INPUT_STREAM_NAME=grid1
+export CAMERA=1000
+./gradlew video-player:run
+```
+
+See (AppConfiguration.java)[video-player/src/main/java/io/pravega/example/videoplayer/AppConfiguration.java]
+for more options.
+
 # Limitations
 
 As of Pravega 0.5.0, the watermarks feature ((Issue 3344)[https://github.com/pravega/pravega/issues/3344])
