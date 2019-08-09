@@ -25,7 +25,9 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
@@ -99,7 +101,9 @@ public class CameraRecorder implements Runnable {
                     opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
                     log.info("pngBytePointer={}", pngBytePointer);
                     byte[] pngByteArray = pngBytePointer.getStringBytes();
-//                Files.write((new File(String.format("capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
+                    if (false) {
+                        Files.write((new File(String.format("capture-%05d.png", frameNumber))).toPath(), pngByteArray);
+                    }
 
                     // Create VideoFrame. We assume that it fits in a single chunk (< 1 MB).
                     VideoFrame videoFrame = new VideoFrame();

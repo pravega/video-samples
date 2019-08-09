@@ -1,6 +1,6 @@
 VideoDataGeneratorJob:
   parallelism: 4
-  imageWidth: 424
+  imageWidth: 100
   chunkSizeBytes: 524288
   taskManager:
     replicas: 1
@@ -13,7 +13,7 @@ MultiVideoGridJob:
   parallelism: 4
   input:
     stream: video1
-    minNumSegments: 6
+    minNumSegments: 1
   output:
     stream: grid1
     minNumSegments: 1

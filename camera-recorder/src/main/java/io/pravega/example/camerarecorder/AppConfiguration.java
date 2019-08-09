@@ -11,11 +11,11 @@ public class AppConfiguration extends PravegaAppConfiguration {
 
     public AppConfiguration(String[] args) {
         super(args);
-        imageWidth = Integer.parseInt(getEnvVar("IMAGE_WIDTH", "320"));
-        imageHeight = Integer.parseInt(getEnvVar("IMAGE_HEIGHT", "200"));
-        framesPerSec = Double.parseDouble(getEnvVar("FRAMES_PER_SEC", "0.25"));
+        imageWidth = Integer.parseInt(getEnvVar("IMAGE_WIDTH", "160"));
+        imageHeight = Integer.parseInt(getEnvVar("IMAGE_HEIGHT", "100"));
+        framesPerSec = Double.parseDouble(getEnvVar("FRAMES_PER_SEC", "2.0"));
         cameraDeviceNumber = Integer.parseInt(getEnvVar("CAMERA_DEVICE_NUMBER", "0"));
-        camera = Integer.parseInt(getEnvVar("CAMERA", "8"));
+        camera = Integer.parseInt(getEnvVar("CAMERA", "3"));
     }
 
     public int getImageWidth() {

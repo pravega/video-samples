@@ -7,7 +7,7 @@ VideoDataGeneratorJob:
   enabled: true
   parallelism: 1
   enableOperatorChaining: "false"
-  numCameras: 4
+  numCameras: 3
   imageWidth: 100
   framesPerSec: 1.0
   chunkSizeBytes: 10240

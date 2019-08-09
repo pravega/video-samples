@@ -241,6 +241,7 @@ public class PravegaTests {
         log.info("starting grabber");
         grabber.start();
         log.info("actual frame rate={}", grabber.getFrameRate());
+        log.info("canvas gamma={}, grabber gamma={}", CanvasFrame.getDefaultGamma(), grabber.getGamma());
         final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
         Frame capturedFrame;
         int frameNumber = 0;
@@ -251,7 +252,7 @@ public class PravegaTests {
                 // Show our frame in the preview
                 cFrame.showImage(capturedFrame);
             }
-            Thread.sleep(3000);
+            Thread.sleep(100);
             frameNumber++;
         }
     }
