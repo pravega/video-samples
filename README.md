@@ -313,9 +313,15 @@ scripts/deploy-k8s-components.sh
 scripts/deploy-k8s-components.sh
 ```
 
-Note: If you make changes to the source code, you may redeploy your application by repeating steps 2 to 3.
+You can edit the file (charts/videoprocessor/values.yaml)[charts/videoprocessor/values.yaml]
+to change various parameters such as the image dimensions, frames per second, and
+number of cameras.
+If you make changes to the source code or values.yaml, you may redeploy your application by repeating steps 2 to 3.
+When you do this, you will see the current Flink applications save their state in a savepoint,
+terminate, restart with the new JAR file, and resume from the last savepoint.
 
 Note: You may use the script `scripts/uninstall.sh` to delete your Flink application and cluster.
+This will also delete any savepoints.
 
 ### Viewing Logs in Nautilus
 

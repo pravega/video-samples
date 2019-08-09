@@ -89,6 +89,7 @@ public class VideoPlayer implements Runnable {
                     if (event.getEvent() != null) {
                         ChunkedVideoFrame chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
                         log.info("chunkedVideoFrame={}", chunkedVideoFrame);
+                        // TODO: Reassemble multiple chunks - see ChunkedVideoFrameReassembler
                         VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
                             videoFrame.validateHash();
