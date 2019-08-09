@@ -13,7 +13,10 @@ package io.pravega.example.videoprocessor;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.video.VideoFrame;
 import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -67,12 +70,10 @@ public class VideoDataGeneratorJob extends AbstractJob {
                     .uid("frameNumbers")
                     .name("frameNumbers");
 
-            // Generate a stream of video frames.
+            // Generate a stream of empty video frames.
             int[] cameras = IntStream.range(0, getConfig().getNumCameras()).toArray();
             int ssrc = new Random().nextInt();
-            int width = getConfig().getImageWidth();
-            int height = width;
-            DataStream<VideoFrame> videoFrames =
+            DataStream<VideoFrame> emptyVideoFrames =
                     frameNumbers.flatMap(new FlatMapFunction<Tuple2<Integer,Long>, VideoFrame>() {
                         @Override
                         public void flatMap(Tuple2<Integer,Long> in, Collector<VideoFrame> out) {
@@ -82,15 +83,28 @@ public class VideoDataGeneratorJob extends AbstractJob {
                                 frame.ssrc = ssrc + camera;
                                 frame.timestamp = new Timestamp(in.f1);
                                 frame.frameNumber = in.f0;
-                                frame.data = new ImageGenerator(width, height).generate(frame.camera, frame.frameNumber);
-                                frame.hash = frame.calculateHash();
                                 out.collect(frame);
                             }
                         }
                     })
+                    .setParallelism(1)
+                    .uid("emptyVideoFrames")
+                    .name("emptyVideoFrames");
+            emptyVideoFrames.printToErr().uid("emptyVideoFrames-print").name("emptyVideoFrames-print");
+
+            // Generate images in parallel.
+            int width = getConfig().getImageWidth();
+            int height = width;
+            DataStream<VideoFrame> videoFrames = emptyVideoFrames
+                    .keyBy("camera")
+                    .map((frame) -> {
+                        frame.data = new ImageGenerator(width, height).generate(frame.camera, frame.frameNumber);
+                        frame.hash = frame.calculateHash();
+                        return frame;
+                    })
                     .uid("videoFrames")
                     .name("videoFrames");
-            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
+//            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Split video frames into chunks of 1 MB or less. We must account for base-64 encoding, header fields, and JSON. Use 0.5 MB to be safe.
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = videoFrames

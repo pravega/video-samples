@@ -10,7 +10,9 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.example.video.ChunkedVideoFrame;
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -19,7 +21,8 @@ import java.io.IOException;
  * Deserializes ChunkedVideoFrame from JSON.
  */
 public class ChunkedVideoFrameDeserializationSchema extends AbstractDeserializationSchema<ChunkedVideoFrame> {
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Override
     public ChunkedVideoFrame deserialize(byte[] message) throws IOException {
