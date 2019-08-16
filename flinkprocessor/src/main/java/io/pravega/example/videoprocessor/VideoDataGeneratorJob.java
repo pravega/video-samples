@@ -16,7 +16,6 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.video.ChunkedVideoFrame;
 import io.pravega.example.video.VideoFrame;
 import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -61,7 +60,9 @@ public class VideoDataGeneratorJob extends AbstractJob {
         try {
             final String jobName = VideoDataGeneratorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
-            createStream(getConfig().getOutputStreamConfig());
+            if (getConfig().isWriteToPravega()) {
+                createStream(getConfig().getOutputStreamConfig());
+                }
 
             // Generate a stream of sequential frame numbers along with timestamps.
             DataStream<Tuple2<Integer,Long>> frameNumbers = env.fromCollection(
@@ -117,20 +118,25 @@ public class VideoDataGeneratorJob extends AbstractJob {
                 chunkedVideoFrames = chunkedVideoFrames.filter(f -> !(f.camera == 0 && (f.frameNumber + 1) % 10 == 0 && f.chunkIndex == f.finalChunkIndex));
             }
 
-//            chunkedVideoFrames.printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
+            // Print to screen a small subset.
+            chunkedVideoFrames
+                    .filter(f -> f.camera == 0 && f.frameNumber % 10 == 0)
+                    .printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.
-            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
-                    .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getOutputStreamConfig().getStream())
-                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
-                    .withEventRouter(frame -> String.format("%d", frame.camera))
-                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
-                    .build();
-            chunkedVideoFrames
-                    .addSink(flinkPravegaWriter)
-                    .uid("output-sink")
-                    .name("output-sink");
+            if (getConfig().isWriteToPravega()) {
+                FlinkPravegaWriter<ChunkedVideoFrame> sink = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+                        .withPravegaConfig(getConfig().getPravegaConfig())
+                        .forStream(getConfig().getOutputStreamConfig().getStream())
+                        .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
+                        .withEventRouter(frame -> String.format("%d", frame.camera))
+                        .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
+                        .build();
+                chunkedVideoFrames
+                        .addSink(sink)
+                        .uid("output-sink")
+                        .name("output-sink");
+            }
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);

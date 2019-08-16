@@ -47,6 +47,8 @@ spec:
   parallelism: {{ .Values.VideoDataGeneratorJob.parallelism }}
   state: started
   parameters:
+    - name: enableCheckpoint
+      value: "false"
     - name: enableOperatorChaining
       value: {{ .Values.VideoDataGeneratorJob.enableOperatorChaining | quote }}
     - name: scope
@@ -63,4 +65,6 @@ spec:
       value: {{ .Values.VideoDataGeneratorJob.framesPerSec | quote }}
     - name: chunkSizeBytes
       value: {{ .Values.VideoDataGeneratorJob.chunkSizeBytes | quote }}
+#    - name: writeToPravega
+#      value: "false"
 {{- end }}

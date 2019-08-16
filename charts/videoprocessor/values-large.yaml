@@ -1,22 +1,23 @@
 VideoDataGeneratorJob:
-#  parallelism: 4
-  numCameras: 4
+  parallelism: 12
+  enableOperatorChaining: "true"
+  numCameras: 48
   imageWidth: 367 # ok
   #imageWidth: 450 # kinda ok
-  #imageWidth:  550 # data generator lags
+#  imageWidth: 550 # data generator lags
   chunkSizeBytes: 524288
-#  taskManager:
-#    replicas: 1
-#    memory: 2G
-#    cpu: 1000m
-#    taskSlots: 4
+  taskManager:
+    replicas: 4
+    memory: 2G
+    cpu: 1500m
+    taskSlots: 3
 
-#MultiVideoGridJob:
-#  enabled: false
+MultiVideoGridJob:
+  enabled: false
 #  parallelism: 4
-#  input:
-#    stream: video1
-#    minNumSegments: 1
+  input:
+    stream: video1
+    minNumSegments: 12
 #  output:
 #    stream: grid1
 #    minNumSegments: 1
@@ -26,5 +27,5 @@ VideoDataGeneratorJob:
 #    cpu: 1000m
 #    taskSlots: 4
 
-#VideoReaderJob:
-#  enabled: false
+VideoReaderJob:
+  enabled: false
