@@ -1,0 +1,51 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fio-1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Gi
+  storageClassName: standard
+  volumeMode: Filesystem
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: fio-1
+spec:
+  containers:
+    - name: fio
+      image: ljishen/fio:3.6
+      resources:
+        limits:
+          cpu: "4"
+          memory: "4Gi"
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+      args:
+        - "--status-interval=10"
+        - "--runtime=10m"
+        - "--time_based"
+        - "--kb_base=1000"
+        - "--name=job1"
+        - "--rw=write"
+        - "--numjobs=1"
+        - "--iodepth=1"
+        - "--directory=/data"
+        - "--ioengine=libaio"
+        - "--filesize=10GiB"
+        - "--nrfiles=1"
+        - "--bs=1024KiB"
+        - "--fsync=1"
+      volumeMounts:
+        - mountPath: /data
+          name: data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: fio-1

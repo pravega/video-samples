@@ -1,0 +1,30 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: bmrk-1
+spec:
+  serviceAccount: examples-pravega
+  containers:
+    - name: benchmark
+      #image: nautperf/bmrk:3-0.5.0s
+      image: nautperf/bmrk:0.5.0-2299.8779f22s
+#      image: nautperf/bmrk:0.5.0-2305
+      imagePullPolicy: Always
+      resources:
+        limits:
+          #cpu: "4"
+          cpu: "2"
+          memory: "4Gi"
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+      args: [bash, -c, 'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 100; done']
+      env:
+        - name: CONTROLLER_URI
+          value:  tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g"
+        - name: pravega_client_auth_method
+          value: Bearer
+        - name: pravega_client_auth_loadDynamic
+          value: "true"
