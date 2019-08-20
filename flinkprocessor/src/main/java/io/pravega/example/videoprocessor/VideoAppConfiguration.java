@@ -27,6 +27,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     private final boolean dropChunks;
     private final double framesPerSec;
     private final boolean writeToPravega;
+    private final boolean useCachedFrame;
 
     public VideoAppConfiguration(String[] args) {
         super(args);
@@ -36,6 +37,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         dropChunks = getParams().getBoolean("dropChunks", false);
         framesPerSec = getParams().getDouble("framesPerSec", 1.0);
         writeToPravega = getParams().getBoolean("writeToPravega", true);
+        useCachedFrame = getParams().getBoolean("useCachedFrame", false);
     }
 
     @Override
@@ -48,6 +50,7 @@ public class VideoAppConfiguration extends AppConfiguration {
                 ", dropChunks=" + dropChunks +
                 ", framesPerSec=" + framesPerSec +
                 ", writeToPravega=" + writeToPravega +
+                ", useCachedFrame=" + useCachedFrame +
                 '}';
     }
 
@@ -73,5 +76,9 @@ public class VideoAppConfiguration extends AppConfiguration {
 
     public boolean isWriteToPravega() {
         return writeToPravega;
+    }
+
+    public boolean isUseCachedFrame() {
+        return useCachedFrame;
     }
 }

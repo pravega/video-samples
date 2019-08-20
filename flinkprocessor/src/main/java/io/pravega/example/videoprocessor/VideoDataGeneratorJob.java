@@ -96,15 +96,14 @@ public class VideoDataGeneratorJob extends AbstractJob {
             // Generate images in parallel.
             final int width = getConfig().getImageWidth();
             final int height = width;
-            final boolean isUseCachedFrame = true;
-            byte[] cachedFrameData;
-            byte[] cachedFrameHash;
+            final boolean isUseCachedFrame = getConfig().isUseCachedFrame();
+            VideoFrame cachedFrame = new VideoFrame();
             if (isUseCachedFrame) {
-                VideoFrame cachedFrame = new VideoFrame();
                 cachedFrame.data = new ImageGenerator(width, height).generate(0, 0);
-                cachedFrameData = cachedFrame.data;
-                cachedFrameHash = cachedFrame.calculateHash();
+                cachedFrame.hash = cachedFrame.calculateHash();
             }
+            final byte[] cachedFrameData = cachedFrame.data;
+            final byte[] cachedFrameHash = cachedFrame.hash;
             DataStream<VideoFrame> videoFrames = emptyVideoFrames
                     .keyBy("camera")
                     .map((frame) -> {
