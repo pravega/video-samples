@@ -65,6 +65,8 @@ spec:
       value: {{ .Values.VideoDataGeneratorJob.framesPerSec | quote }}
     - name: chunkSizeBytes
       value: {{ .Values.VideoDataGeneratorJob.chunkSizeBytes | quote }}
+    - name: useCachedFrame
+      value: {{ .Values.VideoDataGeneratorJob.useCachedFrame | quote }}
 #    - name: writeToPravega
 #      value: "false"
 {{- end }}

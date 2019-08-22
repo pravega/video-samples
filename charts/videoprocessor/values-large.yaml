@@ -1,7 +1,8 @@
 VideoDataGeneratorJob:
   parallelism: 12
   enableOperatorChaining: "true"
-  numCameras: 72
+  useCachedFrame: "true"
+  numCameras: 96
   imageWidth: 367 # ok
   #imageWidth: 450 # kinda ok
 #  imageWidth: 550 # data generator lags
