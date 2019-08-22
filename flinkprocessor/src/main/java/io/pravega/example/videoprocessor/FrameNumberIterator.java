@@ -10,9 +10,14 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Bucket4j;
 import org.apache.flink.api.java.tuple.Tuple2;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.Iterator;
 
 /**
@@ -21,12 +26,32 @@ import java.util.Iterator;
  * Used to generate sample video data.
  */
 public class FrameNumberIterator implements Iterator<Tuple2<Integer,Long>>, Serializable {
-    private double framesPerSec;
+    private final double framesPerSec;
+    private final long burstFrames;
     private int frameNumber;
-    private long t0;
+    private transient Bucket tokenBucket;
 
-    public FrameNumberIterator(double framesPerSec) {
+    public FrameNumberIterator(double framesPerSec, long burstFrames) {
         this.framesPerSec = framesPerSec;
+        this.burstFrames = burstFrames;
+        initializeTokenBucket();
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        initializeTokenBucket();
+    }
+
+    /**
+     * Create token bucket to allow a burst of burstFrames and a normal rate of framesPerSec.
+     * 1 token = 1 frame
+     */
+    private void initializeTokenBucket() {
+        final double burstSec = burstFrames / framesPerSec;
+        final Bandwidth limit = Bandwidth.simple(burstFrames, Duration.ofMillis((long) (1000*burstSec)));
+        tokenBucket = Bucket4j.builder().addLimit(limit).build();
+        // Start with an empty bucket to allow a ramp up.
+        tokenBucket.tryConsumeAsMuchAsPossible();
     }
 
     @Override
@@ -36,18 +61,9 @@ public class FrameNumberIterator implements Iterator<Tuple2<Integer,Long>>, Seri
 
     @Override
     public Tuple2<Integer,Long> next() {
-        if (t0 == 0) {
-            t0 = System.currentTimeMillis();
-        }
-        long timeMs = t0 + (long) (frameNumber * 1000 / framesPerSec);
-        long sleepMs = timeMs - System.currentTimeMillis();
-        if (sleepMs > 0) {
-            try {
-                Thread.sleep(sleepMs);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        // Wait for the token bucket to fill up. This limits the maximum rate.
+        tokenBucket.asScheduler().consumeUninterruptibly(1);
+        long timeMs = System.currentTimeMillis();
         Tuple2<Integer,Long> result = new Tuple2<Integer,Long>(frameNumber, timeMs);
         frameNumber++;
         return result;

@@ -56,6 +56,8 @@ dependencies {
         compile "io.pravega:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
     }
 
+    compile "com.github.vladimir-bukhtoyarov:bucket4j-core:${bucket4jVersion}"
+
     testCompile "org.apache.flink:flink-test-utils_${flinkScalaVersion}:${flinkVersion}"
     testCompile "junit:junit:${junitVersion}"
 }

@@ -66,7 +66,7 @@ public class VideoDataGeneratorJob extends AbstractJob {
 
             // Generate a stream of sequential frame numbers along with timestamps.
             DataStream<Tuple2<Integer,Long>> frameNumbers = env.fromCollection(
-                    new FrameNumberIterator(getConfig().getFramesPerSec()),
+                    new FrameNumberIterator(getConfig().getFramesPerSec(), 10),
                     TypeInformation.of(new TypeHint<Tuple2<Integer,Long>>(){}))
                     .uid("frameNumbers")
                     .name("frameNumbers");
