@@ -17,6 +17,9 @@ import org.apache.flink.api.java.utils.ParameterTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.flink.api.common.ExecutionConfig.PARALLELISM_DEFAULT;
+import static org.apache.flink.api.common.ExecutionConfig.PARALLELISM_UNKNOWN;
+
 /**
  * A generic configuration class for Flink Pravega applications.
  * This class can be extended for job-specific configuration parameters.
@@ -29,6 +32,7 @@ public class AppConfiguration {
     private final StreamConfig inputStreamConfig;
     private final StreamConfig outputStreamConfig;
     private final int parallelism;
+    private final int readerParallelism;
     private final long checkpointIntervalMs;
     private final boolean enableCheckpoint;
     private final boolean enableOperatorChaining;
@@ -43,7 +47,8 @@ public class AppConfiguration {
         pravegaConfig = PravegaConfig.fromParams(getParams()).withDefaultScope(defaultScope);
         inputStreamConfig = new StreamConfig(getPravegaConfig(),"input-",  getParams());
         outputStreamConfig = new StreamConfig(getPravegaConfig(),"output-",  getParams());
-        parallelism = getParams().getInt("parallelism", 0);
+        parallelism = getParams().getInt("parallelism", PARALLELISM_UNKNOWN);
+        readerParallelism = getParams().getInt("readerParallelism", PARALLELISM_DEFAULT);
         checkpointIntervalMs = getParams().getLong("checkpointIntervalMs", 10000);
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
@@ -59,6 +64,7 @@ public class AppConfiguration {
                 ", inputStreamConfig=" + inputStreamConfig +
                 ", outputStreamConfig=" + outputStreamConfig +
                 ", parallelism=" + parallelism +
+                ", readerParallelism=" + readerParallelism +
                 ", checkpointIntervalMs=" + checkpointIntervalMs +
                 ", enableCheckpoint=" + enableCheckpoint +
                 ", enableOperatorChaining=" + enableOperatorChaining +
@@ -86,6 +92,10 @@ public class AppConfiguration {
 
     public int getParallelism() {
         return parallelism;
+    }
+
+    public int getReaderParallelism() {
+        return readerParallelism;
     }
 
     public long getCheckpointIntervalMs() {

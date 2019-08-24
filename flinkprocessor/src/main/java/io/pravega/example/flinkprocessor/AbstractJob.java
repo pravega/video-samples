@@ -68,10 +68,7 @@ public abstract class AbstractJob implements Runnable {
 
     public StreamExecutionEnvironment initializeFlinkStreaming() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        int parallelism = getConfig().getParallelism();
-        if (parallelism > 0) {
-            env.setParallelism(parallelism);
-        }
+        env.setParallelism(getConfig().getParallelism());
         if (!getConfig().isEnableOperatorChaining()) {
             env.disableOperatorChaining();
         }

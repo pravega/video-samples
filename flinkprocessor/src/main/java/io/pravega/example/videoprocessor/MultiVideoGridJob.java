@@ -83,6 +83,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .build();
             DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
+                    .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
                     .name("input-source");
 

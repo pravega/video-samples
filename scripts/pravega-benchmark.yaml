@@ -3,7 +3,7 @@ apiVersion: batch/v1
 metadata:
   name: pravega-benchmark
 spec:
-  parallelism: 5
+  parallelism: 4
   template:
     spec:
       serviceAccount: examples-pravega

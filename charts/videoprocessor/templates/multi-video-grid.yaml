@@ -47,6 +47,8 @@ spec:
   parallelism: {{ .Values.MultiVideoGridJob.parallelism }}
   state: started
   parameters:
+    - name: readerParallelism
+      value: {{ .Values.MultiVideoGridJob.readerParallelism | quote }}
     - name: enableOperatorChaining
       value: {{ .Values.MultiVideoGridJob.enableOperatorChaining | quote }}
     - name: scope
