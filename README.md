@@ -3,7 +3,7 @@
 
 ## Overview
 
-![grid-sample](images/grid-sample.png)
+![grid-sample](images/video-samples-diagram.png)
 
 This project demonstrates methods to store, process, and read video with Pravega and Flink.
 
