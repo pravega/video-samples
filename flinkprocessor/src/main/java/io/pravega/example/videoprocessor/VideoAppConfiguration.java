@@ -28,6 +28,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     private final double framesPerSec;
     private final boolean writeToPravega;
     private final boolean useCachedFrame;
+    private final StreamConfig sensorStreamConfig;
 
     public VideoAppConfiguration(String[] args) {
         super(args);
@@ -38,6 +39,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         framesPerSec = getParams().getDouble("framesPerSec", 1.0);
         writeToPravega = getParams().getBoolean("writeToPravega", true);
         useCachedFrame = getParams().getBoolean("useCachedFrame", false);
+        sensorStreamConfig = new StreamConfig(getPravegaConfig(),"sensor-",  getParams());
     }
 
     @Override
@@ -51,6 +53,7 @@ public class VideoAppConfiguration extends AppConfiguration {
                 ", framesPerSec=" + framesPerSec +
                 ", writeToPravega=" + writeToPravega +
                 ", useCachedFrame=" + useCachedFrame +
+                ", sensorStreamConfig=" + sensorStreamConfig +
                 '}';
     }
 
@@ -80,5 +83,9 @@ public class VideoAppConfiguration extends AppConfiguration {
 
     public boolean isUseCachedFrame() {
         return useCachedFrame;
+    }
+
+    public StreamConfig getSensorStreamConfig() {
+        return sensorStreamConfig;
     }
 }
