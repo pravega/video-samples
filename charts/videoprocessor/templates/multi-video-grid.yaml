@@ -6,7 +6,8 @@ metadata:
   labels:
     name: multi-video-grid
 spec:
-  flinkVersion: 1.7.2
+  imageRef:
+    name: 1.7.2
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:

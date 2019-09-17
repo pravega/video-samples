@@ -6,7 +6,8 @@ metadata:
   labels:
     name: video-data-generator
 spec:
-  flinkVersion: 1.7.2
+  imageRef:
+    name: 1.7.2
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:

@@ -76,7 +76,7 @@ In the command below, replace x.x.x.x with the IP address of a local network int
 cd
 git clone https://github.com/pravega/pravega
 cd pravega
-git checkout r0.5
+git checkout cd6bfe7
 ./gradlew docker
 cd docker/compose
 export HOST_IP=x.x.x.x
@@ -113,12 +113,12 @@ This can be skipped in Nautilus SDK Desktop as it has already been performed.
 cd
 git clone https://github.com/pravega/pravega
 pushd pravega
-git checkout r0.5
+git checkout cd6bfe7
 ./gradlew install
 popd
 git clone https://github.com/pravega/flink-connectors
 pushd flink-connectors
-git checkout r0.5
+git checkout 9e3fa4d74e6648168047d312d4c9a607990cf56d
 ./gradlew install
 popd
 ```
@@ -139,7 +139,7 @@ Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib direc
 
 ```
 sudo apt install maven
-PRAVEGA_CREDENTIALS_VERSION=0.5.0-2306.a5a5cdf-0.11.10-002.985e705
+PRAVEGA_CREDENTIALS_VERSION=0.6.0-2345.298015f-0.12.0-W5-001.4e5c9a1
 mvn install:install-file \
 -Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
 -DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
