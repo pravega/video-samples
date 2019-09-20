@@ -11,6 +11,6 @@
 rootProject.name = "video-samples"
 
 include "camera-recorder"
-include 'common'
+include "common"
 include "flinkprocessor"
-include 'video-player'
+include "video-player"

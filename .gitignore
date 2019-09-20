@@ -6,10 +6,10 @@
 *.json
 *.log
 .nfs*
-build
-ca-certificates/
+build/
+ca-certificates/*
 !ca-certificates/README.txt
 data/
-lib/
+lib/*
 !lib/README.txt
 out/
