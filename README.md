@@ -99,8 +99,8 @@ the standalone container using the following commands.
 
 ```
 export HOST_IP=x.x.x.x
-docker run -it --rm -e HOST_IP -p 9090:9090 -p 9091:9091 -p 12345:12345 pravega/pravega:latest standalone
-curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:9091/v1/scopes
+docker run -it --rm -e HOST_IP -p 9090:9090 -p 10080:9091 -p 12345:12345 pravega/pravega:latest standalone
+curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:10080/v1/scopes
 ```
 
 ### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries
