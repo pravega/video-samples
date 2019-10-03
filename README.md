@@ -170,7 +170,9 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
   `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
 
 - External:
-  (provided by the Nautilus administrator)
+  Run the following command and find the external IP:
+  `kubectl get -n nautilus-pravega svc/nautilus-pravega-controller`
+  The Pravega Controller URL will be `tcp://EXTERNAL-IP:9090`
 
 ### Running the Examples in IntelliJ
 
