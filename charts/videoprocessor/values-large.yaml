@@ -1,21 +1,22 @@
 VideoDataGeneratorJob:
-  parallelism: 12
+  parallelism: 6
   enableOperatorChaining: "true"
   useCachedFrame: "true"
-  numCameras: 96
+  numCameras: 150 #96
   imageWidth: 450
   chunkSizeBytes: 524288
+  framesPerSec: 3.0
   taskManager:
-    replicas: 4
+    replicas: 3
     memory: 2G
-    cpu: 1500m
-    taskSlots: 3
+    cpu: 2000m
+    taskSlots: 2
 
 MultiVideoGridJob:
   enabled: false
   input:
-    stream: video1
-    minNumSegments: 42
+    stream: video3
+    minNumSegments: 96
 
 VideoReaderJob:
   enabled: false
