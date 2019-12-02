@@ -1,6 +1,6 @@
 package io.pravega.example.camerarecorder;
 
-import io.pravega.example.video.PravegaAppConfiguration;
+import io.pravega.example.common.PravegaAppConfiguration;
 
 public class AppConfiguration extends PravegaAppConfiguration {
     private final int imageWidth;
@@ -13,7 +13,7 @@ public class AppConfiguration extends PravegaAppConfiguration {
         super(args);
         imageWidth = Integer.parseInt(getEnvVar("IMAGE_WIDTH", "160"));
         imageHeight = Integer.parseInt(getEnvVar("IMAGE_HEIGHT", "100"));
-        framesPerSec = Double.parseDouble(getEnvVar("FRAMES_PER_SEC", "2.0"));
+        framesPerSec = Double.parseDouble(getEnvVar("FRAMES_PER_SEC", "5.0"));
         cameraDeviceNumber = Integer.parseInt(getEnvVar("CAMERA_DEVICE_NUMBER", "0"));
         camera = Integer.parseInt(getEnvVar("CAMERA", "3"));
     }

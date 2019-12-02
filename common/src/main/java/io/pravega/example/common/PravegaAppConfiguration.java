@@ -8,7 +8,7 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.video;
+package io.pravega.example.common;
 
 import io.pravega.client.ClientConfig;
 import io.pravega.client.stream.ScalingPolicy;
@@ -30,14 +30,22 @@ public class PravegaAppConfiguration {
     private final StreamConfig inputStreamConfig;
     private final StreamConfig outputStreamConfig;
     private final boolean startAtTail;
+    private final boolean pravega_standalone;
+
+
 
     public PravegaAppConfiguration(String[] args) {
+
+//        URI controllerURI = URI.create(getEnvVar("PRAVEGA_CONTROLLER_URI", "tcp://10.247.115.55:9090"));
         URI controllerURI = URI.create(getEnvVar("PRAVEGA_CONTROLLER_URI", "tcp://localhost:9090"));
+        System.out.println("fkin controlleruri " + controllerURI);
         clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
-        defaultScope = getEnvVar("PRAVEGA_SCOPE", "examples");
+        defaultScope = getEnvVar("PRAVEGA_SCOPE", "video-demo");
         inputStreamConfig = new StreamConfig(defaultScope,"INPUT_");
         outputStreamConfig = new StreamConfig(defaultScope,"OUTPUT_");
         startAtTail = Boolean.parseBoolean(getEnvVar("START_AT_TAIL", "true"));
+        pravega_standalone = Boolean.parseBoolean(getEnvVar("PRAVEGA_STANDALONE", "true"));   //changed
+
     }
 
     @Override
@@ -59,6 +67,7 @@ public class PravegaAppConfiguration {
         return defaultScope;
     }
 
+
     public StreamConfig getInputStreamConfig() {
         return inputStreamConfig;
     }
@@ -71,6 +80,10 @@ public class PravegaAppConfiguration {
         return startAtTail;
     }
 
+    public boolean isPravegaStandalonel() {
+        return pravega_standalone;
+    }
+
     public static class StreamConfig {
         private final Stream stream;
         private final int targetRate;
@@ -78,7 +91,7 @@ public class PravegaAppConfiguration {
         private final int minNumSegments;
 
         public StreamConfig(String defaultScope, String prefix) {
-            String streamName = getEnvVar(prefix + "STREAM_NAME", "default");
+            String streamName = getEnvVar(prefix + "STREAM_NAME", "video-demo-stream");
             stream = Stream.of(defaultScope, streamName);
             targetRate = Integer.parseInt(getEnvVar(prefix + "TARGET_RATE_KB_PER_SEC", "100000"));
             scaleFactor = Integer.parseInt(getEnvVar(prefix + "SCALE_FACTOR", "2"));
@@ -105,7 +118,9 @@ public class PravegaAppConfiguration {
     }
 
     protected static String getEnvVar(String name, String defaultValue) {
-        String value = System.getenv(name);
+//        System.out.println(System.getenv("controllerURI"));
+        String value = System.getProperty(name);
+
         if (value == null || value.isEmpty()) {
             return defaultValue;
         }

@@ -10,11 +10,17 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.Utils;
+import io.pravega.example.common.VideoFrame;
+import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.tensorflow.TFObjectDetector;
+import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
-import io.pravega.example.flinkprocessor.AbstractJob;
-import io.pravega.example.common.ChunkedVideoFrame;
-import io.pravega.example.common.VideoFrame;
+import io.pravega.connectors.flink.FlinkPravegaWriter;
+import io.pravega.connectors.flink.PravegaEventRouter;
+import io.pravega.connectors.flink.serialization.PravegaSerialization;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
@@ -22,31 +28,32 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
+import java.io.IOException;
+
+//import sun.net.www.content.image.png;
 
 /**
- * This job reads a video stream from Pravega and writes frame metadata to the console.
+ * This job reads and writes a video stream from Pravega and writes frame metadata to the console.
  */
-public class VideoReaderJob extends AbstractJob {
-    private static Logger log = LoggerFactory.getLogger(VideoReaderJob.class);
+public class FlinkObjectDetectorJob extends AbstractJob {
+    // Logger initialization
+    private static Logger log = LoggerFactory.getLogger(FlinkObjectDetectorJob.class);
+    final TFObjectDetector objectDetector = new TFObjectDetector();
+
 
     /**
      * The entry point for Flink applications.
      *
      * @param args Command line arguments
      */
-    public static void main(String... args) {
+    public static void main(String[] args) throws IOException, InterruptedException {
         VideoAppConfiguration config = new VideoAppConfiguration(args);
         log.info("config: {}", config);
-        VideoReaderJob job = new VideoReaderJob(config);
+        FlinkObjectDetectorJob job = new FlinkObjectDetectorJob(config);
         job.run();
     }
 
-    public VideoReaderJob(VideoAppConfiguration config) {
+    public FlinkObjectDetectorJob(VideoAppConfiguration config) throws IOException, InterruptedException {
         super(config);
     }
 
@@ -57,7 +64,8 @@ public class VideoReaderJob extends AbstractJob {
 
     public void run() {
         try {
-            final String jobName = VideoReaderJob.class.getName();
+            long start = System.currentTimeMillis();
+            final String jobName = FlinkObjectDetectorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
 
@@ -71,11 +79,11 @@ public class VideoReaderJob extends AbstractJob {
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
+
             DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-//            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
             DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
@@ -89,7 +97,7 @@ public class VideoReaderJob extends AbstractJob {
                             })
                     .uid("assignTimestampsAndWatermarks")
                     .name("assignTimestampsAndWatermarks");
-//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
+            // inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Reassemble whole video frames from chunks.
             boolean failOnError = false;
@@ -99,25 +107,10 @@ public class VideoReaderJob extends AbstractJob {
                     .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
-            videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
-
-            // Write some frames to files for viewing.
-            videoFrames
-                    .filter(frame -> frame.frameNumber < 20)
-                    .uid("write-file-filter")
-                    .map(frame -> {
-                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
-                        log.info("Writing frame to {}", fileName);
-                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
-                            fos.write(frame.data);
-                        }
-                        return 0;
-                    })
-                    .uid("write-file-map")
-                    .name("write-file-map");
+            // videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Parse image file and obtain metadata.
-            DataStream<String> frameInfo = videoFrames
+           /* DataStream<String> frameInfo = videoFrames
                     .map(frame -> {
                         InputStream inStream = new ByteArrayInputStream(frame.data);
                         BufferedImage inImage = ImageIO.read(inStream);
@@ -131,8 +124,37 @@ public class VideoReaderJob extends AbstractJob {
                                 inImage.toString());
                     })
                     .uid("frameInfo")
-                    .name("frameInfo");
-            frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
+                    .name("frameInfo");*/
+            //  frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
+
+            //  identify objects with YOLOv3
+           DataStream<VideoFrame> objectDetectedFrames = videoFrames
+                    .map(frame -> {
+                        frame.data = TFObjectDetector.getInstance().detect(frame.data);
+//                      frame.recognitions = new ArrayList<Recognition>();
+//                      for(Recognition rec : TFObjectDetector.getInstance().getRecognitions()) {
+//                          frame.recognitions.add(rec);
+//                      }
+                        return frame;
+                    });
+            objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
+
+            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
+
+            // create the Pravega sink to write a stream of video frames
+            FlinkPravegaWriter<VideoFrame> writer = FlinkPravegaWriter.<VideoFrame>builder()
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(output_stream)
+                    .withEventRouter(new EventRouter())
+                    .withSerializationSchema(PravegaSerialization.serializationFor(VideoFrame.class))
+                    .build();
+
+
+            objectDetectedFrames.addSink(writer).name("video-objects-detected");
+//            videoFrames.addSink(writer).name("video-objects-detected");
+
+            long end = System.currentTimeMillis();
+            System.out.println("@@@@@@@@@@@  TIME TAKEN FOR FLINK PROCESS @@@@@@@@@@@  "+(end - start));
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
@@ -140,4 +162,17 @@ public class VideoReaderJob extends AbstractJob {
             throw new RuntimeException(e);
         }
     }
+
+    /*
+     * Event Router class
+     */
+    public static class EventRouter implements PravegaEventRouter<VideoFrame> {
+        // Ordering - events with the same routing key will always be
+        // read in the order they were written
+        @Override
+        public String getRoutingKey(VideoFrame event) {
+            return "SomeRoutingKey";
+        }
+    }
+
 }

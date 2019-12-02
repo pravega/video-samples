@@ -8,7 +8,7 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.video;
+package io.pravega.example.common;
 
 import java.sql.Timestamp;
 
