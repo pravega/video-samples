@@ -1,10 +1,10 @@
-{{- if .Values.VideoReaderJob.enabled }}
+{{- if .Values.FlinkObjectDetectorJob.enabled }}
 apiVersion: flink.nautilus.dellemc.com/v1beta1
 kind: FlinkCluster
 metadata:
-  name: video-reader
+  name: flink-object-detector
   labels:
-    name: video-reader
+    name: flink-object-detector
 spec:
   flinkVersion: 1.7.2
   zookeeperUrl: zookeeper-client:2181
@@ -25,38 +25,35 @@ spec:
     memory: 1024M
     cpu: 250m
   taskManager:
-    replicas: {{ .Values.VideoReaderJob.taskManager.replicas }}
-    memory: {{ .Values.VideoReaderJob.taskManager.memory }}
-    cpu: {{ .Values.VideoReaderJob.taskManager.cpu }}
-    numberOfTaskSlots: {{ .Values.VideoReaderJob.taskManager.taskSlots }}
+    replicas: {{ .Values.FlinkObjectDetectorJob.taskManager.replicas }}
+    memory: {{ .Values.FlinkObjectDetectorJob.taskManager.memory }}
+    cpu: {{ .Values.FlinkObjectDetectorJob.taskManager.cpu }}
+    numberOfTaskSlots: {{ .Values.FlinkObjectDetectorJob.taskManager.taskSlots }}
 ---
 apiVersion: flink.nautilus.dellemc.com/v1beta1
 kind: FlinkApplication
 metadata:
-  name: video-reader
+  name: flink-object-detector
   labels:
     app: videoprocessor
-    component: VideoReaderJob
+    component: FlinkObjectDetectorJob
     release: {{ $.Release.Name }}
 spec:
   flinkVersion: 1.7.2
+  imageRef: cuda10.0flink1.7.2v3
   clusterSelector:
-    name: video-reader
+    name: flink-object-detector
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
-  mainClass: io.pravega.example.videoprocessor.VideoReaderJob
-  parallelism: {{ .Values.VideoReaderJob.parallelism }}
+  mainClass: io.pravega.example.videoprocessor.FlinkObjectDetectorJob
+  parallelism: {{ .Values.FlinkObjectDetectorJob.parallelism }}
   state: started
   parameters:
     - name: enableOperatorChaining
-      value: {{ .Values.VideoReaderJob.enableOperatorChaining | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.enableOperatorChaining | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
-    - name: input-stream
-      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
-    - name: input-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
     - name: startAtTail
-      value: {{ .Values.VideoReaderJob.startAtTail | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}
     - name: maxOutOfOrdernessMs
-      value: {{ .Values.VideoReaderJob.maxOutOfOrdernessMs | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.maxOutOfOrdernessMs | quote }}
 {{- end }}

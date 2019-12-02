@@ -1,6 +1,6 @@
 package io.pravega.example.videoprocessor;
 
-import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.common.ChunkedVideoFrame;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

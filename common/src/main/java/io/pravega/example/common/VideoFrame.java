@@ -8,20 +8,25 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.video;
+package io.pravega.example.common;
 
+import io.pravega.example.tensorflow.Recognition;
+
+import java.io.Serializable;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * A class for storing a single video frame.
  */
-public class VideoFrame {
+public class VideoFrame implements Serializable {
     // Unique ID for this video stream.
     public int camera;
     // Random source identifier used to avoid corruption if multiple sources use the same camera and timestamp.
@@ -38,6 +43,8 @@ public class VideoFrame {
     // Arbitrary user-defined key/value pairs.
     public Map<String,String> tags;
 
+    public List<Recognition> recognitions = new ArrayList<>();
+
     public VideoFrame() {
     }
 
@@ -49,6 +56,7 @@ public class VideoFrame {
         this.data = frame.data;
         this.hash = frame.hash;
         this.tags = frame.tags;
+//        this.recognitions = frame.recognitions;
     }
 
     @Override
@@ -77,6 +85,7 @@ public class VideoFrame {
                 ", frameNumber=" + frameNumber +
                 ", tags=" + tagsStr +
                 ", hash=" + Arrays.toString(hash) +
+                ", recognitions=" + recognitions.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

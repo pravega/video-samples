@@ -9,33 +9,27 @@
  *
  */
 
-apply plugin: "java"
-apply plugin: "application"
+plugins {
+    id 'com.github.johnrengelman.shadow'
+}
 
-group = "io.pravega.example.video"
+apply plugin: "java"
+apply plugin: "maven"
+apply plugin: "application"
+apply plugin: "maven-publish"
+
+group = "io.pravega.example"
 version = samplesVersion
 archivesBaseName = "video-player"
 description = "video-player"
-mainClassName = "io.pravega.example.videoplayer.VideoPlayer"
+mainClassName = "io.pravega.example.videoplayer.PravegaReaderVideoPlayer"
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven {
-        url "https://repository.apache.org/snapshots"
-    }
-    maven {
-        url "https://oss.sonatype.org/content/repositories/snapshots"
-    }
-    maven {
-        url "https://oss.jfrog.org/jfrog-dependencies"
-    }
-}
 
 dependencies {
-    compile project(":common")
+    compile project(':common')
+
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "ch.qos.logback:logback-classic:${logbackVersion}"
     compile "ch.qos.logback:logback-core:${logbackVersion}"
@@ -43,7 +37,7 @@ dependencies {
     compile "org.bytedeco:javacv-platform:1.5.1"
     compile "io.pravega:pravega-client:${pravegaVersion}"
     if (includePravegaCredentials.toBoolean()) {
-        compile "io.pravega:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+        compile "com.dellemc.nautilus:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
     }
     testCompile "junit:junit:${junitVersion}"
 }
@@ -58,4 +52,8 @@ distributions {
             }
         }
     }
+}
+
+shadowJar {
+    zip64 true
 }

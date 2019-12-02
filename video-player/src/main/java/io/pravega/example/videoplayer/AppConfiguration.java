@@ -1,6 +1,6 @@
 package io.pravega.example.videoplayer;
 
-import io.pravega.example.video.PravegaAppConfiguration;
+import io.pravega.example.common.PravegaAppConfiguration;
 
 public class AppConfiguration extends PravegaAppConfiguration {
     private final int camera;
