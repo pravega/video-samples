@@ -103,11 +103,12 @@ docker run -it --rm -e HOST_IP -p 9090:9090 -p 10080:9091 -p 12345:12345 pravega
 curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:10080/v1/scopes
 ```
 
-### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries
+### (Local only) Install Pravega Client and Pravega Flink Connector Libraries
 
 This step is required when using pre-release versions of Pravega and/or Nautilus.
 It will install required libraries in the local Maven repository.
 This can be skipped in Nautilus SDK Desktop as it has already been performed.
+This can also be skipped with 0.13-W11 release
 
 ```
 cd
@@ -133,22 +134,9 @@ If necessary, edit the file `gradle.properties` to include the following line.
 includePravegaCredentials=true
 ```
 
-### (External) Configure Nautilus Authentication
-
-Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib directory.
-
-```
-sudo apt install maven
-PRAVEGA_CREDENTIALS_VERSION=0.6.0-2345.298015f-0.12.0-W5-001.4e5c9a1
-mvn install:install-file \
--Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
--DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
--Dversion=${PRAVEGA_CREDENTIALS_VERSION} -Dpackaging=jar
-```
-
 Obtain the Pravega authentication credentials.
 ```
-kubectl get secret examples-pravega -n examples -o jsonpath="{.data.keycloak\.json}" | base64 -d > ${HOME}/keycloak.json
+PROJECT=examples ; kubectl get secret ${PROJECT}-pravega -n ${PROJECT} -o jsonpath="{.data.keycloak\.json}" | base64 -d | python -m json.tool > ~/keycloak.json
 chmod go-rw ${HOME}/keycloak.json
 ```
 
@@ -172,7 +160,7 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
 - External:
   Run the following command and find the external IP:
   `kubectl get -n nautilus-pravega svc/nautilus-pravega-controller`
-  The Pravega Controller URL will be `tcp://EXTERNAL-IP:9090`
+  The Pravega Controller URL will be `tls://EXTERNAL-IP:443`
 
 ### Running the Examples in IntelliJ
 
