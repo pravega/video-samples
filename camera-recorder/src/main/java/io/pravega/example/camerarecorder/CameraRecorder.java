@@ -135,7 +135,7 @@ public class CameraRecorder implements Runnable {
                     Thread.sleep((long) (1000.0 / getConfig().getFramesPerSec()));
 
                     // Make sure frame has been durably persisted to Pravega.
-                    future.get();
+//                    future.get();
 
                     frameNumber++;
                 }
