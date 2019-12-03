@@ -44,7 +44,7 @@ public class AppConfiguration {
         params = ParameterTool.fromArgs(args);
 
         log.info("Parameter Tool: {}", getParams().toMap());
-        String defaultScope = getParams().get("scope", "video-demo");
+        String defaultScope = getParams().get("scope", "object-detection");
 
 
         pravegaConfig = PravegaConfig.fromParams(getParams()).withDefaultScope(defaultScope);

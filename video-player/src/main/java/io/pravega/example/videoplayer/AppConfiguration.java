@@ -7,7 +7,7 @@ public class AppConfiguration extends PravegaAppConfiguration {
 
     public AppConfiguration(String[] args) {
         super(args);
-        camera = Integer.parseInt(getEnvVar("CAMERA", "1000"));
+        camera = Integer.parseInt(getEnvVar("CAMERA", "3"));
     }
 
     @Override

@@ -12,6 +12,7 @@ package io.pravega.example.camerarecorder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.EventStreamClientFactory;
+import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
@@ -57,6 +58,12 @@ public class CameraRecorder implements Runnable {
 
     public void run() {
         try {
+            if (getConfig().isPravegaStandalonel()) {
+                try (StreamManager streamManager = StreamManager.create(getConfig().getClientConfig())) {
+                    streamManager.createScope(getConfig().getDefaultScope());
+                }
+            }
+
             // Initialize camera.
             final int captureWidth = getConfig().getImageWidth();
             final int captureHeight = getConfig().getImageHeight();
