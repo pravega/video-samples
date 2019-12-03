@@ -8,7 +8,7 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-package io.pravega.example.videoplayer;
+package  io.pravega.example.videoplayer;
 
 import io.pravega.example.common.CommonParams;
 import io.pravega.example.common.Utils;
@@ -140,6 +140,8 @@ public class PravegaReaderVideoPlayer implements Runnable {
                     EventRead<VideoFrame> event = reader.readNextEvent(timeoutMs);
                     if (event.getEvent() != null) {
                         VideoFrame videoFrame = event.getEvent();;
+                        System.out.print("videoframe camera: " + videoFrame.camera);
+                        System.out.print("config camera: " + getConfig().getCamera());
                         if (videoFrame.camera == getConfig().getCamera()) {
                             count++;
                             log.info("============== @@@@@  RESULT VIDEO   @@@@@@@@=============== "+videoFrame.frameNumber  );
