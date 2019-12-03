@@ -47,7 +47,7 @@ dependencies {
     compile "ch.qos.logback:logback-classic:${logbackVersion}"
     compile "ch.qos.logback:logback-core:${logbackVersion}"
     compile "net.logstash.logback:logstash-logback-encoder:${logstashLogbackEncoderVersion}"
-    compile "io.pravega:pravega-connectors-flink_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
+    compile "io.pravega:pravega-connectors-flink-${flinkShortVersion}_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
     compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-ml_${flinkScalaVersion}:${flinkVersion}"
@@ -56,7 +56,7 @@ dependencies {
     compile "io.pravega:pravega-client:${pravegaVersion}"
 
     if (includePravegaCredentials.toBoolean()) {
-        compile "io.pravega:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+        compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
     }
 
     compile "com.github.vladimir-bukhtoyarov:bucket4j-core:${bucket4jVersion}"
