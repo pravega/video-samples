@@ -158,9 +158,9 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
   `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
 
 - External:
-  Run the following command and find the external IP:
-  `kubectl get -n nautilus-pravega svc/nautilus-pravega-controller`
-  The Pravega Controller URL will be `tls://EXTERNAL-IP:443`
+  Run the following command and find the external FQDN in the HOSTS column:
+  `kubectl get -n nautilus-pravega ing/pravega-controller`
+  The Pravega Controller URL will be `tls://pravega-controller.FQDN:443`
 
 ### Running the Examples in IntelliJ
 
