@@ -10,7 +10,9 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.Utils;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
@@ -67,7 +69,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final String jobName = FlinkObjectDetectorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
-            createStream(getConfig().getOutputStreamConfig());
 
             StreamCut startStreamCut = StreamCut.UNBOUNDED;
             if (getConfig().isStartAtTail()) {
@@ -139,16 +140,36 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
+            //change to use from input
+            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
+
+
+            DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
+                    .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
+                    .uid("VideoFrameChunker")
+                    .name("VideoFrameChunker");
+
+            // Print to screen a small subset.
+            chunkedVideoFrames
+                    .filter(f -> f.camera == 0 && f.frameNumber % 10 == 0)
+                    .printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
+
+            System.out.println("Reached chunked");
+
             // create the Pravega sink to write a stream of video frames
-            FlinkPravegaWriter<VideoFrame> writer = FlinkPravegaWriter.<VideoFrame>builder()
+            FlinkPravegaWriter<ChunkedVideoFrame> writer = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
-                    .withEventRouter(new EventRouter())
-                    .withSerializationSchema(PravegaSerialization.serializationFor(VideoFrame.class))
+                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
+                    .withEventRouter(frame -> String.format("%d", frame.camera))
+                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
                     .build();
+            chunkedVideoFrames
+                    .addSink(writer)
+                    .uid("output-sink")
+                    .name("output-sink");
 
-
-            objectDetectedFrames.addSink(writer).name("video-objects-detected");
+            chunkedVideoFrames.addSink(writer).name("video-objects-detected");
 //            videoFrames.addSink(writer).name("video-objects-detected");
 
             long end = System.currentTimeMillis();

@@ -24,7 +24,9 @@ import org.bytedeco.javacv.*;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.global.opencv_videoio;
 import org.bytedeco.opencv.opencv_core.Mat;
+import org.bytedeco.opencv.opencv_videoio.CvCapture;
 import org.bytedeco.opencv.opencv_videoio.VideoCapture;
+import org.bytedeco.videoinput.global.videoInputLib;
 import org.bytedeco.videoinput.videoInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.rmi.ConnectIOException;
 import java.sql.Timestamp;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
@@ -62,20 +63,11 @@ public class CameraRecorder implements Runnable {
 
     public void run() {
         try {
-            if (getConfig().isCreateScope()) {
+            if (getConfig().isPravegaStandalonel()) {
                 try (StreamManager streamManager = StreamManager.create(getConfig().getClientConfig())) {
                     streamManager.createScope(getConfig().getDefaultScope());
                 }
             }
-
-            int n = videoInput.listDevices();
-
-            for (int i = 0; i < n; i++) {
-                int info = videoInput.getDeviceIDFromName(videoInput.getDeviceName(i));
-
-                System.out.println("Camera info: " + info);
-            }
-
 
             // Initialize camera.
             final int captureWidth = getConfig().getImageWidth();
@@ -84,28 +76,26 @@ public class CameraRecorder implements Runnable {
 //        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
             final VideoCapture cap = new VideoCapture(getConfig().getCameraDeviceNumber());
 
-            if(!cap.open(getConfig().getCameraDeviceNumber() + opencv_videoio.CAP_DSHOW)) {
-                throw new ConnectIOException("Cannot open the camera");
+            if(!cap.open(getConfig().getCameraDeviceNumber())) {
+                System.out.println("Can not open the cam !!!");
             }
             log.info("starting video capture");
             cap.set(opencv_videoio.CAP_PROP_FPS, getConfig().getFramesPerSec());
             cap.set(opencv_videoio.CAP_PROP_FRAME_WIDTH, captureWidth);
             cap.set(opencv_videoio.CAP_PROP_FRAME_HEIGHT, captureHeight);
 
-            final double actualFramesPerSec = cap.get(opencv_videoio.CAP_PROP_FPS);
-            log.info("actual frame rate={}", actualFramesPerSec);
-            final boolean dropFrames = actualFramesPerSec > getConfig().getFramesPerSec();
-            long lastTimestamp = 0;
+//            grabber.start();
+            log.info("actual frame rate={}", cap.get(opencv_videoio.CAP_PROP_FPS));
 
             // Initialize capture preview window.
-            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma()/cap.get(opencv_videoio.CAP_PROP_GAMMA));
+            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma());
 
             // Create Pravega stream.
             PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
 
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
-                        getConfig().getOutputStreamConfig().getStream().getScope(),
-                        getConfig().getClientConfig());
+                    getConfig().getOutputStreamConfig().getStream().getScope(),
+                    getConfig().getClientConfig());
                  EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName(),
                          new ByteBufferSerializer(),
@@ -124,15 +114,10 @@ public class CameraRecorder implements Runnable {
                 while (cap.read(mat)) {
                     capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
-                    // drop frames to adjust speed of camera recorder
-                    if (dropFrames && timestamp - lastTimestamp < 1000 / getConfig().getFramesPerSec()) {
-                        log.debug("Dropping captured frame to maintain desired frames per second");
-                        continue;
-                    }
-
                     log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
 
                     // Convert captured frame to PNG.
+//                    Mat mat = converterToMat.convert(capturedFrame);
                     BytePointer pngBytePointer = new BytePointer();
                     opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
                     log.info("pngBytePointer={}", pngBytePointer);
@@ -160,11 +145,13 @@ public class CameraRecorder implements Runnable {
                         cFrame.showImage(capturedFrame);
                     }
 
+                    // Sleep to limit frame rate.
+//                    Thread.sleep((long) (1000.0 / getConfig().getFramesPerSec()));
+
                     // Make sure frame has been durably persisted to Pravega.
 //                    future.get();
 
                     frameNumber++;
-                    lastTimestamp = timestamp;
                 }
             }
         } catch (Exception e) {
