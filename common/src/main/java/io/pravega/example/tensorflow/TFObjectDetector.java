@@ -46,6 +46,8 @@ public class TFObjectDetector implements Serializable {
     }
 
     public TFObjectDetector() {
+        System.out.println("@@@@@@@@@@@  new TF @@@@@@@@@@@  " );
+
         InputStream graphFile = getClass().getResourceAsStream("/tiny-yolo-voc.pb");       // The model
         InputStream labelFile = getClass().getResourceAsStream("/yolo-voc-labels.txt");    // labels for classes used to train model
 
@@ -97,11 +99,24 @@ public class TFObjectDetector implements Serializable {
      * @return output tensor returned by tensorFlow
      */
     private float[] executeYOLOGraph(byte[] image) {
+        long start = System.currentTimeMillis();
+
+
+
         Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class);
+        long start1 = System.currentTimeMillis();
         Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class);
+        long end1 = System.currentTimeMillis();
+        System.out.println("@@@@@@@@@@@  result TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end1 - start1));
+
+
         float[] outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(result)];
         FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
         result.writeTo(floatBuffer);
+
+        long end = System.currentTimeMillis();
+        System.out.println("@@@@@@@@@@@  executeYOLOGraph  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
+
         return outputTensor;
     }
 

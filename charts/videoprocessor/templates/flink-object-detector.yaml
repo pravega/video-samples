@@ -6,20 +6,22 @@ metadata:
   labels:
     name: flink-object-detector
 spec:
-  flinkVersion: 1.7.2
+  imageRef:
+    name: 1.7.2
   zookeeperUrl: zookeeper-client:2181
-  storage:
+storage:
     volumeSource:
       persistentVolumeClaim:
         claimName: data-project
+
   localStorage:
     replicas: 2
     volumeClaimTemplate:
-      accessModes: [ ReadWriteOnce ]
-      storageClassName: standard
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"
       resources:
         requests:
-          storage: 5Gi
+          storage: 5G
   jobManager:
     replicas: 1
     memory: 1024M
@@ -40,7 +42,6 @@ metadata:
     release: {{ $.Release.Name }}
 spec:
   flinkVersion: 1.7.2
-  imageRef: cuda10.0flink1.7.2v3
   clusterSelector:
     name: flink-object-detector
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
@@ -52,6 +53,10 @@ spec:
       value: {{ .Values.FlinkObjectDetectorJob.enableOperatorChaining | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
+    - name: input-stream
+      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+    - name: input-minNumSegments
+      value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
     - name: startAtTail
       value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}
     - name: maxOutOfOrdernessMs

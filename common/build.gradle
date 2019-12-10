@@ -26,11 +26,11 @@ dependencies {
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
 
 //    13.1 works
-    compile group: 'org.tensorflow', name: 'tensorflow', version: '1.13.1'
-    compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.13.1'
+    compile group: 'org.tensorflow', name: 'tensorflow', version: '1.15.0'
+    compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.15.0'
 
     // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
-    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.13.1'
+    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
 
 }
 

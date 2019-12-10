@@ -22,7 +22,12 @@ import io.pravega.example.common.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.*;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
+import org.bytedeco.opencv.global.opencv_videoio;
 import org.bytedeco.opencv.opencv_core.Mat;
+import org.bytedeco.opencv.opencv_videoio.CvCapture;
+import org.bytedeco.opencv.opencv_videoio.VideoCapture;
+import org.bytedeco.videoinput.global.videoInputLib;
+import org.bytedeco.videoinput.videoInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,23 +74,28 @@ public class CameraRecorder implements Runnable {
             final int captureHeight = getConfig().getImageHeight();
             log.info("creating grabber");
 //        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
-            final FrameGrabber grabber = new OpenCVFrameGrabber(getConfig().getCameraDeviceNumber());
-            grabber.setImageWidth(captureWidth);
-            grabber.setImageHeight(captureHeight);
-            grabber.setFrameRate(getConfig().getFramesPerSec());
-            log.info("starting grabber");
-            grabber.start();
-            log.info("actual frame rate={}", grabber.getFrameRate());
+            final VideoCapture cap = new VideoCapture(getConfig().getCameraDeviceNumber());
+
+            if(!cap.open(getConfig().getCameraDeviceNumber())) {
+                System.out.println("Can not open the cam !!!");
+            }
+            log.info("starting video capture");
+            cap.set(opencv_videoio.CAP_PROP_FPS, getConfig().getFramesPerSec());
+            cap.set(opencv_videoio.CAP_PROP_FRAME_WIDTH, captureWidth);
+            cap.set(opencv_videoio.CAP_PROP_FRAME_HEIGHT, captureHeight);
+
+//            grabber.start();
+            log.info("actual frame rate={}", cap.get(opencv_videoio.CAP_PROP_FPS));
 
             // Initialize capture preview window.
-            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
+            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma());
 
             // Create Pravega stream.
             PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
 
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
-                        getConfig().getOutputStreamConfig().getStream().getScope(),
-                        getConfig().getClientConfig());
+                    getConfig().getOutputStreamConfig().getStream().getScope(),
+                    getConfig().getClientConfig());
                  EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName(),
                          new ByteBufferSerializer(),
@@ -98,12 +108,16 @@ public class CameraRecorder implements Runnable {
                 int ssrc = new Random().nextInt();
                 Frame capturedFrame;
 
-                while ((capturedFrame = grabber.grab()) != null) {
+                Mat mat = new Mat();
+
+//                OpenCVFrameConverter.ToIplImage converterToImage = new OpenCVFrameConverter.ToIplImage();
+                while (cap.read(mat)) {
+                    capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
                     log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
 
                     // Convert captured frame to PNG.
-                    Mat mat = converterToMat.convert(capturedFrame);
+//                    Mat mat = converterToMat.convert(capturedFrame);
                     BytePointer pngBytePointer = new BytePointer();
                     opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
                     log.info("pngBytePointer={}", pngBytePointer);
@@ -132,7 +146,7 @@ public class CameraRecorder implements Runnable {
                     }
 
                     // Sleep to limit frame rate.
-                    Thread.sleep((long) (1000.0 / getConfig().getFramesPerSec()));
+//                    Thread.sleep((long) (1000.0 / getConfig().getFramesPerSec()));
 
                     // Make sure frame has been durably persisted to Pravega.
 //                    future.get();
