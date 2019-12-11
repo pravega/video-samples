@@ -105,6 +105,7 @@ public class TFObjectDetector implements Serializable {
 
         Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class);
         long start1 = System.currentTimeMillis();
+//        Tensor<Float> result = imageTensor;
         Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class);
         long end1 = System.currentTimeMillis();
         System.out.println("@@@@@@@@@@@  result TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end1 - start1));
