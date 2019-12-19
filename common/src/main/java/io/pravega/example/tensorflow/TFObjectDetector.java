@@ -101,22 +101,23 @@ public class TFObjectDetector implements Serializable {
     private float[] executeYOLOGraph(byte[] image) {
         long start = System.currentTimeMillis();
 
+        float[] outputTensor;
 
-
-        Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class);
-        long start1 = System.currentTimeMillis();
+        try(Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class)) {
+            long start1 = System.currentTimeMillis();
 //        Tensor<Float> result = imageTensor;
-        Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class);
-        long end1 = System.currentTimeMillis();
-        System.out.println("@@@@@@@@@@@  result TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end1 - start1));
+            Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class);
+            long end1 = System.currentTimeMillis();
+            System.out.println("@@@@@@@@@@@  result TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end1 - start1));
 
 
-        float[] outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(result)];
-        FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
-        result.writeTo(floatBuffer);
+            outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(result)];
+            FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
+            result.writeTo(floatBuffer);
 
-        long end = System.currentTimeMillis();
-        System.out.println("@@@@@@@@@@@  executeYOLOGraph  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
+            long end = System.currentTimeMillis();
+            System.out.println("@@@@@@@@@@@  executeYOLOGraph  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
+        }
 
         return outputTensor;
     }

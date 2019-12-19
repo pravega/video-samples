@@ -31,7 +31,7 @@ dependencies {
     compile "org.bytedeco:javacv-platform:1.5.1"
     compile "io.pravega:pravega-client:${pravegaVersion}"
     if (includePravegaCredentials.toBoolean()) {
-        compile "com.dellemc.nautilus:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+        compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
     }
     testCompile "junit:junit:${junitVersion}"
 }
