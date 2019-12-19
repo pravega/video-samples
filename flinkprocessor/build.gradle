@@ -29,6 +29,7 @@ targetCompatibility = 1.8
 dependencies {
     compile project(':common')
 
+//    compile group: 'io.netty', name: 'netty-all', version: ${nettyVersion}
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "ch.qos.logback:logback-classic:${logbackVersion}"
     compile "ch.qos.logback:logback-core:${logbackVersion}"
@@ -42,8 +43,10 @@ dependencies {
     compile "org.apache.flink:flink-json:${flinkVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
 
+
+
     if (includePravegaCredentials.toBoolean()) {
-        compile "com.dellemc.nautilus:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+        compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
     }
 
     compile "com.github.vladimir-bukhtoyarov:bucket4j-core:${bucket4jVersion}"

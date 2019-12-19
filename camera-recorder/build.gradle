@@ -36,7 +36,7 @@ dependencies {
 //    // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
 ////     compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.6.0'
     if (includePravegaCredentials.toBoolean()) {
-        compile "com.dellemc.nautilus:pravega-keycloak-credentials:${pravegaCredentialsVersion}"
+        compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
     }
     testCompile "junit:junit:${junitVersion}"
 }

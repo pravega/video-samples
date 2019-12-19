@@ -39,7 +39,7 @@ import java.io.IOException;
 public class FlinkObjectDetectorJob extends AbstractJob {
     // Logger initialization
     private static Logger log = LoggerFactory.getLogger(FlinkObjectDetectorJob.class);
-    final TFObjectDetector objectDetector = new TFObjectDetector();
+//    final TFObjectDetector objectDetector = new TFObjectDetector();
 
 
     /**
@@ -131,6 +131,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             //  identify objects with YOLOv3
             DataStream<VideoFrame> objectDetectedFrames = videoFrames
                     .map(frame -> {
+//                        frame.data = frame.data;
                         frame.data = TFObjectDetector.getInstance().detect(frame.data);
 //                      frame.recognitions = new ArrayList<Recognition>();
 //                      for(Recognition rec : TFObjectDetector.getInstance().getRecognitions()) {
@@ -141,7 +142,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
             //change to use from input
-            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
+//            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
 
 
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
@@ -169,7 +170,10 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("output-sink")
                     .name("output-sink");
 
-            chunkedVideoFrames.addSink(writer).name("video-objects-detected");
+
+            System.out.println("output-stream: " + getConfig().getOutputStreamConfig().toString());
+
+            chunkedVideoFrames.addSink(writer).name(getConfig().getOutputStreamConfig().toString());
 //            videoFrames.addSink(writer).name("video-objects-detected");
 
             long end = System.currentTimeMillis();
