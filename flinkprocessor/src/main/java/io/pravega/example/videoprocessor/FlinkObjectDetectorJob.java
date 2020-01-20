@@ -142,7 +142,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
             //change to use from input
-//            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
+            Utils.createStream(getConfig().getPravegaConfig(),getConfig().getOutputStreamConfig().getStream().getStreamName());
 
 
             DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
