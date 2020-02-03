@@ -1,0 +1,63 @@
+{{- if .Values.VideoReaderJob.enabled }}
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkCluster
+metadata:
+  name: video-reader
+  labels:
+    name: video-reader
+spec:
+  imageRef:
+    name: 1.7.2
+  zookeeperUrl: zookeeper-client:2181
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ ReadWriteOnce ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    cpu: 250m
+  taskManager:
+    replicas: {{ .Values.VideoReaderJob.taskManager.replicas }}
+    memory: {{ .Values.VideoReaderJob.taskManager.memory }}
+    cpu: {{ .Values.VideoReaderJob.taskManager.cpu }}
+    numberOfTaskSlots: {{ .Values.VideoReaderJob.taskManager.taskSlots }}
+---
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  name: video-reader
+  labels:
+    app: videoprocessor
+    component: VideoReaderJob
+    release: {{ $.Release.Name }}
+spec:
+  flinkVersion: 1.7.2
+  clusterSelector:
+    name: video-reader
+  mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  mainClass: io.pravega.example.videoprocessor.VideoReaderJob
+  parallelism: {{ .Values.VideoReaderJob.parallelism }}
+  state: started
+  parameters:
+    - name: enableOperatorChaining
+      value: {{ .Values.VideoReaderJob.enableOperatorChaining | quote }}
+    - name: scope
+      value: {{ $.Release.Namespace | quote }}
+    - name: input-stream
+      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+    - name: input-minNumSegments
+      value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
+    - name: startAtTail
+      value: {{ .Values.VideoReaderJob.startAtTail | quote }}
+    - name: maxOutOfOrdernessMs
+      value: {{ .Values.VideoReaderJob.maxOutOfOrdernessMs | quote }}
+{{- end }}

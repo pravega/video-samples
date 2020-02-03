@@ -12,6 +12,7 @@
 
 plugins {
     id 'com.github.johnrengelman.shadow' version '4.0.3'
+    id "ua.eshepelyuk.ManifestClasspath" version "1.0.0"
 }
 apply plugin: 'idea'
 configurations.all {
@@ -31,10 +32,6 @@ subprojects {
         }
         maven {
             url "https://oss.sonatype.org/content/repositories/snapshots"
-        }
-        maven {
-            name "prerelease"
-            url "http://asdrepo.isus.emc.com:8081/artifactory/nautilus-prerelease-local"
         }
     }
 

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 /**
  * A class for storing a single video frame.
  */
-public class VideoFrame implements Serializable {
+public class VideoFrame {
     // Unique ID for this video stream.
     public int camera;
     // Random source identifier used to avoid corruption if multiple sources use the same camera and timestamp.
@@ -56,7 +56,7 @@ public class VideoFrame implements Serializable {
         this.data = frame.data;
         this.hash = frame.hash;
         this.tags = frame.tags;
-//        this.recognitions = frame.recognitions;
+        this.recognitions = frame.recognitions;
     }
 
     @Override

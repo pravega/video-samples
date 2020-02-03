@@ -19,18 +19,16 @@ dependencies {
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
     testCompile group: 'junit', name: 'junit', version: '4.12'
-//    compile "org.bytedeco:javacv-platform:1.5.1"
-//    compile "io.pravega:pravega-connectors-flink_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
     compile "io.pravega:pravega-connectors-flink-${flinkShortVersion}_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
     compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
 
-//    13.1 works
-    compile group: 'org.tensorflow', name: 'tensorflow', version: '1.13.1'
-    compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.13.1'
+//    13.1 works without custom image
+    compile group: 'org.tensorflow', name: 'tensorflow', version: '1.15.0'
+    compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.15.0'
 
     // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
-    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.13.1'
+    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
 
 }
 
