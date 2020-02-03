@@ -30,21 +30,19 @@ public class PravegaAppConfiguration {
     private final StreamConfig inputStreamConfig;
     private final StreamConfig outputStreamConfig;
     private final boolean startAtTail;
-    private final boolean pravega_standalone;
+    private static boolean is_create_scope;
 
 
 
     public PravegaAppConfiguration(String[] args) {
 
-//        URI controllerURI = URI.create(getEnvVar("PRAVEGA_CONTROLLER_URI", "tcp://10.247.115.55:9090"));
         URI controllerURI = URI.create(getEnvVar("PRAVEGA_CONTROLLER_URI", "tcp://localhost:9090"));
-        System.out.println("fkin controlleruri " + controllerURI);
         clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
         defaultScope = getEnvVar("PRAVEGA_SCOPE", "video-demo");
         inputStreamConfig = new StreamConfig(defaultScope,"INPUT_");
         outputStreamConfig = new StreamConfig(defaultScope,"OUTPUT_");
         startAtTail = Boolean.parseBoolean(getEnvVar("START_AT_TAIL", "true"));
-        pravega_standalone = Boolean.parseBoolean(getEnvVar("PRAVEGA_STANDALONE", "true"));   //changed
+        is_create_scope = Boolean.parseBoolean(getEnvVar("IS_CREATE_SCOPE", "true"));   //changed
 
     }
 
@@ -80,8 +78,8 @@ public class PravegaAppConfiguration {
         return startAtTail;
     }
 
-    public boolean isPravegaStandalonel() {
-        return pravega_standalone;
+    public static boolean isCreateScope() {
+        return is_create_scope;
     }
 
     public static class StreamConfig {
@@ -120,10 +118,13 @@ public class PravegaAppConfiguration {
     protected static String getEnvVar(String name, String defaultValue) {
 //        System.out.println(System.getenv("controllerURI"));
         String value = System.getProperty(name);
-
-        if (value == null || value.isEmpty()) {
-            return defaultValue;
+        if (value != null && !value.isEmpty()) {
+            return value;
         }
-        return value;
+        value = System.getenv(name);
+        if (value != null && !value.isEmpty()) {
+            return value;
+        }
+        return defaultValue;
     }
 }

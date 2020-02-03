@@ -11,7 +11,6 @@
 package io.pravega.example.videoprocessor;
 
 import io.pravega.example.common.ChunkedVideoFrame;
-import io.pravega.example.common.Utils;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
@@ -68,6 +67,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final String jobName = FlinkObjectDetectorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
+            createStream(getConfig().getOutputStreamConfig());
 
             StreamCut startStreamCut = StreamCut.UNBOUNDED;
             if (getConfig().isStartAtTail()) {
@@ -139,12 +139,10 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
-            Stream output_stream = Utils.createStream(getConfig().getPravegaConfig(),"video-objects-detected");
-
             // create the Pravega sink to write a stream of video frames
             FlinkPravegaWriter<VideoFrame> writer = FlinkPravegaWriter.<VideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(output_stream)
+                    .forStream(getConfig().getOutputStreamConfig().getStream())
                     .withEventRouter(new EventRouter())
                     .withSerializationSchema(PravegaSerialization.serializationFor(VideoFrame.class))
                     .build();

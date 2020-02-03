@@ -36,7 +36,7 @@ public class PravegaUtil {
         ClientConfig clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
         try(StreamManager streamManager = StreamManager.create(clientConfig);)
         {
-            if (CommonParams.isPravegaStandalone()) {
+            if (PravegaAppConfiguration.isCreateScope()) {
                 streamManager.createScope(scope);
             }
             result = streamManager.createStream(scope, streamName, StreamConfiguration.builder().build());

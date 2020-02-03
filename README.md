@@ -437,3 +437,9 @@ for each Flink reader task.
 
 If you are using a non-transactional writer, you should also account for additional frames to be buffered.
 If interruptions are rare, a single additional frame should be sufficient.
+
+
+# Object Detection
+This project demonstrates methods to store, process, and read video with Pravega and Flink. It also includes an 
+application that performs object detection using TensorFlow and YOLO.
+
