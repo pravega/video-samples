@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 
@@ -30,18 +31,16 @@ public final class IOUtil {
         try {
             return Arrays.asList(org.apache.commons.io.IOUtils.toString(file).split("\n"));
         } catch (IOException  ex) {
-            LOGGER.error("Failed to read [{}]!", file, ex.getMessage());
             throw new RuntimeException("Failed to read [" + file + "]!", ex);
         }
     }
 
     public static void createDirIfNotExists(final File directory) {
-        if (!directory.exists()) {
-            directory.mkdir();
+        try {
+            directory.createNewFile();
+        } catch (IOException ex){
+            throw new RuntimeException("Could not create [" + directory +"]!", ex);
         }
     }
 
-    public static String getFileName(final String path) {
-        return path.substring(path.lastIndexOf("/") + 1, path.length());
-    }
 }

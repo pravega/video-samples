@@ -21,7 +21,7 @@ public final class Recognition {
     private final Integer id;
     private final String title;
     private final Float confidence;
-    private BoxPosition location;
+    private final BoxPosition location;
 
     public Recognition(final Integer id, final String title,
                        final Float confidence, final BoxPosition location) {
@@ -51,9 +51,9 @@ public final class Recognition {
         return new BoxPosition(location);
     }
 
-    public void setLocation(BoxPosition location) {
-        this.location = location;
-    }
+//    public void setLocation(BoxPosition location) {
+//        this.location = location;
+//    }
 
     @Override
     public String toString() {

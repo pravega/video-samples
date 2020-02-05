@@ -2,7 +2,7 @@
 set -ex
 
 ROOT_DIR=$(dirname $0)/..
-NAMESPACE=${NAMESPACE:-object-detection}
+NAMESPACE=${NAMESPACE:-examples}
 
 helm upgrade --install --timeout 600 --wait --debug \
 ${NAMESPACE} \

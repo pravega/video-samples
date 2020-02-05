@@ -51,7 +51,7 @@ public class ImageUtil {
      * Label image with classes and predictions given by the ThensorFLow
      * @param image buffered image to label
      * @param recognitions list of recognized objects
-     * @return location of the labeled image
+     * @return JPEG image in a byte array
      */
     public byte[] labelImage(final byte[] image, final List<Recognition> recognitions) {
         byte[] bytes = null;
@@ -87,10 +87,10 @@ public class ImageUtil {
     }
 
     /**
-     *
+     * Saves image into target file name
      * @param image to save
-     * @param target to save image
-     * @return location of the labeled image
+     * @param target file name to save image
+     * @return location of the saved image
      */
     public String saveImage(final BufferedImage image, final String target) {
         try {

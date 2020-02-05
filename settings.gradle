@@ -14,3 +14,4 @@ include "camera-recorder"
 include 'common'
 include "flinkprocessor"
 include 'video-player'
+include 'common'

@@ -68,25 +68,16 @@ public class CameraRecorder implements Runnable {
                 }
             }
 
-            int n = videoInput.listDevices();
-
-            for (int i = 0; i < n; i++) {
-                int info = videoInput.getDeviceIDFromName(videoInput.getDeviceName(i));
-
-                System.out.println("Camera info: " + info);
-            }
-
-
             // Initialize camera.
             final int captureWidth = getConfig().getImageWidth();
             final int captureHeight = getConfig().getImageHeight();
             log.info("creating grabber");
-//        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
             final VideoCapture cap = new VideoCapture(getConfig().getCameraDeviceNumber());
 
-            if(!cap.open(getConfig().getCameraDeviceNumber() + opencv_videoio.CAP_DSHOW)) {
+            if(!cap.open(getConfig().getCameraDeviceNumber())) {
                 throw new ConnectIOException("Cannot open the camera");
             }
+
             log.info("starting video capture");
             cap.set(opencv_videoio.CAP_PROP_FPS, getConfig().getFramesPerSec());
             cap.set(opencv_videoio.CAP_PROP_FRAME_WIDTH, captureWidth);
@@ -98,7 +89,7 @@ public class CameraRecorder implements Runnable {
             long lastTimestamp = 0;
 
             // Initialize capture preview window.
-            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma()/cap.get(opencv_videoio.CAP_PROP_GAMMA));
+            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / 2.2);
 
             // Create Pravega stream.
             PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());

@@ -12,21 +12,20 @@ package io.pravega.example.tensorflow;
 
 import org.apache.commons.math3.analysis.function.Sigmoid;
 import org.tensorflow.Tensor;
+//import org.tensorflow.op.nn.Softmax;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.PriorityQueue;
+import java.nio.file.Files;
+import java.util.*;
 
 
 public class YOLOClassifier {
     private final static float OVERLAP_THRESHOLD = 0.5f;
     private final static double anchors[] = {1.08,1.19,  3.42,4.41,  6.63,11.38,  9.42,5.11,  16.62,10.52};
-    private final static int SIZE = 13;
+    private final static int NUMBER_OF_BOXES = 13;
     private final static int MAX_RECOGNIZED_CLASSES = 24;
     private final static float THRESHOLD = 0.5f;
     private final static int MAX_RESULTS = 24;
-    private final static int NUMBER_OF_BOUNDING_BOX = 5;
+    private final static int NUMBER_OF_BOUNDING_BOXES = 5;
     private static YOLOClassifier classifier;
 
     private YOLOClassifier() {}
@@ -46,7 +45,7 @@ public class YOLOClassifier {
      * @return the number of classes
      */
     public int getOutputSizeByShape(Tensor<Float> result) {
-        return (int) (result.shape()[3] * Math.pow(SIZE,2));
+        return (int) (result.shape()[3] * (NUMBER_OF_BOXES * NUMBER_OF_BOXES));
     }
 
     /**
@@ -58,15 +57,15 @@ public class YOLOClassifier {
      * @return a list of recognition objects
      */
     public List<Recognition> classifyImage(final float[] tensorFlowOutput, final List<String> labels) {
-        int numClass = (int) (tensorFlowOutput.length / (Math.pow(SIZE,2) * NUMBER_OF_BOUNDING_BOX) - 5);
-        BoundingBox[][][] boundingBoxPerCell = new BoundingBox[SIZE][SIZE][NUMBER_OF_BOUNDING_BOX];
+        int numClass = (int) (tensorFlowOutput.length / (Math.pow(NUMBER_OF_BOXES,2) * NUMBER_OF_BOUNDING_BOXES) - 5);
+        BoundingBox[][][] boundingBoxPerCell = new BoundingBox[NUMBER_OF_BOXES][NUMBER_OF_BOXES][NUMBER_OF_BOUNDING_BOXES];
         PriorityQueue<Recognition> priorityQueue = new PriorityQueue(MAX_RECOGNIZED_CLASSES, new RecognitionComparator());
 
         int offset = 0;
-        for (int cy=0; cy<SIZE; cy++) {        // SIZE * SIZE cells
-            for (int cx=0; cx<SIZE; cx++) {
-                for (int b=0; b<NUMBER_OF_BOUNDING_BOX; b++) {   // 5 bounding boxes per each cell
-                    boundingBoxPerCell[cx][cy][b] = getModel(tensorFlowOutput, cx, cy, b, numClass, offset);
+        for (int cy = 0; cy< NUMBER_OF_BOXES; cy++) {        // SIZE * SIZE cells
+            for (int cx = 0; cx< NUMBER_OF_BOXES; cx++) {
+                for (int b = 0; b< NUMBER_OF_BOUNDING_BOXES; b++) {   // 5 bounding boxes per each cell
+                    boundingBoxPerCell[cx][cy][b] = getBoundingBox(tensorFlowOutput, cx, cy, b, numClass, offset);
                     calculateTopPredictions(boundingBoxPerCell[cx][cy][b], priorityQueue, labels);
                     offset = offset + numClass + 5;
                 }
@@ -76,23 +75,24 @@ public class YOLOClassifier {
         return getRecognition(priorityQueue);
     }
 
-    private BoundingBox getModel(final float[] tensorFlowOutput, int cx, int cy, int b, int numClass, int offset) {
-        BoundingBox model = new BoundingBox();
+    private BoundingBox getBoundingBox(final float[] tensorFlowOutput, int cx, int cy, int b, int numClass, int offset) {
+        BoundingBox boundingBox = new BoundingBox();
         Sigmoid sigmoid = new Sigmoid();
-        model.setX((cx + sigmoid.value(tensorFlowOutput[offset])) * 32);
-        model.setY((cy + sigmoid.value(tensorFlowOutput[offset + 1])) * 32);
-        model.setWidth(Math.exp(tensorFlowOutput[offset + 2]) * anchors[2 * b] * 32);
-        model.setHeight(Math.exp(tensorFlowOutput[offset + 3]) * anchors[2 * b + 1] * 32);
-        model.setConfidence(sigmoid.value(tensorFlowOutput[offset + 4]));
+        boundingBox.setX((cx + sigmoid.value(tensorFlowOutput[offset])) * 32);
+        boundingBox.setY((cy + sigmoid.value(tensorFlowOutput[offset + 1])) * 32);
+        boundingBox.setWidth(Math.exp(tensorFlowOutput[offset + 2]) * anchors[2 * b] * 32);
+        boundingBox.setHeight(Math.exp(tensorFlowOutput[offset + 3]) * anchors[2 * b + 1] * 32);
+        boundingBox.setConfidence(sigmoid.value(tensorFlowOutput[offset + 4]));
 
-        model.setClasses(new double[numClass]);
+        boundingBox.setClasses(new double[numClass]);
 
         for (int probIndex=0; probIndex<numClass; probIndex++) {
-            model.getClasses()[probIndex] = tensorFlowOutput[probIndex + offset + 5];
+            boundingBox.getClasses()[probIndex] = tensorFlowOutput[probIndex + offset + 5];
         }
 
-        return model;
+        return boundingBox;
     }
+
 
     private void calculateTopPredictions(final BoundingBox boundingBox, final PriorityQueue<Recognition> predictionQueue,
                                          final List<String> labels) {
