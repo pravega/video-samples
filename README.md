@@ -5,9 +5,10 @@
 
 ![grid-sample](images/video-samples-diagram.png)
 
-This project demonstrates methods to store, process, and read video with Pravega and Flink.
+This project demonstrates an object detection use case using Nautilus and Flink.
 
 ## Components
+- Nautilus: Nautilus is a new stream storage and analytics platform made by dell. It allows for handling streaming data at scale.
 
 - Pravega: Pravega provides a new storage abstraction - a stream - for continuous and unbounded data. 
   A Pravega stream is a durable, elastic, append-only, unbounded sequence of bytes that has good performance and strong consistency.
@@ -76,7 +77,7 @@ In the command below, replace x.x.x.x with the IP address of a local network int
 cd
 git clone https://github.com/pravega/pravega
 cd pravega
-git checkout cd6bfe7
+git checkout r0.5
 ./gradlew docker
 cd docker/compose
 export HOST_IP=x.x.x.x
@@ -113,12 +114,12 @@ This can be skipped in Nautilus SDK Desktop as it has already been performed.
 cd
 git clone https://github.com/pravega/pravega
 pushd pravega
-git checkout cd6bfe7
+git checkout r0.5
 ./gradlew install
 popd
 git clone https://github.com/pravega/flink-connectors
 pushd flink-connectors
-git checkout 9e3fa4d74e6648168047d312d4c9a607990cf56d
+git checkout r0.5
 ./gradlew install
 popd
 ```
@@ -139,7 +140,7 @@ Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib direc
 
 ```
 sudo apt install maven
-PRAVEGA_CREDENTIALS_VERSION=0.6.0-2345.298015f-0.12.0-W5-001.4e5c9a1
+PRAVEGA_CREDENTIALS_VERSION=0.5.0-2306.a5a5cdf-0.11.10-002.985e705
 mvn install:install-file \
 -Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
 -DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
@@ -170,9 +171,7 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
   `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
 
 - External:
-  Run the following command and find the external IP:
-  `kubectl get -n nautilus-pravega svc/nautilus-pravega-controller`
-  The Pravega Controller URL will be `tcp://EXTERNAL-IP:9090`
+  (provided by the Nautilus administrator)
 
 ### Running the Examples in IntelliJ
 
@@ -440,8 +439,85 @@ for each Flink reader task.
 If you are using a non-transactional writer, you should also account for additional frames to be buffered.
 If interruptions are rare, a single additional frame should be sufficient.
 
-
 # Object Detection
-This project demonstrates methods to store, process, and read video with Pravega and Flink. It also includes an 
-application that performs object detection using TensorFlow and YOLO.
+This project demonstrates methods to store, process, and read video with Pravega and Flink. It also includes an application
+ that performs object detection using TensorFlow and YOLO. 
+ 
+## Overview
+![object-detection-architecture](images/object-detection-arch.png)
+ 
+## Additional Components
+- GPU: GPUs are essential for increased performance of processing data.
+- CUDA: To utilize the GPUs, NVIDIA CUDA libraries are required. CUDA 10.0 is used in the project.
+  For more information, see <`https://developer.nvidia.com/hpc`>
+- Tensorflow: 
+ 
+## Building and Running 
+These steps are additional to the previous setup. 
+ 
+### Update the repository
+ ```
+cd /HOME/video-samples
 
+git checkout tensorflow-gpu
+```
+`HOME` is the location of the project
+ 
+### Setup access to GPUs and Tensorflow
+ 
+#### Build Custom Image
+
+```
+docker pull pvthejas/flinkcuda:cuda10.0flink1.7.2
+docker tag pvthejas/flinkcuda:cuda10.0flink1.7.2 registryName/repositoryName:cuda10.0flink1.7.2
+docker push registryName/repositoryName:cuda10.0flink1.7.2
+```
+
+Make sure to put your registry name and repository name for the cuda and flink image.
+
+```
+kubectl create -f /HOME/video-samples/GPUTensorflowImage/ClusterFlinkImage.yaml
+```
+`HOME` is the location of the project
+
+Make sure to edit the image reference in ClusterFlinkImage.yaml with appropriate registry name.
+
+### Running in IntelliJ
+Run the FlinkObjectDetectorJob using following parameters:
+```
+--controller
+tcp://127.0.0.1:9090
+--scope
+examples
+--input-stream
+examples-raw
+--output-stream
+examples-detected
+--CAMERA
+3
+--startAtTail
+true
+```
+
+### Running the Examples in Nautilus
+
+1. You must make the Maven repo in Nautilus available to your development workstation.
+```
+kubectl port-forward service/repo 9092:80 --namespace examples &
+```
+
+Note: If you have GPUs on the machine it is running on, then enable GPU access uncommenting the following in common/build.gradle
+```
+    // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
+//    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
+```
+
+2. Build and publish your application JAR file.
+```
+./gradlew publish
+```
+
+3. Use Helm to start your Flink cluster and Flink applications.
+```
+scripts/deploy-k8s-components.sh
+```

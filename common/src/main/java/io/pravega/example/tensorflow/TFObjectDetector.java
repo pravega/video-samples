@@ -26,15 +26,16 @@ import java.util.List;
 public class TFObjectDetector implements Serializable {
     private final Logger log = LoggerFactory.getLogger(TFObjectDetector.class);
 
-    public List<Recognition> recognitions = null;
-    Graph graph;
+//    public List<Recognition> recognitions = null;
+//    Graph graph;
     Session session;
     // Params used for image processing
-    int SIZE = 416;
-    float MEAN = 255f;
+    int IMAGE_DIMENSION = 416;
+    float SCALE = 255f;
     Output<Float> output = null;
     private List<String> LABEL_DEF;
     private static TFObjectDetector single_instance = null;
+    private static FloatBuffer floatBuffer = null;
 
 
     public static TFObjectDetector getInstance() {
@@ -46,14 +47,14 @@ public class TFObjectDetector implements Serializable {
     }
 
     public TFObjectDetector() {
-        System.out.println("@@@@@@@@@@@  new TF @@@@@@@@@@@  " );
+        log.info("@@@@@@@@@@@  new TF @@@@@@@@@@@  " );
 
         InputStream graphFile = getClass().getResourceAsStream("/tiny-yolo-voc.pb");       // The model
         InputStream labelFile = getClass().getResourceAsStream("/yolo-voc-labels.txt");    // labels for classes used to train model
 
         byte[] GRAPH_DEF = IOUtil.readAllBytesOrExit(graphFile);
         LABEL_DEF = IOUtil.readAllLinesOrExit(labelFile);
-        graph = new Graph();
+        Graph graph = new Graph();
         graph.importGraphDef(GRAPH_DEF);
         session = new Session(graph);
         GraphBuilder graphBuilder = new GraphBuilder(graph);
@@ -67,8 +68,8 @@ public class TFObjectDetector implements Serializable {
                                                         .setAttr("dtype", DataType.STRING)
                                                         .build().output(0), 3),
                                         graphBuilder.constant("make_batch", 0)),
-                                graphBuilder.constant("size", new int[]{SIZE, SIZE})),
-                        graphBuilder.constant("scale", MEAN));
+                                graphBuilder.constant("size", new int[]{IMAGE_DIMENSION, IMAGE_DIMENSION})),
+                        graphBuilder.constant("scale", SCALE));
     }
 
     /**
@@ -81,12 +82,13 @@ public class TFObjectDetector implements Serializable {
         long start = System.currentTimeMillis();
         byte[] finalData = null;
 
-        recognitions = YOLOClassifier.getInstance().classifyImage(executeYOLOGraph(image), LABEL_DEF);
+
+        List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(executeYOLOGraph(image), LABEL_DEF);
 
         finalData = ImageUtil.getInstance().labelImage(image, recognitions);
 
         long end = System.currentTimeMillis();
-        System.out.println("@@@@@@@@@@@  TENSORFLOW  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
+        log.info("@@@@@@@@@@@  TENSORFLOW  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
 
 
         return finalData;
@@ -99,26 +101,16 @@ public class TFObjectDetector implements Serializable {
      * @return output tensor returned by tensorFlow
      */
     private float[] executeYOLOGraph(byte[] image) {
-        long start = System.currentTimeMillis();
-
         float[] outputTensor;
 
-        try(Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class)) {
-            long start1 = System.currentTimeMillis();
-//        Tensor<Float> result = imageTensor;
-            Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class);
-            long end1 = System.currentTimeMillis();
-            System.out.println("@@@@@@@@@@@  result TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end1 - start1));
-
-
+        try(Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class);
+            Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class)) {
             outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(result)];
-            FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
+            floatBuffer = FloatBuffer.wrap(outputTensor);
             result.writeTo(floatBuffer);
-
-            long end = System.currentTimeMillis();
-            System.out.println("@@@@@@@@@@@  executeYOLOGraph  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
         }
 
+        floatBuffer.clear();
         return outputTensor;
     }
 

@@ -11,7 +11,7 @@
 package io.pravega.example.tensorflow;
 
 /**
- * Model to store the position of the bounding boxes
+ * Class to store the position of the bounding boxes
  */
 public class BoxPosition {
     private float left;

@@ -44,15 +44,13 @@ public class AppConfiguration {
         params = ParameterTool.fromArgs(args);
 
         log.info("Parameter Tool: {}", getParams().toMap());
-        String defaultScope = getParams().get("scope", "object-detection");
-
+        String defaultScope = getParams().get("scope", "examples");
 
         pravegaConfig = PravegaConfig.fromParams(getParams()).withDefaultScope(defaultScope);
         inputStreamConfig = new StreamConfig(getPravegaConfig(),"input-",  getParams());
         outputStreamConfig = new StreamConfig(getPravegaConfig(),"output-",  getParams());
         parallelism = getParams().getInt("parallelism", PARALLELISM_UNKNOWN);
         readerParallelism = getParams().getInt("readerParallelism", PARALLELISM_DEFAULT);
-//        readerParallelism = getParams().getInt("readerParallelism", 1);
 
         checkpointIntervalMs = getParams().getLong("checkpointIntervalMs", 10000);
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);

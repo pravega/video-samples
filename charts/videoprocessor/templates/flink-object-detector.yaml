@@ -30,6 +30,7 @@ storage:
     replicas: {{ .Values.FlinkObjectDetectorJob.taskManager.replicas }}
     memory: {{ .Values.FlinkObjectDetectorJob.taskManager.memory }}
     cpu: {{ .Values.FlinkObjectDetectorJob.taskManager.cpu }}
+    heap: {{ .Values.FlinkObjectDetectorJob.taskManager.heap }}
     numberOfTaskSlots: {{ .Values.FlinkObjectDetectorJob.taskManager.taskSlots }}
 ---
 apiVersion: flink.nautilus.dellemc.com/v1beta1
@@ -54,8 +55,12 @@ spec:
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: input-stream
-      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+      value: {{ .Values.MultiVideoGridJob.input.stream | quote }}
     - name: input-minNumSegments
+      value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
+    - name: output-stream
+      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+    - name: output-minNumSegments
       value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
     - name: startAtTail
       value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}

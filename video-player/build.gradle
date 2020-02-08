@@ -22,7 +22,7 @@ group = "io.pravega.example"
 version = samplesVersion
 archivesBaseName = "video-player"
 description = "video-player"
-mainClassName = "io.pravega.example.videoplayer.PravegaReaderVideoPlayer"
+mainClassName = "io.pravega.example.videoplayer.VideoPlayer"
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 

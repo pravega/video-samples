@@ -38,7 +38,7 @@ public class PravegaAppConfiguration {
 
         URI controllerURI = URI.create(getEnvVar("PRAVEGA_CONTROLLER_URI", "tcp://localhost:9090"));
         clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
-        defaultScope = getEnvVar("PRAVEGA_SCOPE", "video-demo");
+        defaultScope = getEnvVar("PRAVEGA_SCOPE", "examples");
         inputStreamConfig = new StreamConfig(defaultScope,"INPUT_");
         outputStreamConfig = new StreamConfig(defaultScope,"OUTPUT_");
         startAtTail = Boolean.parseBoolean(getEnvVar("START_AT_TAIL", "true"));
@@ -64,7 +64,6 @@ public class PravegaAppConfiguration {
     public String getDefaultScope() {
         return defaultScope;
     }
-
 
     public StreamConfig getInputStreamConfig() {
         return inputStreamConfig;
@@ -116,7 +115,6 @@ public class PravegaAppConfiguration {
     }
 
     protected static String getEnvVar(String name, String defaultValue) {
-//        System.out.println(System.getenv("controllerURI"));
         String value = System.getProperty(name);
         if (value != null && !value.isEmpty()) {
             return value;
