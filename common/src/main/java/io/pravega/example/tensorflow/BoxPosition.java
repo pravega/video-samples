@@ -14,6 +14,7 @@ package io.pravega.example.tensorflow;
  * Class to store the position of the bounding boxes
  */
 public class BoxPosition {
+    // TODO: What are units?
     private float left;
     private float top;
     private float right;

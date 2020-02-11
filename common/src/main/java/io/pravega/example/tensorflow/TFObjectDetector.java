@@ -26,20 +26,20 @@ import java.util.List;
 public class TFObjectDetector implements Serializable {
     private final Logger log = LoggerFactory.getLogger(TFObjectDetector.class);
 
-//    public List<Recognition> recognitions = null;
-//    Graph graph;
-    Session session;
     // Params used for image processing
-    int IMAGE_DIMENSION = 416;
-    float SCALE = 255f;
-    Output<Float> output = null;
-    private List<String> LABEL_DEF;
-    private static TFObjectDetector single_instance = null;
-    private static FloatBuffer floatBuffer = null;
+    private static final int IMAGE_DIMENSION = 416;
+    private static final float SCALE = 255f;
+    private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
 
+    private static TFObjectDetector single_instance;
+
+    private final Session session;
+    private final Output<Float> imagePreprocessingOutput;
+    private final List<String> LABEL_DEF;
 
     public static TFObjectDetector getInstance() {
-        if(single_instance == null) {
+        // TODO: fix race condition
+        if (single_instance == null) {
             single_instance = new TFObjectDetector();
         }
 
@@ -59,12 +59,12 @@ public class TFObjectDetector implements Serializable {
         session = new Session(graph);
         GraphBuilder graphBuilder = new GraphBuilder(graph);
 
-        output =
+        imagePreprocessingOutput =
                 graphBuilder.div( // Divide each pixels with the MEAN
                         graphBuilder.resizeBilinear( // Resize using bilinear interpolation
                                 graphBuilder.expandDims( // Increase the output tensors dimension
                                         graphBuilder.decodeJpeg(
-                                                graph.opBuilder("Placeholder", "image")
+                                                graph.opBuilder("Placeholder", JPEG_BYTES_PLACEHOLDER_NAME)
                                                         .setAttr("dtype", DataType.STRING)
                                                         .build().output(0), 3),
                                         graphBuilder.constant("make_batch", 0)),
@@ -79,54 +79,45 @@ public class TFObjectDetector implements Serializable {
      * @return output image with objects detected
      */
     public byte[] detect(byte[] image) {
-        long start = System.currentTimeMillis();
-        byte[] finalData = null;
-
-
-        List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(executeYOLOGraph(image), LABEL_DEF);
-
-        finalData = ImageUtil.getInstance().labelImage(image, recognitions);
-
-        long end = System.currentTimeMillis();
+        final long start = System.currentTimeMillis();
+        final float[] tensorFlowOutput = executeYOLOGraph(image);
+        final List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(tensorFlowOutput, LABEL_DEF);
+        final byte[] finalData = ImageUtil.getInstance().labelImage(image, recognitions);
+        final long end = System.currentTimeMillis();
         log.info("@@@@@@@@@@@  TENSORFLOW  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
-
-
         return finalData;
     }
 
     /**
      * Executes graph on the given preprocessed image
      *
-     * @param image preprocessed image
+     * @param jpegBytes JPEG image
      * @return output tensor returned by tensorFlow
      */
-    private float[] executeYOLOGraph(byte[] image) {
-        float[] outputTensor;
-
-        try(Tensor<Float> imageTensor = session.runner().feed("image", Tensor.create(image)).fetch(output.op().name()).run().get(0).expect(Float.class);
-            Tensor<Float> result = session.runner().feed("input", imageTensor).fetch("output").run().get(0).expect(Float.class)) {
-            outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(result)];
-            floatBuffer = FloatBuffer.wrap(outputTensor);
-            result.writeTo(floatBuffer);
+    private float[] executeYOLOGraph(byte[] jpegBytes) {
+        // Preprocess image (decode JPEG and resize)
+        try (final Tensor<?> jpegTensor = Tensor.create(jpegBytes)) {
+            final List<Tensor<?>> imagePreprocessorOutputs = session
+                    .runner()
+                    .feed(JPEG_BYTES_PLACEHOLDER_NAME, jpegTensor)
+                    .fetch(imagePreprocessingOutput.op().name())
+                    .run();
+            assert imagePreprocessorOutputs.size() == 1;
+            try (final Tensor<Float> preprocessedImageTensor = imagePreprocessorOutputs.get(0).expect(Float.class)) {
+                // YOLO object detection
+                final List<Tensor<?>> detectorOutputs = session
+                        .runner()
+                        .feed("input", preprocessedImageTensor)
+                        .fetch("output")
+                        .run();
+                assert detectorOutputs.size() == 1;
+                try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
+                    final float[] outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(resultTensor)];
+                    final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
+                    resultTensor.writeTo(floatBuffer);
+                    return outputTensor;
+                }
+            }
         }
-
-        floatBuffer.clear();
-        return outputTensor;
     }
-
-//    public List<Recognition> getRecognitions() {
-//        return recognitions;
-//    }
-
-//    private static void printToConsole() {
-//        for (Recognition recognition : getRecognitions()) {
-//            System.out.println("TITLE :  " + recognition.getTitle());
-//            System.out.println("CONFIDENCE :  " + recognition.getConfidence());
-//        }
-//    }
-
-//    private void setRecognitions(List<Recognition> recs) {
-//        this.recognitions = recs;
-//    }
-
 }

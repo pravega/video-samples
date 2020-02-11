@@ -40,6 +40,7 @@ public class YOLOClassifier {
 
     /**
      * Gets the number of classes based on the tensor shape
+     * TODO: make this a static method
      *
      * @param result - the tensorflow output
      * @return the number of classes
