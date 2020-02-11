@@ -101,6 +101,9 @@ public class VideoFrame {
     }
 
     public void validateHash() throws DigestException {
+        if (hash == null) {
+            return;
+        }
         byte[] calculatedHash = calculateHash();
         if (!MessageDigest.isEqual(calculatedHash, hash)) {
             throw new DigestException();
