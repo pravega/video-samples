@@ -103,32 +103,10 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
-            // Parse image file and obtain metadata.
-           /* DataStream<String> frameInfo = videoFrames
-                    .map(frame -> {
-                        InputStream inStream = new ByteArrayInputStream(frame.data);
-                        BufferedImage inImage = ImageIO.read(inStream);
-                        return String.format("camera %d, frame %d, %dx%dx%d, %d bytes, %s",
-                                frame.camera,
-                                frame.frameNumber,
-                                inImage.getWidth(),
-                                inImage.getHeight(),
-                                inImage.getColorModel().getNumColorComponents(),
-                                frame.data.length,
-                                inImage.toString());
-                    })
-                    .uid("frameInfo")
-                    .name("frameInfo");*/
-            //  frameInfo.printToErr().uid("frameInfo-print").name("frameInfo-print");
-
             //  identify objects with YOLOv3
             DataStream<VideoFrame> objectDetectedFrames = videoFrames
                     .map(frame -> {
                         frame.data = TFObjectDetector.getInstance().detect(frame.data);
-//                      frame.recognitions = new ArrayList<Recognition>();
-//                      for(Recognition rec : TFObjectDetector.getInstance().getRecognitions()) {
-//                          frame.recognitions.add(rec);
-//                      }
                         return frame;
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
