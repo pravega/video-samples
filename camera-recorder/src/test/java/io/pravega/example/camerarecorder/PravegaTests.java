@@ -37,6 +37,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
@@ -295,5 +296,20 @@ public class PravegaTests {
                 }
             }
         }
+    }
+
+    @Test
+    public void TestSerialization1() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        VideoFrame videoFrame = new VideoFrame();
+        videoFrame.camera = 0;
+        videoFrame.ssrc = 1;
+        videoFrame.timestamp = Timestamp.from(Instant.now());
+        videoFrame.frameNumber = 2;
+        videoFrame.data = new byte[]{0, 1, 2, 3, 4, 5};
+        videoFrame.hash = videoFrame.calculateHash();
+        ChunkedVideoFrame chunkedVideoFrame = new ChunkedVideoFrame(videoFrame);
+        String jsonString = mapper.writeValueAsString(chunkedVideoFrame);
+        log.info("jsonString={}", jsonString);
     }
 }
