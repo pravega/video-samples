@@ -18,8 +18,8 @@ import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
-import io.pravega.example.video.ChunkedVideoFrame;
-import io.pravega.example.video.VideoFrame;
+import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.CanvasFrame;
 import org.bytedeco.javacv.Frame;
@@ -92,7 +92,7 @@ public class VideoPlayer implements Runnable {
                         // TODO: Reassemble multiple chunks - see ChunkedVideoFrameReassembler
                         VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
-                            videoFrame.validateHash();
+//                            videoFrame.validateHash();
                             Mat pngMat = new Mat(new BytePointer(videoFrame.data));
                             Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
                             Frame frame = converter.convert(mat);

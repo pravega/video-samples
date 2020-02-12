@@ -1,0 +1,10 @@
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: ClusterFlinkImage
+metadata:
+  name: 2.0.0
+spec:
+  apiversion: v1
+  docker:
+    image: 024626128611.dkr.ecr.us-west-2.amazonaws.com/desa-lab-sulfur/cuda-flink:cuda10.0flink1.7.2
+    pullPolicy: IfNotPresent
+  flinkVersion: 2.0.0

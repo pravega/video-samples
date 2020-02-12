@@ -1,6 +1,6 @@
 package io.pravega.example.videoprocessor;
 
-import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.common.ChunkedVideoFrame;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;

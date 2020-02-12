@@ -42,13 +42,16 @@ public class AppConfiguration {
 
     public AppConfiguration(String[] args) {
         params = ParameterTool.fromArgs(args);
+
         log.info("Parameter Tool: {}", getParams().toMap());
         String defaultScope = getParams().get("scope", "examples");
+
         pravegaConfig = PravegaConfig.fromParams(getParams()).withDefaultScope(defaultScope);
         inputStreamConfig = new StreamConfig(getPravegaConfig(),"input-",  getParams());
         outputStreamConfig = new StreamConfig(getPravegaConfig(),"output-",  getParams());
         parallelism = getParams().getInt("parallelism", PARALLELISM_UNKNOWN);
         readerParallelism = getParams().getInt("readerParallelism", PARALLELISM_DEFAULT);
+
         checkpointIntervalMs = getParams().getLong("checkpointIntervalMs", 10000);
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
@@ -129,7 +132,7 @@ public class AppConfiguration {
         private final int minNumSegments;
 
         public StreamConfig(PravegaConfig pravegaConfig, String argPrefix, ParameterTool params) {
-            stream = pravegaConfig.resolve(params.get(argPrefix + "stream", "default"));
+            stream = pravegaConfig.resolve(params.get(argPrefix + "stream", "video-demo-stream"));
             targetRate = params.getInt(argPrefix + "targetRate", 100000);  // data rate in KB/sec
             scaleFactor = params.getInt(argPrefix + "scaleFactor", 2);
             minNumSegments = params.getInt(argPrefix + "minNumSegments", 2);

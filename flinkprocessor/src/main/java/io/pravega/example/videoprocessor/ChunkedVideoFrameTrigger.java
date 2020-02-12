@@ -10,7 +10,7 @@
  */
 package io.pravega.example.videoprocessor;
 
-import io.pravega.example.video.ChunkedVideoFrame;
+import io.pravega.example.common.ChunkedVideoFrame;
 import org.apache.flink.streaming.api.windowing.triggers.Trigger;
 import org.apache.flink.streaming.api.windowing.triggers.TriggerResult;
 import org.slf4j.Logger;

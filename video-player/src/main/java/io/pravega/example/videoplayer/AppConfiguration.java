@@ -1,13 +1,13 @@
 package io.pravega.example.videoplayer;
 
-import io.pravega.example.video.PravegaAppConfiguration;
+import io.pravega.example.common.PravegaAppConfiguration;
 
 public class AppConfiguration extends PravegaAppConfiguration {
     private final int camera;
 
     public AppConfiguration(String[] args) {
         super(args);
-        camera = Integer.parseInt(getEnvVar("CAMERA", "1000"));
+        camera = Integer.parseInt(getEnvVar("CAMERA", "3"));
     }
 
     @Override

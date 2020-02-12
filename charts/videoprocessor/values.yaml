@@ -3,8 +3,30 @@ mavenCoordinate:
   artifact: flinkprocessor
   version: 0.1.0
 
-VideoDataGeneratorJob:
+
+FlinkObjectDetectorJob:
+  scope: "examples"
   enabled: true
+  parallelism: 1
+  enableOperatorChaining: "false"
+  input:
+    stream: examples-raw
+    minNumSegments: 1
+  output:
+    stream: examples-detected
+    minNumSegments: 1
+  startAtTail: "true"
+  maxOutOfOrdernessMs: 1000
+  taskManager:
+    replicas: 1
+    memory: 20G
+    cpu: 5000m
+    heap: 500m
+    taskSlots: 5
+
+
+VideoDataGeneratorJob:
+  enabled: false
   parallelism: 1
   enableOperatorChaining: "false"
   useCachedFrame: "false"
@@ -19,7 +41,7 @@ VideoDataGeneratorJob:
     taskSlots: 2
 
 MultiVideoGridJob:
-  enabled: true
+  enabled: false
   parallelism: 1
   readerParallelism: -1
   enableOperatorChaining: "false"
@@ -42,7 +64,7 @@ MultiVideoGridJob:
     taskSlots: 4
 
 VideoReaderJob:
-  enabled: true
+  enabled: false
   parallelism: 1
   enableOperatorChaining: "false"
   startAtTail: "false"
@@ -52,3 +74,5 @@ VideoReaderJob:
     memory: 4G
     cpu: 250m
     taskSlots: 1
+
+
