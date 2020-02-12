@@ -19,8 +19,8 @@ apply plugin: "com.github.johnrengelman.shadow"
 
 group = "io.pravega.example"
 version = samplesVersion
-archivesBaseName = "video-videoprocessor"
-description = "video-videoprocessor"
+archivesBaseName = "video-flinkprocessor"
+description = "video-flinkprocessor"
 // The default main class.
 mainClassName =  "io.pravega.example.videoprocessor.FlinkVideoReaderJob"
 sourceCompatibility = 1.8

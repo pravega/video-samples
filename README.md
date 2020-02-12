@@ -5,11 +5,9 @@
 
 ![grid-sample](images/video-samples-diagram.png)
 
-This project demonstrates an object detection use case using Nautilus and Flink.
+This project demonstrates methods to store, process, and read video with Pravega and Flink.
 
 ## Components
-- Nautilus: Nautilus is a new stream storage and analytics platform made by dell. It allows for handling streaming data at scale.
-
 - Pravega: Pravega provides a new storage abstraction - a stream - for continuous and unbounded data. 
   A Pravega stream is a durable, elastic, append-only, unbounded sequence of bytes that has good performance and strong consistency.
 

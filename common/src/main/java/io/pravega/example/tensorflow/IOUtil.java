@@ -23,7 +23,6 @@ public final class IOUtil {
         try {
             return IOUtils.toByteArray(file);
         } catch (IOException | NullPointerException ex) {
-            LOGGER.error("Failed to read [{}]!", file);
             throw new RuntimeException("Failed to read [" + file + "]!", ex);
         }
     }
