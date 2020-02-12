@@ -13,6 +13,7 @@ package io.pravega.example.common;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.StreamCut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +87,8 @@ public class PravegaAppConfiguration {
         private final int targetRate;
         private final int scaleFactor;
         private final int minNumSegments;
+        private final StreamCut startStreamCut;
+        private final StreamCut endStreamCut;
 
         public StreamConfig(String defaultScope, String prefix) {
             String streamName = getEnvVar(prefix + "STREAM_NAME", "video-demo-stream");
@@ -93,6 +96,8 @@ public class PravegaAppConfiguration {
             targetRate = Integer.parseInt(getEnvVar(prefix + "TARGET_RATE_KB_PER_SEC", "100000"));
             scaleFactor = Integer.parseInt(getEnvVar(prefix + "SCALE_FACTOR", "2"));
             minNumSegments = Integer.parseInt(getEnvVar(prefix + "MIN_NUM_SEGMENTS", "1"));
+            startStreamCut = StreamCut.from(getEnvVar(prefix + "START_STREAM_CUT", StreamCut.UNBOUNDED.asText()));
+            endStreamCut = StreamCut.from(getEnvVar(prefix + "END_STREAM_CUT", StreamCut.UNBOUNDED.asText()));
         }
 
         @Override
@@ -102,6 +107,8 @@ public class PravegaAppConfiguration {
                     ", targetRate=" + targetRate +
                     ", scaleFactor=" + scaleFactor +
                     ", minNumSegments=" + minNumSegments +
+                    ", startStreamCut=" + startStreamCut +
+                    ", endStreamCut=" + endStreamCut +
                     '}';
         }
 
@@ -111,6 +118,14 @@ public class PravegaAppConfiguration {
 
         public ScalingPolicy getScalingPolicy() {
             return ScalingPolicy.byDataRate(targetRate, scaleFactor, minNumSegments);
+        }
+
+        public StreamCut getStartStreamCut() {
+            return startStreamCut;
+        }
+
+        public StreamCut getEndStreamCut() {
+            return endStreamCut;
         }
     }
 
