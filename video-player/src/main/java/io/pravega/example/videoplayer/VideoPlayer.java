@@ -60,42 +60,56 @@ public class VideoPlayer implements Runnable {
             String scope = getConfig().getInputStreamConfig().getStream().getScope();
             String streamName = getConfig().getInputStreamConfig().getStream().getStreamName();
             ClientConfig clientConfig = getConfig().getClientConfig();
+
             StreamInfo streamInfo;
             try (StreamManager streamManager = StreamManager.create(clientConfig)) {
                 streamInfo = streamManager.getStreamInfo(scope, streamName);
             }
-            final long timeoutMs = 1000;
-            ObjectMapper mapper = new ObjectMapper();
-            log.info("gamma={}", CanvasFrame.getDefaultGamma());
-            final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega", 1.0);
-            OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
+
+            StreamCut startStreamCut = getConfig().getInputStreamConfig().getStartStreamCut();
+            if (startStreamCut == StreamCut.UNBOUNDED && getConfig().isStartAtTail()) {
+                startStreamCut = streamInfo.getTailStreamCut();
+            }
+
             final String readerGroup = UUID.randomUUID().toString().replace("-", "");
             final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
                     .stream(
                             getConfig().getInputStreamConfig().getStream(),
-                            streamInfo.getTailStreamCut(),
-                            StreamCut.UNBOUNDED)
+                            startStreamCut,
+                            getConfig().getInputStreamConfig().getEndStreamCut())
                     .build();
             try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
                 readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
             }
+
+            final long timeoutMs = 1000;
+            final ObjectMapper mapper = new ObjectMapper();
+            log.info("gamma={}", CanvasFrame.getDefaultGamma());
+            final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega", 1.0);
+            OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
+
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
                  EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
                          readerGroup,
                          new ByteBufferSerializer(),
                          ReaderConfig.builder().build())) {
+                final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(getConfig().getInputStreamConfig().getStream());
                 for (;;) {
                     EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
                     if (event.getEvent() != null) {
-                        ChunkedVideoFrame chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
+                        streamCutBuilder.addEvent(event.getPosition());
+                        final StreamCut streamCutForNextEvent = streamCutBuilder.getStreamCut();
+                        final ChunkedVideoFrame chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
                         log.info("chunkedVideoFrame={}", chunkedVideoFrame);
+                        log.info("streamCutForNextEvent={}", streamCutForNextEvent);
+                        log.info("streamCutForNextEvent={}", streamCutForNextEvent.asText());
                         // TODO: Reassemble multiple chunks - see ChunkedVideoFrameReassembler
-                        VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
+                        final VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
-//                            videoFrame.validateHash();
-                            Mat pngMat = new Mat(new BytePointer(videoFrame.data));
-                            Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
-                            Frame frame = converter.convert(mat);
+                            videoFrame.validateHash();
+                            final Mat pngMat = new Mat(new BytePointer(videoFrame.data));
+                            final Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
+                            final Frame frame = converter.convert(mat);
                             cFrame.showImage(frame);
                         }
                     }
