@@ -10,10 +10,13 @@
  */
 package io.pravega.example.common;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Allows a VideoFrame to be split into smaller chunks.
  * VideoFrame.data contains the chunk of data.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ChunkedVideoFrame extends VideoFrame {
     // 0-based chunk index. The first chunk of each frame has chunkIndex 0.
     public short chunkIndex;
