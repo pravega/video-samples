@@ -12,7 +12,6 @@ package io.pravega.example.common;
 
 import io.pravega.example.tensorflow.Recognition;
 
-import java.io.Serializable;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
