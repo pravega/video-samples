@@ -109,28 +109,32 @@ public class VideoPlayer implements Runnable {
                 .build();
         try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
             readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
-        }
-        try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
-             EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
-                     readerGroup,
-                     new ByteBufferSerializer(),
-                     ReaderConfig.builder().build())) {
-            for (;;) {
-                EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
-                if (event.getEvent() != null) {
-                    ChunkedVideoFrame chunkedVideoFrame = null;
-                    try {
-                        chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
-                    } catch (IOException e) {
-                        log.warn("Error parsing event", e);
-                        continue;
-                    }
-                    log.info("chunkedVideoFrame={}", chunkedVideoFrame);
-                    VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
-                    synchronized (latestFrames) {
-                        latestFrames.put(videoFrame.camera, videoFrame);
+            try {
+                try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
+                     EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
+                             readerGroup,
+                             new ByteBufferSerializer(),
+                             ReaderConfig.builder().build())) {
+                    for (; ; ) {
+                        EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
+                        if (event.getEvent() != null) {
+                            ChunkedVideoFrame chunkedVideoFrame = null;
+                            try {
+                                chunkedVideoFrame = mapper.readValue(event.getEvent().array(), ChunkedVideoFrame.class);
+                            } catch (IOException e) {
+                                log.warn("Error parsing event", e);
+                                continue;
+                            }
+                            log.info("chunkedVideoFrame={}", chunkedVideoFrame);
+                            VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
+                            synchronized (latestFrames) {
+                                latestFrames.put(videoFrame.camera, videoFrame);
+                            }
+                        }
                     }
                 }
+            } finally {
+                readerGroupManager.deleteReaderGroup(readerGroup);
             }
         }
     }
