@@ -93,7 +93,7 @@ public class VideoPlayer implements Runnable {
                          readerGroup,
                          new ByteBufferSerializer(),
                          ReaderConfig.builder().build())) {
-                final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(getConfig().getInputStreamConfig().getStream());
+                final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(getConfig().getInputStreamConfig().getStream(), startStreamCut);
                 for (;;) {
                     EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
                     if (event.getEvent() != null) {
