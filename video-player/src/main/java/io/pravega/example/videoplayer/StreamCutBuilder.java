@@ -1,35 +1,34 @@
 package io.pravega.example.videoplayer;
 
-import io.pravega.client.segment.impl.Segment;
-import io.pravega.client.stream.*;
+import io.pravega.client.stream.Position;
+import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.StreamCut;
 import io.pravega.client.stream.impl.PositionImpl;
 import io.pravega.client.stream.impl.StreamCutImpl;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * This builds a StreamCut based on the Position of an event.
+ * This incrementally builds a StreamCut by starting with the reader group's
+ * starting StreamCut and updating it after each event has been read by
+ * this reader.
  * The StreamCut will point to the event immediately following the event
- * whose Position was provided. The StreamCut will also point to
- * any unread events in other segments.
- *
- * TODO: Confirm that this works for multi-segment streams and through scaling events.
+ * whose Position was provided.
  */
 public class StreamCutBuilder {
     private final Stream stream;
-    private Map<Segment, Long> ownedSegmentsWithOffsets = new HashMap<>();
+    private StreamCut streamCut;
 
-    public StreamCutBuilder(Stream stream) {
+    public StreamCutBuilder(Stream stream, StreamCut startStreamCut) {
         this.stream = stream;
+        this.streamCut = startStreamCut;
     }
 
     public void addEvent(Position position) {
         final PositionImpl pos = (PositionImpl) position;
-        ownedSegmentsWithOffsets = pos.getOwnedSegmentsWithOffsets();
+        // TODO: This may not provide a complete stream cut if there are multiple readers in the reader group.
+        streamCut = new StreamCutImpl(stream, pos.getOwnedSegmentsWithOffsets());
     }
 
     public StreamCut getStreamCut() {
-        return new StreamCutImpl(stream, ownedSegmentsWithOffsets);
+        return streamCut;
     }
 }
