@@ -23,36 +23,41 @@ import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.*;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.global.opencv_videoio;
+import org.bytedeco.opencv.opencv_core.CvRect;
+import org.bytedeco.opencv.opencv_core.IplImage;
 import org.bytedeco.opencv.opencv_core.Mat;
-import org.bytedeco.opencv.opencv_videoio.VideoCapture;
-import org.bytedeco.videoinput.videoInput;
+import org.bytedeco.opencv.opencv_core.Rect;
+
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.rmi.ConnectIOException;
 import java.sql.Timestamp;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
+import static org.bytedeco.opencv.global.opencv_core.*;
+import static org.bytedeco.opencv.helper.opencv_imgcodecs.cvSaveImage;
+
 /**
  * Reads video images from a web cam and writes them to a Pravega stream.
  */
-public class CameraRecorder implements Runnable {
-    private static Logger log = LoggerFactory.getLogger(CameraRecorder.class);
+public class CameraRecorderVideoInput implements Runnable {
+    private static Logger log = LoggerFactory.getLogger(CameraRecorderVideoInput.class);
 
     private final AppConfiguration config;
 
     public static void main(String... args) {
         AppConfiguration config = new AppConfiguration(args);
         log.info("config: {}", config);
-        Runnable app = new CameraRecorder(config);
+        Runnable app = new CameraRecorderVideoInput(config);
         app.run();
     }
 
-    public CameraRecorder(AppConfiguration appConfiguration) {
+    public CameraRecorderVideoInput(AppConfiguration appConfiguration) {
         config = appConfiguration;
     }
 
@@ -68,24 +73,28 @@ public class CameraRecorder implements Runnable {
                 }
             }
 
+
             // Initialize camera.
             final int captureWidth = getConfig().getImageWidth();
             final int captureHeight = getConfig().getImageHeight();
             log.info("creating grabber");
-            final VideoCapture cap = new VideoCapture("/home/vidyat/Desktop/video-samples/data/sampleVideo.mp4");
+//            final VideoCapture cap = new VideoCapture("/home/vidyat/Desktop/video-samples/data/sampleVideo.mp4");
+            final FFmpegFrameGrabber grabber = new FFmpegFrameGrabber("/home/vidyat/Desktop/video-samples/data/DJI_0023.MP4");
+//            final FrameGrabber grabber = new OpenCVFrameGrabber(getConfig().getCameraDeviceNumber());
 
 
+            log.info("starting grabber");
+//            log.info("frame rate wanted: {}", getConfig().getFramesPerSec());
+//            grabber.setFrameRate(getConfig().getFramesPerSec());
 
-            if(!cap.open(getConfig().getCameraDeviceNumber())) {
-                throw new ConnectIOException("Cannot open the camera");
-            }
+            grabber.start();
+            log.info("grabber frame rate={}", grabber.getFrameRate());
 
-            log.info("starting video capture");
-            cap.set(opencv_videoio.CAP_PROP_FPS, getConfig().getFramesPerSec());
-            cap.set(opencv_videoio.CAP_PROP_FRAME_WIDTH, captureWidth);
-            cap.set(opencv_videoio.CAP_PROP_FRAME_HEIGHT, captureHeight);
+//            if(!cap.open(getConfig().getCameraDeviceNumber())) {
+//                throw new ConnectIOException("Cannot open the camera");
+//            }
 
-            final double actualFramesPerSec = cap.get(opencv_videoio.CAP_PROP_FPS);
+            final double actualFramesPerSec = grabber.getFrameRate();
             log.info("actual frame rate={}", actualFramesPerSec);
             final boolean dropFrames = actualFramesPerSec > getConfig().getFramesPerSec();
             long lastTimestamp = 0;
@@ -107,15 +116,40 @@ public class CameraRecorder implements Runnable {
                 ObjectMapper mapper = new ObjectMapper();
                 OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
 
+                OpenCVFrameConverter.ToIplImage convertToIplImage = new OpenCVFrameConverter.ToIplImage();
+
                 int frameNumber = 0;
                 int ssrc = new Random().nextInt();
                 Frame capturedFrame;
 
-                Mat mat = new Mat();
-
 //                OpenCVFrameConverter.ToIplImage converterToImage = new OpenCVFrameConverter.ToIplImage();
-                while (cap.read(mat)) {
-                    capturedFrame = converterToMat.convert(mat);
+                while ((capturedFrame = grabber.grabImage()) != null) {
+//                    Mat mat = converterToMat.convert(capturedFrame);
+
+//                    log.info("Matrix dimensions: {}, {}", mat.arrayWidth(), mat.arrayHeight());
+
+                    IplImage img = convertToIplImage.convert(capturedFrame);
+
+                    CvRect rect = new CvRect();
+                    rect.x(0);
+                    rect.y(1000);
+                    rect.width(1000);
+                    rect.height(1000);
+
+                    cvSetImageROI(img, rect);
+                    IplImage cropped = cvCreateImage(cvGetSize(img), img.depth(), img.nChannels());
+                    // Copy original image (only ROI) to the cropped image
+                    cvCopy(img, cropped);
+                    cvSaveImage("cropped.png", cropped);
+
+                    Frame croppedFrame = convertToIplImage.convert(cropped);
+                    Mat mat = converterToMat.convertToMat(croppedFrame);
+
+
+
+
+//                    System.out.println("*********************** size:" + );
+//                    capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
                     // drop frames to adjust speed of camera recorder
                     if (dropFrames && timestamp - lastTimestamp < 1000 / getConfig().getFramesPerSec()) {
@@ -126,10 +160,10 @@ public class CameraRecorder implements Runnable {
                     log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
 
                     // Convert captured frame to PNG.
-                    BytePointer pngBytePointer = new BytePointer();
-                    opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
-                    log.info("pngBytePointer={}", pngBytePointer);
-                    byte[] pngByteArray = pngBytePointer.getStringBytes();
+                    BytePointer jpgBytePointer = new BytePointer();
+                    opencv_imgcodecs.imencode(".jpg", mat,  jpgBytePointer);
+                    log.info("jpgBytePointer={}", jpgBytePointer);
+                    byte[] pngByteArray = jpgBytePointer.getStringBytes();
                     if (false) {
                         Files.write((new File(String.format("capture-%05d.png", frameNumber))).toPath(), pngByteArray);
                     }
@@ -144,13 +178,15 @@ public class CameraRecorder implements Runnable {
                     videoFrame.hash = videoFrame.calculateHash();
                     ChunkedVideoFrame chunkedVideoFrame = new ChunkedVideoFrame(videoFrame);
                     ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(chunkedVideoFrame));
+                    log.info("Remaining: {}", jsonBytes.remaining());
+
 
                     // Write to Pravega.
                     CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
 
                     // Show our frame in the preview window..
                     if (cFrame.isVisible()) {
-                        cFrame.showImage(capturedFrame);
+                        cFrame.showImage(croppedFrame);
                     }
 
                     // Make sure frame has been durably persisted to Pravega.

@@ -74,7 +74,7 @@ public class ImageUtil {
         try
         {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(bufferedImage, "jpg", baos);
+            ImageIO.write(bufferedImage, "jpg", baos);      // change to png from jpeg
             bytes = baos.toByteArray();
         }
         catch (IOException e)
