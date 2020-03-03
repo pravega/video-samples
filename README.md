@@ -122,28 +122,7 @@ git checkout r0.5
 popd
 ```
 
-### (Nautilus SDK Desktop) Enable Nautilus Authentication
-
-Accessing Pravega on Nautilus requires authentication provided by a credentials jar file.
-This file is available in your local Maven repository.
-If necessary, edit the file `gradle.properties` to include the following line.
-
-```
-includePravegaCredentials=true
-```
-
 ### (External) Configure Nautilus Authentication
-
-Obtain the file pravega-keycloak-credentials-*.jar and place it in the lib directory.
-
-```
-sudo apt install maven
-PRAVEGA_CREDENTIALS_VERSION=0.5.0-2306.a5a5cdf-0.11.10-002.985e705
-mvn install:install-file \
--Dfile=lib/pravega-keycloak-credentials-${PRAVEGA_CREDENTIALS_VERSION}-shadow.jar \
--DgroupId=io.pravega -DartifactId=pravega-keycloak-credentials \
--Dversion=${PRAVEGA_CREDENTIALS_VERSION} -Dpackaging=jar
-```
 
 Obtain the Pravega authentication credentials.
 ```
@@ -158,6 +137,11 @@ you must manually replace `${HOME}` with your actual home directory.
 export pravega_client_auth_method=Bearer
 export pravega_client_auth_loadDynamic=true
 export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
+```
+
+Obtain the "desdp" user password.
+```
+kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.password}' | base64 -d ; echo
 ```
 
 ### Determine the Pravega Controller URL
@@ -226,6 +210,8 @@ kubectl port-forward service/repo 9092:80 --namespace examples &
 
 2. Build and publish your application JAR file.
 ```
+export MAVEN_USERNAME=desdp
+export MAVEN_PASSWORD=your_password
 ./gradlew publish
 ```
 

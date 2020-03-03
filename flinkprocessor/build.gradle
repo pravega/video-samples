@@ -17,7 +17,7 @@ apply plugin: "application"
 apply plugin: "maven-publish"
 apply plugin: "com.github.johnrengelman.shadow"
 
-group = "io.pravega.example"
+group = "io.pravega.example.video"
 version = samplesVersion
 archivesBaseName = "video-flinkprocessor"
 description = "video-flinkprocessor"
@@ -79,8 +79,8 @@ publishing {
     repositories {
         maven {
             credentials {
-                username userName
-                password passWord
+                username "$System.env.MAVEN_USERNAME"
+                password "$System.env.MAVEN_PASSWORD"
             }
             url projectRepoUrl
         }
