@@ -1,0 +1,40 @@
+hub:
+  extraConfig:
+    jupyterlab: |
+      c.Spawner.cmd = ['jupyter-labhub']
+
+prePuller:
+  hook:
+    enabled: false
+
+singleuser:
+  defaultUrl: "/lab"
+  extraEnv:
+    pravega_client_auth_method: "Bearer"
+    pravega_client_auth_loadDynamic: "true"
+    KEYCLOAK_SERVICE_ACCOUNT_FILE: "/var/run/secrets/nautilus.dellemc.com/serviceaccount/keycloak.json"
+  image:
+    name: jupyter/minimal-notebook
+    tag: ae5f7e104dd5
+  imagePullPolicy: Always
+  profileList:
+
+    - display_name: "Jupyter Notebook"
+      default: true
+      description: "Jupyter Notebook"
+      kubespawner_override:
+        image: jupyter/all-spark-notebook:f646d2b2a3af
+
+  storage:
+    extraVolumes:
+      - name: examples-pravega
+        secret:
+          secretName: examples-pravega
+      - name: data-project
+        persistentVolumeClaim:
+          claimName: data-project
+    extraVolumeMounts:
+      - name: examples-pravega
+        mountPath: /var/run/secrets/nautilus.dellemc.com/serviceaccount
+      - name: data-project
+        mountPath: /home/jovyan/data-project
