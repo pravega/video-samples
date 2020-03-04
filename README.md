@@ -27,10 +27,10 @@ This project demonstrates methods to store, process, and read video with Pravega
 ## Building and Running the Video Samples
 
 In the steps below, sections noted with **(Nautilus SDK Desktop)** apply only to a
-Nautilus SDK Desktop in a Kubernetes deployment of Nautilus.
+Nautilus SDK Desktop in a Kubernetes deployment of SDP.
 Sections noted with **(Local)** apply to a local workstation deployment of Pravega (standalone or Docker).
 Sections noted with **(External)** apply to a local workstation running IntelliJ that
-connects to Pravega running in an external Kubernetes deployment of Nautilus.
+connects to Pravega running in an external Kubernetes deployment of SDP.
 
 ### Download this Repository
 
@@ -104,7 +104,7 @@ curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' h
 
 ### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries
 
-This step is required when using pre-release versions of Pravega and/or Nautilus.
+This step is required when using pre-release versions of Pravega and/or SDP.
 It will install required libraries in the local Maven repository.
 This can be skipped in Nautilus SDK Desktop as it has already been performed.
 
@@ -122,7 +122,7 @@ git checkout r0.5
 popd
 ```
 
-### (External) Configure Nautilus Authentication
+### (External) Configure SDP Authentication
 
 Obtain the Pravega authentication credentials.
 ```
@@ -149,11 +149,13 @@ kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.passwor
 - Local:
   `tcp://127.0.0.1:9090`
 
-- Nautilus SDK Desktop or a Flink job running in Nautilus:
+- Nautilus SDK Desktop or a Flink job running in SDP:
   `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
 
 - External:
-  (provided by the Nautilus administrator)
+  The IP address and DNS name can be retrieved by running:
+  `kubectl get -n nautilus-pravega svc nautilus-pravega-controller -o yaml`
+  For non-TLS, use the form `tcp://ip:9090`.
 
 ### Running the Examples in IntelliJ
 
@@ -201,9 +203,9 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 ![grid-sample](images/grid-sample.png)
 
-### Running the Examples in Nautilus
+### Running the Examples in SDP
 
-1. You must make the Maven repo in Nautilus available to your development workstation.
+1. You must make the Maven repo in SDP available to your development workstation.
 ```
 kubectl port-forward service/repo 9092:80 --namespace examples &
 ```
@@ -230,7 +232,7 @@ terminate, restart with the new JAR file, and resume from the last savepoint.
 Note: You may use the script `scripts/uninstall.sh` to delete your Flink application and cluster.
 This will also delete any savepoints.
 
-### Viewing Logs in Nautilus
+### Viewing Logs in SDP
 
 To troubleshoot a failed job, begin with the following command.
 ```
@@ -483,9 +485,9 @@ examples-detected
 true
 ```
 
-### Running the Examples in Nautilus
+### Running the Examples in SDP
 
-1. You must make the Maven repo in Nautilus available to your development workstation.
+1. You must make the Maven repo in SDP available to your development workstation.
 ```
 kubectl port-forward service/repo 9092:80 --namespace examples &
 ```
