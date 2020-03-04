@@ -7,7 +7,7 @@ metadata:
     name: flink-object-detector
 spec:
   imageRef:
-    name: 1.7.2
+    name: "cuda10.0flink1.7.2"
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:
