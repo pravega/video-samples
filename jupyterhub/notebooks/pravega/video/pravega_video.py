@@ -1,16 +1,12 @@
 
-from matplotlib import pyplot as plt
 import IPython
+import base64
 import cv2
-import itertools
+import json
 import numpy as np
 import pandas as pd
-import grpc
-import pravega
-import json
-import base64
-import datetime
-import time
+import pravega.grpc_gateway as pravega
+from matplotlib import pyplot as plt
 
 
 def ignore_non_events(read_events):
@@ -58,7 +54,7 @@ class UnindexedStream():
 
     def read_video_frames(self, from_stream_cut=None, to_stream_cut=None):
         read_events = self.read_events(from_stream_cut, to_stream_cut)
-        return [self.read_event_to_video_frame(read_event) for read_event in read_events]
+        return (self.read_event_to_video_frame(read_event) for read_event in read_events)
 
 
     def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1):

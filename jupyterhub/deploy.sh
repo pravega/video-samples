@@ -1,13 +1,11 @@
 #! /bin/bash
 set -ex
 
-ROOT_DIR=$(dirname $0)/..
-
 helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/
 helm repo update
 
 RELEASE=jupyterhub
-NAMESPACE=examples
+NAMESPACE=${NAMESPACE:-examples}
 
 helm upgrade --install \
 $RELEASE \
