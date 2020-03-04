@@ -13,3 +13,4 @@ data/
 lib/*
 !lib/README.txt
 out/
+__pycache__
