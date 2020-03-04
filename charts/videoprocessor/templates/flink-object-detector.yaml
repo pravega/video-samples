@@ -9,11 +9,10 @@ spec:
   imageRef:
     name: 1.7.2
   zookeeperUrl: zookeeper-client:2181
-storage:
+  storage:
     volumeSource:
       persistentVolumeClaim:
         claimName: data-project
-
   localStorage:
     replicas: 2
     volumeClaimTemplate:

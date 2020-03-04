@@ -4,7 +4,6 @@ mavenCoordinate:
   version: 0.1.0
 
 FlinkObjectDetectorJob:
-  scope: "examples"
   enabled: true
   parallelism: 1
   enableOperatorChaining: "false"
@@ -14,14 +13,14 @@ FlinkObjectDetectorJob:
   output:
     stream: examples-detected
     minNumSegments: 1
-  startAtTail: "true"
+  startAtTail: "false"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
-    memory: 20G
-    cpu: 5000m
+    memory: 2G
     heap: 500m
-    taskSlots: 5
+    cpu: 1000m
+    taskSlots: 1
 
 VideoDataGeneratorJob:
   enabled: true
@@ -36,7 +35,7 @@ VideoDataGeneratorJob:
     replicas: 1
     memory: 2G
     cpu: 250m
-    taskSlots: 2
+    taskSlots: 1
 
 MultiVideoGridJob:
   enabled: false
@@ -47,7 +46,7 @@ MultiVideoGridJob:
     stream: video1
     minNumSegments: 1
   output:
-    stream: grid1
+    stream: video1
     minNumSegments: 1
   imageWidth: 75
   framesPerSec: 1.0
@@ -62,14 +61,14 @@ MultiVideoGridJob:
     taskSlots: 4
 
 VideoReaderJob:
-  enabled: false
+  enabled: true
   parallelism: 1
   enableOperatorChaining: "false"
   startAtTail: "false"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
-    memory: 4G
+    memory: 1G
     cpu: 250m
     taskSlots: 1
 
