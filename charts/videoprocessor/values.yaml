@@ -3,14 +3,13 @@ mavenCoordinate:
   artifact: flinkprocessor
   version: 0.1.0
 
-
 FlinkObjectDetectorJob:
   scope: "examples"
   enabled: true
   parallelism: 1
   enableOperatorChaining: "false"
   input:
-    stream: examples-raw
+    stream: video1
     minNumSegments: 1
   output:
     stream: examples-detected
@@ -24,16 +23,15 @@ FlinkObjectDetectorJob:
     heap: 500m
     taskSlots: 5
 
-
 VideoDataGeneratorJob:
-  enabled: false
+  enabled: true
   parallelism: 1
   enableOperatorChaining: "false"
   useCachedFrame: "false"
-  numCameras: 3
+  numCameras: 1
   imageWidth: 100
   framesPerSec: 1.0
-  chunkSizeBytes: 10240
+  chunkSizeBytes: 524288
   taskManager:
     replicas: 1
     memory: 2G

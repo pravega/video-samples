@@ -126,7 +126,8 @@ popd
 
 Obtain the Pravega authentication credentials.
 ```
-kubectl get secret examples-pravega -n examples -o jsonpath="{.data.keycloak\.json}" | base64 -d > ${HOME}/keycloak.json
+export NAMESPACE=examples
+kubectl get secret ${NAMESPACE}-pravega -n ${NAMESPACE} -o jsonpath="{.data.keycloak\.json}" | base64 -d > ${HOME}/keycloak.json
 chmod go-rw ${HOME}/keycloak.json
 ```
 
@@ -207,7 +208,7 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 1. You must make the Maven repo in SDP available to your development workstation.
 ```
-kubectl port-forward service/repo 9092:80 --namespace examples &
+kubectl port-forward service/repo 9092:80 --namespace ${NAMESPACE} &
 ```
 
 2. Build and publish your application JAR file.
