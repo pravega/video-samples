@@ -8,7 +8,6 @@ docker run \
 -p 8890:8888 \
 -e JUPYTER_ENABLE_LAB=yes \
 -v "${ROOT_DIR}":/home/jovyan/video-samples \
--v /mnt:/home/jovyan/mnt \
 --name jupyter-notebook-video-samples \
 jupyter/all-spark-notebook:f646d2b2a3af \
 jupyter-lab \

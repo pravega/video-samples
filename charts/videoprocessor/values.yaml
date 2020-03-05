@@ -23,7 +23,7 @@ FlinkObjectDetectorJob:
     taskSlots: 1
 
 VideoDataGeneratorJob:
-  enabled: true
+  enabled: false
   parallelism: 1
   enableOperatorChaining: "false"
   useCachedFrame: "false"
