@@ -107,6 +107,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             DataStream<VideoFrame> objectDetectedFrames = videoFrames
                     .map(frame -> {
                         frame.data = TFObjectDetector.getInstance().detect(frame.data);
+                        frame.hash = frame.calculateHash();
                         return frame;
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
