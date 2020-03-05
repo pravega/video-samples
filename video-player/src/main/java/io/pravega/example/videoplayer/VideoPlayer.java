@@ -106,7 +106,7 @@ public class VideoPlayer implements Runnable {
                         // TODO: Reassemble multiple chunks - see ChunkedVideoFrameReassembler
                         final VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
-//                            videoFrame.validateHash();
+                            videoFrame.validateHash();
                             final Mat pngMat = new Mat(new BytePointer(videoFrame.data));
                             final Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
                             final Frame frame = converter.convert(mat);
