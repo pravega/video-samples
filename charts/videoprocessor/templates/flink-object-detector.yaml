@@ -54,13 +54,13 @@ spec:
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: input-stream
-      value: {{ .Values.MultiVideoGridJob.input.stream | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.input.stream | quote }}
     - name: input-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.input.minNumSegments | quote }}
     - name: output-stream
-      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.output.stream | quote }}
     - name: output-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.output.minNumSegments | quote }}
     - name: startAtTail
       value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}
     - name: maxOutOfOrdernessMs
