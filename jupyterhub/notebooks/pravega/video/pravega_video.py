@@ -85,7 +85,7 @@ class OutputStream(StreamBase):
 
             to_log_dict = event_dict.copy()
             to_log_dict['data'] = '(%d bytes)' % len(event_dict['data'])
-            print('video_frame_write_generator: ' + json.dumps(to_log_dict))
+            # print('video_frame_write_generator: ' + json.dumps(to_log_dict))
 
             event_json = json.dumps(event_dict)
             event_bytes = event_json.encode(encoding='UTF-8')
@@ -97,7 +97,6 @@ class OutputStream(StreamBase):
                 routing_key=str(camera),
             )
             yield event_to_write
-
 
 
 class UnindexedStream(StreamBase):
