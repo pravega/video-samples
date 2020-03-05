@@ -8,12 +8,12 @@ FlinkObjectDetectorJob:
   parallelism: 1
   enableOperatorChaining: "false"
   input:
-    stream: video1
+    stream: generated-video
     minNumSegments: 1
   output:
-    stream: examples-detected
+    stream: object-detector-output-video
     minNumSegments: 1
-  startAtTail: "false"
+  startAtTail: "true"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
@@ -43,10 +43,10 @@ MultiVideoGridJob:
   readerParallelism: -1
   enableOperatorChaining: "false"
   input:
-    stream: video1
+    stream: generated-video
     minNumSegments: 1
   output:
-    stream: video1
+    stream: grid-video
     minNumSegments: 1
   imageWidth: 75
   framesPerSec: 1.0
