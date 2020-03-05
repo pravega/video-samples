@@ -8,7 +8,7 @@ FlinkObjectDetectorJob:
   parallelism: 1
   enableOperatorChaining: "false"
   input:
-    stream: generated-video
+    stream: object-detector-input-video
     minNumSegments: 1
   output:
     stream: object-detector-output-video
@@ -61,7 +61,7 @@ MultiVideoGridJob:
     taskSlots: 4
 
 VideoReaderJob:
-  enabled: true
+  enabled: false
   parallelism: 1
   enableOperatorChaining: "false"
   startAtTail: "false"
