@@ -63,6 +63,9 @@ public class ImageUtil {
 
         for (Recognition recognition: recognitions) {
             BoxPosition box = recognition.getScaledLocation(scaleX, scaleY);
+            //set font
+            Font myFont = new Font("Courier New", 1, 17);
+            graphics.setFont(myFont);
             //draw text
             graphics.drawString(recognition.getTitle() + " " + recognition.getConfidence(), box.getLeft(), box.getTop() - 7);
             // draw bounding box
