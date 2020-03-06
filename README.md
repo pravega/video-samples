@@ -6,6 +6,7 @@
 ![grid-sample](images/video-samples-diagram.png)
 
 This project demonstrates methods to store, process, and read video with Pravega and Flink.
+It also includes an application that performs object detection using TensorFlow and YOLO. 
 
 ## Components
 - Pravega: Pravega provides a new storage abstraction - a stream - for continuous and unbounded data. 
@@ -408,36 +409,19 @@ Either of the following methods may provide a workaround for this limitation.
 - Use a Flink batch job for any historical processing.
   Configure Flink streaming jobs to begin at the tail of the input Pravega stream(s).
 
-# References
-
-- <http://pravega.io/>
-
-# Appendix
-
-## Memory Usage of the Flink Video Reader
-
-A Flink task must store in memory all `ChunkedVideoFrame` instances which it has read until the final chunk for that
-frame has been read or a session timeout occurs. A single Flink task that is reading from multiple Pravega segments
-may receive chunks from interleaved frames, this requiring multiple partial frames to be buffered. To avoid out-of-memory
-errors, each Flink task should have enough memory to buffer its share of Pravega segments.
-For example, if you have 12 Pravega segments and 3 Flink reader tasks, you should account for 4 frames to be buffered
-for each Flink reader task.
-
-If you are using a non-transactional writer, you should also account for additional frames to be buffered.
-If interruptions are rare, a single additional frame should be sufficient.
-
 # Object Detection
-This project demonstrates methods to store, process, and read video with Pravega and Flink. It also includes an application
- that performs object detection using TensorFlow and YOLO. 
+This project demonstrates methods to store, process, and read video with Pravega and Flink.
  
 ## Overview
+
 ![object-detection-architecture](images/object-detection-arch.png)
  
 ## Additional Components
+
 - GPU: GPUs are essential for increased performance of processing data.
 - CUDA: To utilize the GPUs, NVIDIA CUDA libraries are required. CUDA 10.0 is used in the project.
   For more information, see <`https://developer.nvidia.com/hpc`>
-- Tensorflow: 
+- Tensorflow
  
 ## Building and Running 
 These steps are additional to the previous setup. 
@@ -455,19 +439,15 @@ git checkout tensorflow-gpu
 #### Build Custom Image
 
 ```
-docker pull pvthejas/flinkcuda:cuda10.0flink1.7.2
-docker tag pvthejas/flinkcuda:cuda10.0flink1.7.2 registryName/repositoryName:cuda10.0flink1.7.2
-docker push registryName/repositoryName:cuda10.0flink1.7.2
+cd GPUTensorflowImage
+docker build .
 ```
 
-Make sure to put your registry name and repository name for the cuda and flink image.
+#### Add Custom Flink Image to SDP
 
 ```
-kubectl create -f /HOME/video-samples/GPUTensorflowImage/ClusterFlinkImage.yaml
+kubectl create -f GPUTensorflowImage/ClusterFlinkImage.yaml
 ```
-`HOME` is the location of the project
-
-Make sure to edit the image reference in ClusterFlinkImage.yaml with appropriate registry name.
 
 ### Running in IntelliJ
 Run the FlinkObjectDetectorJob using following parameters:
@@ -508,3 +488,21 @@ Note: If you have GPUs on the machine it is running on, then enable GPU access u
 ```
 scripts/deploy-k8s-components.sh
 ```
+
+# References
+
+- <http://pravega.io/>
+
+# Appendix
+
+## Memory Usage of the Flink Video Reader
+
+A Flink task must store in memory all `ChunkedVideoFrame` instances which it has read until the final chunk for that
+frame has been read or a session timeout occurs. A single Flink task that is reading from multiple Pravega segments
+may receive chunks from interleaved frames, this requiring multiple partial frames to be buffered. To avoid out-of-memory
+errors, each Flink task should have enough memory to buffer its share of Pravega segments.
+For example, if you have 12 Pravega segments and 3 Flink reader tasks, you should account for 4 frames to be buffered
+for each Flink reader task.
+
+If you are using a non-transactional writer, you should also account for additional frames to be buffered.
+If interruptions are rare, a single additional frame should be sufficient.
