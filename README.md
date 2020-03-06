@@ -68,17 +68,11 @@ and <https://docs.docker.com/compose/install/>.
 This will run a development instance of Pravega locally.
 Note that the default *standalone* Pravega used for development is likely insufficient for testing video because
 it stores all data in memory and quickly runs out of memory.
-Using the procedure below, all data will be stored in a small HDFS cluster in Docker.
 
 In the command below, replace x.x.x.x with the IP address of a local network interface such as eth0.
 
 ```
-cd
-git clone https://github.com/pravega/pravega
-cd pravega
-git checkout r0.5
-./gradlew docker
-cd docker/compose
+cd pravega-docker
 export HOST_IP=x.x.x.x
 docker-compose up -d
 ```
@@ -90,7 +84,7 @@ curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' h
 
 You can view the Pravega logs with `docker-compose logs --follow`.
 
-You can view the stream files stored on HDFS with `docker-compose exec hdfs hdfs dfs -ls -h -R /`.
+You can view the stream files stored on Tier 2 `ls -h -R /tmp/pravega-tier2`.
 
 #### Alternative for low-memory systems
 
