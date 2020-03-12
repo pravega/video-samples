@@ -7,7 +7,7 @@ metadata:
     name: video-data-generator
 spec:
   imageRef:
-    name: 1.7.2
+    name: 1.9.1-scala-2.12
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:
@@ -40,7 +40,7 @@ metadata:
     component: VideoDataGeneratorJob
     release: {{ $.Release.Name }}
 spec:
-  flinkVersion: 1.7.2
+  flinkVersion: 1.9.1
   clusterSelector:
     name: video-data-generator
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
@@ -55,9 +55,9 @@ spec:
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: output-stream
-      value: {{ .Values.MultiVideoGridJob.input.stream | quote }}
+      value: {{ .Values.VideoDataGeneratorJob.output.stream | quote }}
     - name: output-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
+      value: {{ .Values.VideoDataGeneratorJob.output.minNumSegments | quote }}
     - name: numCameras
       value: {{ .Values.VideoDataGeneratorJob.numCameras | quote }}
     - name: imageWidth

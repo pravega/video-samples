@@ -46,11 +46,12 @@ class OutputStream(StreamBase):
     def __init__(self, pravega_client, scope, stream, create=True):
         super(OutputStream, self).__init__(pravega_client, scope, stream, create)
 
-    def write_video_from_file(self, filename, crop=None):
+    def write_video_from_file(self, filename, crop=None, size=None):
         cap = cv2.VideoCapture(filename)
         video_frames = self.opencv_video_frame_generator(cap)
         cropped_video_frames = (self.cropped_video_frame(f, crop) for f in video_frames)
-        events_to_write = self.video_frame_write_generator(cropped_video_frames)
+        resized_video_frames = (self.resized_video_frame(f, size) for f in cropped_video_frames)
+        events_to_write = self.video_frame_write_generator(resized_video_frames)
         write_response = self.pravega_client.WriteEvents(events_to_write)
         return write_response
 
@@ -73,13 +74,18 @@ class OutputStream(StreamBase):
             video_frame['image'] = video_frame['image'][top:bottom, left:right]
         return video_frame
 
+    def resized_video_frame(self, video_frame, size):
+        if size:
+            video_frame['image'] = cv2.resize(video_frame['image'], size, interpolation=cv2.INTER_NEAREST)
+        return video_frame
+
     def video_frame_write_generator(self, video_frame_iter, camera=0):
         for video_frame in video_frame_iter:
             event_dict = video_frame.copy()
             event_dict['camera'] = camera
             event_dict['ssrc'] = 0
 
-            success, png_array = cv2.imencode('.png', video_frame['image'])
+            success, png_array = cv2.imencode('.jpg', video_frame['image'])
             event_dict['data'] = base64.b64encode(png_array.tobytes()).decode(encoding='UTF-8')
             del event_dict['image']
 
@@ -127,11 +133,12 @@ class UnindexedStream(StreamBase):
         read_events = self.read_events(from_stream_cut, to_stream_cut)
         return (self.read_event_to_video_frame(read_event) for read_event in read_events)
 
-    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1):
+    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None):
         read_events = self.read_video_frames(from_stream_cut, to_stream_cut)
         for i, video_frame in enumerate(read_events):
             if i % show_frame_interval == 0:
                 IPython.display.clear_output(wait=True)
+                fig = plt.figure(figsize=figsize)
                 plt.title('frameNumber=%d, timestamp=%s' % (video_frame['frameNumber'], video_frame['timestamp']))
                 plt.imshow(opencv_image_to_mpl(video_frame['image_array']));
                 plt.show()
