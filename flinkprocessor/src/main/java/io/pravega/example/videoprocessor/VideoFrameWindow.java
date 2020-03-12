@@ -1,6 +1,8 @@
 package io.pravega.example.videoprocessor;
 
 import io.pravega.example.common.ChunkedVideoFrame;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
@@ -152,7 +154,32 @@ public class VideoFrameWindow extends Window {
 
         @Override
         public TypeSerializerSnapshot<VideoFrameWindow> snapshotConfiguration() {
-            return null;
+            return new TypeSerializerSnapshot<VideoFrameWindow>() {
+                @Override
+                public int getCurrentVersion() {
+                    return 0;
+                }
+
+                @Override
+                public void writeSnapshot(DataOutputView out) throws IOException {
+
+                }
+
+                @Override
+                public void readSnapshot(int readVersion, DataInputView in, ClassLoader userCodeClassLoader) throws IOException {
+
+                }
+
+                @Override
+                public TypeSerializer<VideoFrameWindow> restoreSerializer() {
+                    return null;
+                }
+
+                @Override
+                public TypeSerializerSchemaCompatibility<VideoFrameWindow> resolveSchemaCompatibility(TypeSerializer<VideoFrameWindow> newSerializer) {
+                    return null;
+                }
+            };
         }
     }
 }

@@ -13,14 +13,15 @@ FlinkObjectDetectorJob:
   output:
     stream: object-detector-output-video
     minNumSegments: 1
-  startAtTail: "true"
+  startAtTail: "false"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
     memory: 2G
-    heap: 500m
-    cpu: 1000m
-    taskSlots: 1
+    cpu: 2000m
+    heap: 600m
+    taskSlots: 2
+
 
 VideoDataGeneratorJob:
   enabled: false
@@ -33,7 +34,8 @@ VideoDataGeneratorJob:
   chunkSizeBytes: 524288
   taskManager:
     replicas: 1
-    memory: 2G
+    heap: 500m
+    memory: 1G
     cpu: 250m
     taskSlots: 1
 
