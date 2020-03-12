@@ -7,9 +7,9 @@ metadata:
     name: flink-object-detector
 spec:
   imageRef:
-    name: 1.7.2
+    name: cuda10.0flink1.9.1
   zookeeperUrl: zookeeper-client:2181
-storage:
+  storage:
     volumeSource:
       persistentVolumeClaim:
         claimName: data-project
@@ -21,11 +21,14 @@ storage:
       storageClassName: "standard"
       resources:
         requests:
-          storage: 5G
+          storage: 10G
+
   jobManager:
     replicas: 1
-    memory: 1024M
-    cpu: 250m
+    memory: 1000M
+    heap: 200m
+    cpu: 1000m
+
   taskManager:
     replicas: {{ .Values.FlinkObjectDetectorJob.taskManager.replicas }}
     memory: {{ .Values.FlinkObjectDetectorJob.taskManager.memory }}
@@ -42,7 +45,7 @@ metadata:
     component: FlinkObjectDetectorJob
     release: {{ $.Release.Name }}
 spec:
-  flinkVersion: 1.7.2
+  flinkVersion: 1.9.1
   clusterSelector:
     name: flink-object-detector
   mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
@@ -55,15 +58,15 @@ spec:
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: input-stream
-      value: {{ .Values.MultiVideoGridJob.input.stream | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.input.stream | quote }}
     - name: input-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.input.minNumSegments | quote }}
     - name: output-stream
-      value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.output.stream | quote }}
     - name: output-minNumSegments
-      value: {{ .Values.MultiVideoGridJob.output.minNumSegments | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.output.minNumSegments | quote }}
     - name: startAtTail
       value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}
     - name: maxOutOfOrdernessMs
       value: {{ .Values.FlinkObjectDetectorJob.maxOutOfOrdernessMs | quote }}
-{{- end }}
+  {{- end }}

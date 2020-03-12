@@ -1,5 +1,5 @@
 mavenCoordinate:
-  group: io.pravega.example.video
+  group: io.pravega.example
   artifact: flinkprocessor
   version: 0.1.0
 
@@ -15,14 +15,14 @@ FlinkObjectDetectorJob:
   output:
     stream: examples-detected
     minNumSegments: 1
-  startAtTail: "true"
+  startAtTail: "false"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
-    memory: 20G
-    cpu: 5000m
-    heap: 500m
-    taskSlots: 5
+    memory: 2G
+    cpu: 2000m
+    heap: 600m
+    taskSlots: 2
 
 
 VideoDataGeneratorJob:
@@ -36,7 +36,8 @@ VideoDataGeneratorJob:
   chunkSizeBytes: 10240
   taskManager:
     replicas: 1
-    memory: 2G
+    heap: 500m
+    memory: 1G
     cpu: 250m
     taskSlots: 2
 
