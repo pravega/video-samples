@@ -22,14 +22,16 @@ FlinkObjectDetectorJob:
     heap: 600m
     taskSlots: 2
 
-
 VideoDataGeneratorJob:
   enabled: false
   parallelism: 1
   enableOperatorChaining: "false"
+  output:
+    stream: object-detector-input-video
+    minNumSegments: 1
   useCachedFrame: "false"
   numCameras: 1
-  imageWidth: 100
+  imageWidth: 416
   framesPerSec: 1.0
   chunkSizeBytes: 524288
   taskManager:
