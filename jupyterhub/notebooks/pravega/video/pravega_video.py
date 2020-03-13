@@ -109,7 +109,9 @@ class UnindexedStream(StreamBase):
     def __init__(self, pravega_client, scope, stream):
         super(UnindexedStream, self).__init__(pravega_client, scope, stream)
 
-    def read_events(self, from_stream_cut=None, to_stream_cut=None):
+    def read_events(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False):
+        if stop_at_tail:
+            to_stream_cut = self.get_stream_info().tail_stream_cut
         read_events_request = pravega.pb.ReadEventsRequest(
             scope=self.scope,
             stream=self.stream,
@@ -129,8 +131,8 @@ class UnindexedStream(StreamBase):
         video_frame['timestamp'] = pd.to_datetime(video_frame['timestamp'], unit='ms', utc=True)
         return video_frame
 
-    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None):
-        read_events = self.read_events(from_stream_cut, to_stream_cut)
+    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False):
+        read_events = self.read_events(from_stream_cut, to_stream_cut, stop_at_tail=stop_at_tail)
         return (self.read_event_to_video_frame(read_event) for read_event in read_events)
 
     def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None):
@@ -144,20 +146,20 @@ class UnindexedStream(StreamBase):
                 plt.show()
 
 
-class IndexedStream():
-    def __init__(self, pravega_client, scope, stream, from_stream_cut=None, timestamp_col='timestamp'):
+# TODO: This should be based on UnindexedStream
+class IndexedStream(StreamBase):
+    def __init__(self, pravega_client, scope, stream, timestamp_col='timestamp'):
+        super(IndexedStream, self).__init__(pravega_client, scope, stream)
         self.pravega_client = pravega_client
         self.scope = scope
         self.stream = stream
-        self.from_stream_cut = from_stream_cut
         self.timestamp_col = timestamp_col
         self.index_df = None
+        self.unindexed_stream =  UnindexedStream(pravega_client, scope, stream)
 
-    def build_index(self):
-        stream_info = self.pravega_client.GetStreamInfo(
-            pravega.pb.GetStreamInfoRequest(scope=self.scope, stream=self.stream))
-        # print('stream_info=%s' % str(stream_info))
-        from_stream_cut = stream_info.head_stream_cut if self.from_stream_cut is None else self.from_stream_cut
+    def build_index(self, from_stream_cut=None):
+        stream_info = self.get_stream_info()
+        from_stream_cut = stream_info.head_stream_cut if from_stream_cut is None else from_stream_cut
         to_stream_cut = stream_info.tail_stream_cut
         read_events_request = pravega.pb.ReadEventsRequest(
             scope=self.scope,
@@ -165,7 +167,6 @@ class IndexedStream():
             from_stream_cut=from_stream_cut,
             to_stream_cut=to_stream_cut,
         )
-        # print(read_events_request)
         read_events = ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
         index_list = [self.read_event_to_index(read_event) for read_event in read_events]
         df = pd.DataFrame(index_list)
@@ -188,6 +189,9 @@ class IndexedStream():
     def save_to_file(self, filename):
         self.index_df.to_pickle(filename)
 
+    def load_from_file(self, filename):
+        self.index_df = pd.read_pickle(filename)
+
     def get_stream_cuts_for_time_window(self, ts0, ts1=None, count=None):
         """Get a pair of from and to stream cuts that can be used to read events starting at timestamp ts0 (inclusive).
         If count is specified, this many events will be read.
@@ -196,6 +200,7 @@ class IndexedStream():
         if count is None:
             if ts1 is None: ts1 = ts0
             to_index = self.index_df.index.searchsorted(ts1, side='right') - 1
+            if to_index < 0: raise Exception('End timestamp %s not found' % str(ts1))
         else:
             to_index = from_index + count - 1
         from_index_record = self.index_df.iloc[from_index]
@@ -203,10 +208,17 @@ class IndexedStream():
         from_stream_cut = pravega.pb.StreamCut(text=from_index_record.from_stream_cut)
         to_stream_cut = pravega.pb.StreamCut(text=to_index_record.to_stream_cut)
         return pd.Series(dict(
+            from_index=from_index,
+            to_index=to_index,
             from_timestamp=from_index_record.name,
             to_timestamp=to_index_record.name,
             from_stream_cut=from_stream_cut,
             to_stream_cut=to_stream_cut))
+
+    def get_event_pointer_for_timestamp(self, timestamp):
+        from_index = self.index_df.index.searchsorted(timestamp, side='left')
+        from_index_record = self.index_df.iloc[from_index]
+        return from_index_record
 
     def read_events_in_time_window(self, ts0, ts1):
         stream_cuts = self.get_stream_cuts_for_time_window(ts0, ts1)
@@ -231,7 +243,7 @@ class IndexedStream():
 
     def read_video_frames_in_time_window(self, ts0, ts1):
         read_events = self.read_events_in_time_window(ts0, ts1)
-        return [self.read_event_to_video_frame(read_event) for read_event in read_events]
+        return (self.read_event_to_video_frame(read_event) for read_event in read_events)
 
     def play_video(self, ts0, ts1, show_frame_interval=1):
         read_events = self.read_events_in_time_window(ts0, ts1)
@@ -254,11 +266,30 @@ class IndexedStream():
             to_stream_cut=stream_cuts.to_stream_cut,
         )
         read_events = ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
-        video_frames = [self.read_event_to_video_frame(e) for e in read_events]
+        video_frames = (self.read_event_to_video_frame(e) for e in read_events)
         return pd.DataFrame(video_frames)
 
     def get_single_video_frame(self, timestamp):
-        return self.get_multiple_video_frames(timestamp, count=1).iloc[0]
+        event_pointer = self.get_event_pointer_for_timestamp(timestamp)
+        fetch_event_request = pravega.pb.FetchEventRequest(
+            scope=self.scope,
+            stream=self.stream,
+            event_pointer=pravega.pb.EventPointer(bytes=event_pointer.event_pointer),
+        )
+        fetch_event_response = self.pravega_client.FetchEvent(fetch_event_request)
+        return pd.Series(self.read_event_to_video_frame(fetch_event_response))
+
+    def get_single_video_frame_by_index(self, index):
+        index_rec = self.index_df.iloc[index]
+        fetch_event_request = pravega.pb.FetchEventRequest(
+            scope=self.scope,
+            stream=self.stream,
+            event_pointer=pravega.pb.EventPointer(bytes=index_rec.event_pointer),
+        )
+        fetch_event_response = self.pravega_client.FetchEvent(fetch_event_request)
+        d = self.read_event_to_video_frame(fetch_event_response)
+        for k,v in index_rec.iteritems(): d[k] = v
+        return pd.Series(d)
 
     def show_video_frame(self, video_frame):
         plt.title('frameNumber=%d, timestamp=%s' % (video_frame['frameNumber'], video_frame['timestamp']))
