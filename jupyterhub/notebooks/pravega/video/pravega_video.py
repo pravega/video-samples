@@ -2,12 +2,16 @@
 import IPython
 import base64
 import cv2
+import io
 import json
 import numpy as np
 import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
 import pravega.grpc_gateway as pravega
 from matplotlib import pyplot as plt
 import time
+import logging
+from itertools import islice
 
 
 def ignore_non_events(read_events):
@@ -18,6 +22,28 @@ def ignore_non_events(read_events):
 
 def opencv_image_to_mpl(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+
+def generate_image_bytes(width, height, camera, frame_number, random=True, format='JPEG', quality=100, subsampling=0, compress_level=0):
+    """Generate an image in JPEG for PNG format.
+    format: 'JPEG' or 'PNG'
+    quality: 0-100, for JPEG only
+    subsampling: 0,1,2 for JPEG only
+    compress_level: 0,1 for PNG only
+    """
+    font_size = int(min(width, height) * 0.15)
+    if random:
+        img_array = np.random.rand(height, width, 3) * 255
+        img = Image.fromarray(img_array.astype('uint8')).convert('RGB')
+    else:
+        img = Image.new('RGB', (width, height), (25, 25, 240, 0))
+    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf', font_size)
+    draw = ImageDraw.Draw(img)
+    draw.text((width//10, height//10), 'CAMERA\n %03d\nFRAME\n%05d' % (camera, frame_number), font=font, align='center')
+    out_bytesio = io.BytesIO()
+    img.save(out_bytesio, format=format, quality=quality, subsampling=subsampling, compress_level=compress_level)
+    out_bytes = out_bytesio.getvalue()
+    return out_bytes
 
 
 class StreamBase():
@@ -39,6 +65,13 @@ class StreamBase():
         return self.pravega_client.GetStreamInfo(pravega.pb.GetStreamInfoRequest(
             scope=self.scope,
             stream=self.stream,
+        ))
+
+    def truncate_stream(self):
+        self.pravega_client.TruncateStream(pravega.pb.TruncateStreamRequest(
+            scope=self.scope,
+            stream=self.stream,
+            stream_cut=self.get_stream_info().tail_stream_cut,
         ))
 
 
@@ -105,6 +138,61 @@ class OutputStream(StreamBase):
             yield event_to_write
 
 
+class VideoDataGenerator(StreamBase):
+    def __init__(self, pravega_client, scope, stream, create=True, camera=0, width=320, height=200, fps=1.0, verbose=False):
+        super(VideoDataGenerator, self).__init__(pravega_client, scope, stream, create)
+        self.camera = camera
+        self.width = width
+        self.height = height
+        self.frames_per_sec = fps
+        self.verbose = verbose
+
+    def write_generated_video(self, num_frames=0):
+        frame_numbers = self.frame_number_generator()
+        events_to_write = self.video_frame_write_generator(frame_numbers)
+        if num_frames > 0:
+            events_to_write = islice(events_to_write, num_frames)
+        write_response = self.pravega_client.WriteEvents(events_to_write)
+        return write_response
+
+    def frame_number_generator(self):
+        frame_number = 0
+        t0_ms = time.time() * 1000.0
+        while True:
+            timestamp = int(frame_number / (self.frames_per_sec / 1000.0) + t0_ms)
+            sleep_sec = timestamp / 1000.0 - time.time()
+            if sleep_sec > 0.0:
+                time.sleep(sleep_sec)
+            elif sleep_sec < -5.0:
+                logging.warn(f"Data generator can't keep up with real-time. sleep_sec={sleep_sec}")
+            yield dict(timestamp=timestamp, frameNumber=frame_number)
+            frame_number += 1
+
+    def generate_image_bytes(self, frame_number):
+        return generate_image_bytes(self.width, self.height, self.camera, frame_number)
+
+    def video_frame_write_generator(self, frame_number_iter):
+        for video_frame in frame_number_iter:
+            event_dict = video_frame.copy()
+            event_dict['camera'] = self.camera
+            event_dict['ssrc'] = 0
+            image_array = self.generate_image_bytes(video_frame['frameNumber'])
+            event_dict['data'] = base64.b64encode(image_array).decode(encoding='UTF-8')
+            if self.verbose:
+                to_log_dict = event_dict.copy()
+                to_log_dict['data'] = '(%d bytes)' % len(event_dict['data'])
+                print('video_frame_write_generator: ' + json.dumps(to_log_dict))
+            event_json = json.dumps(event_dict)
+            event_bytes = event_json.encode(encoding='UTF-8')
+            event_to_write = pravega.pb.WriteEventsRequest(
+                scope=self.scope,
+                stream=self.stream,
+                event=event_bytes,
+                routing_key=str(self.camera),
+            )
+            yield event_to_write
+
+
 class UnindexedStream(StreamBase):
     def __init__(self, pravega_client, scope, stream):
         super(UnindexedStream, self).__init__(pravega_client, scope, stream)
@@ -162,16 +250,9 @@ class IndexStream(StreamBase):
 
     def append_index_records(self, index_records, truncate=False):
         if truncate:
-            self.truncate_index()
+            self.truncate_stream()
         events_to_write = self.index_record_write_generator(index_records)
         self.pravega_client.WriteEvents(events_to_write)
-
-    def truncate_index(self):
-        self.pravega_client.TruncateStream(pravega.pb.TruncateStreamRequest(
-            scope=self.scope,
-            stream=self.stream,
-            stream_cut=self.get_stream_info().tail_stream_cut,
-        ))
 
     def read_index_records(self):
         to_stream_cut = self.get_stream_info().tail_stream_cut
@@ -196,11 +277,11 @@ class IndexedStream(StreamBase):
         self.unindexed_stream =  UnindexedStream(pravega_client, scope, stream)
         self.index_stream = IndexStream(pravega_client, scope, '%s-index' % stream, create=True)
 
-    def update_index(self):
+    def update_index(self, force_full=False):
         stream_info = self.get_stream_info()
-        if self.index_df is None:
+        if self.index_df is None and not force_full:
             self.load_index()
-        if self.index_df is None:
+        if self.index_df is None or force_full:
             print('update_index: Performing full index generation')
             from_stream_cut = stream_info.head_stream_cut
             truncate = True
