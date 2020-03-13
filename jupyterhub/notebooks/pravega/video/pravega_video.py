@@ -139,13 +139,12 @@ class OutputStream(StreamBase):
 
 
 class VideoDataGenerator(StreamBase):
-    def __init__(self, pravega_client, scope, stream, create=True, camera=0, width=320, height=200, fps=1.0, verbose=False):
+    def __init__(self, pravega_client, scope, stream, create=True, camera=0, frames_per_sec=1.0, verbose=False, **kwargs):
         super(VideoDataGenerator, self).__init__(pravega_client, scope, stream, create)
         self.camera = camera
-        self.width = width
-        self.height = height
-        self.frames_per_sec = fps
+        self.frames_per_sec = frames_per_sec
         self.verbose = verbose
+        self.generate_image_bytes_kwargs = kwargs
 
     def write_generated_video(self, num_frames=0):
         frame_numbers = self.frame_number_generator()
@@ -169,7 +168,7 @@ class VideoDataGenerator(StreamBase):
             frame_number += 1
 
     def generate_image_bytes(self, frame_number):
-        return generate_image_bytes(self.width, self.height, self.camera, frame_number)
+        return generate_image_bytes(camera=self.camera, frame_number=frame_number, **self.generate_image_bytes_kwargs)
 
     def video_frame_write_generator(self, frame_number_iter):
         for video_frame in frame_number_iter:
