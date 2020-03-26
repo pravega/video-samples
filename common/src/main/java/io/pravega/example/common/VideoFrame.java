@@ -11,6 +11,7 @@
 package io.pravega.example.common;
 
 import io.pravega.example.tensorflow.Recognition;
+import org.bytedeco.opencv.opencv_core.RectVector;
 
 import java.security.DigestException;
 import java.security.MessageDigest;
@@ -44,6 +45,8 @@ public class VideoFrame {
 
     public List<Recognition> recognitions = new ArrayList<>();
 
+    public RectVector recognizedBoxes = new RectVector();
+
     public VideoFrame() {
     }
 
@@ -56,6 +59,7 @@ public class VideoFrame {
         this.hash = frame.hash;
         this.tags = frame.tags;
         this.recognitions = frame.recognitions;
+        this.recognizedBoxes = frame.recognizedBoxes;
     }
 
     @Override

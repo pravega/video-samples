@@ -24,9 +24,9 @@ spec:
 
   jobManager:
     replicas: 1
-    memory: 1000M
+    memory: 1024M
     heap: 200m
-    cpu: 1000m
+    cpu: 450m
 
   taskManager:
     replicas: {{ .Values.FlinkObjectDetectorJob.taskManager.replicas }}

@@ -23,7 +23,7 @@ spec:
           storage: 5Gi
   jobManager:
     replicas: 1
-    memory: 1024M
+    memory: 900M
     cpu: 250m
   taskManager:
     replicas: {{ .Values.VideoDataGeneratorJob.taskManager.replicas }}

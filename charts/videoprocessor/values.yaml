@@ -6,7 +6,7 @@ mavenCoordinate:
 FlinkObjectDetectorJob:
   enabled: true
   parallelism: 1
-  enableOperatorChaining: "false"
+  enableOperatorChaining: "true"
   input:
     stream: object-detector-input-video
     minNumSegments: 1
@@ -18,27 +18,27 @@ FlinkObjectDetectorJob:
   taskManager:
     replicas: 1
     memory: 2G
-    cpu: 2000m
+    cpu: 500m
     heap: 600m
     taskSlots: 2
 
 VideoDataGeneratorJob:
-  enabled: false
+  enabled: true
   parallelism: 1
-  enableOperatorChaining: "false"
+  enableOperatorChaining: "true"
   output:
     stream: object-detector-input-video
     minNumSegments: 1
   useCachedFrame: "false"
   numCameras: 1
-  imageWidth: 416
-  framesPerSec: 1.0
-  chunkSizeBytes: 524288
+  imageWidth: 600
+  framesPerSec: 3.0
+  chunkSizeBytes: 100000
   taskManager:
     replicas: 1
     heap: 500m
-    memory: 1G
-    cpu: 250m
+    memory: 2G
+    cpu: 500m
     taskSlots: 1
 
 MultiVideoGridJob:

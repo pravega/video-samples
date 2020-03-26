@@ -24,6 +24,8 @@ dependencies {
     compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
     compile "com.fasterxml.jackson.core:jackson-databind:2.9.1"
+    compile "org.bytedeco:javacv-platform:1.5.1"
+
 
 //    13.1 works without custom image
     compile group: 'org.tensorflow', name: 'tensorflow', version: '1.15.0'

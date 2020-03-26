@@ -17,6 +17,7 @@ import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.tensorflow.FaceDetector;
 import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -31,9 +32,9 @@ import java.io.IOException;
 /**
  * This job reads and writes a video stream from Pravega and writes frame metadata to the console.
  */
-public class FlinkObjectDetectorJob extends AbstractJob {
+public class FlinkFaceRecognizerJob extends AbstractJob {
     // Logger initialization
-    private static Logger log = LoggerFactory.getLogger(FlinkObjectDetectorJob.class);
+    private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.class);
 
     /**
      * The entry point for Flink applications.
@@ -43,11 +44,11 @@ public class FlinkObjectDetectorJob extends AbstractJob {
     public static void main(String[] args) throws IOException, InterruptedException {
         VideoAppConfiguration config = new VideoAppConfiguration(args);
         log.info("config: {}", config);
-        FlinkObjectDetectorJob job = new FlinkObjectDetectorJob(config);
+        FlinkFaceRecognizerJob job = new FlinkFaceRecognizerJob(config);
         job.run();
     }
 
-    public FlinkObjectDetectorJob(VideoAppConfiguration config) {
+    public FlinkFaceRecognizerJob(VideoAppConfiguration config) {
         super(config);
     }
 
@@ -59,7 +60,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
     public void run() {
         try {
             long start = System.currentTimeMillis();
-            final String jobName = FlinkObjectDetectorJob.class.getName();
+            final String jobName = FlinkFaceRecognizerJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
@@ -106,7 +107,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             //  identify objects with YOLOv3
             DataStream<VideoFrame> objectDetectedFrames = videoFrames
                     .map(frame -> {
-                        frame.data = TFObjectDetector.getInstance().detect(frame.data);
+                        frame = FaceDetector.getInstance().detectFaces(frame);
                         frame.hash = frame.calculateHash();
                         return frame;
                     });
