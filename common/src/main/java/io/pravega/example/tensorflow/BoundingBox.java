@@ -21,6 +21,10 @@ public class BoundingBox {
     private double confidence;
     private double[] classes;
 
+    public BoundingBox() {
+        this(-1.0, -1.0, -1.0, -1.0, -1.0, new double[0]);
+    }
+
     public BoundingBox(double x, double y, double width, double height, double confidence, double[] classes) {
         this.x = x;
         this.y = y;
