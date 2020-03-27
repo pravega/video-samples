@@ -62,7 +62,7 @@ public class FaceDetector implements Serializable {
         cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
         cvEqualizeHist(grayImage, grayImage);
 
-        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
+        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml"; // face detection model configuration
         CascadeClassifier faceCascade = new CascadeClassifier();
         faceCascade.load(classifierPath);
 
@@ -73,6 +73,7 @@ public class FaceDetector implements Serializable {
             absoluteFaceSize = Math.round(height * 0.2f);
         }
 
+        // perform face detection
         faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, 0 | CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
 
 //        BufferedImage bufferedImage = ImageIO.read(imageStream);
