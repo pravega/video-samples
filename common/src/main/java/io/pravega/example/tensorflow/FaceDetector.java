@@ -12,19 +12,15 @@ package io.pravega.example.tensorflow;
 
 
 import io.pravega.example.common.VideoFrame;
-import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tensorflow.*;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.FloatBuffer;
-import java.util.List;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
@@ -36,18 +32,11 @@ import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
  * ObjectDetector class to detect objects using pre-trained models with TensorFlow Java API.
  */
 public class FaceDetector implements Serializable {
+    private static FaceDetector single_instance;
     private final Logger log = LoggerFactory.getLogger(FaceDetector.class);
 
-    // Params used for image processing
-    private static final int IMAGE_DIMENSION = 416;
-    private static final float SCALE = 255f;
-    private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
-
-    private static FaceDetector single_instance;
-//
-//    private final Session session;
-//    private final Output<Float> imagePreprocessingOutput;
-//    private final List<String> LABEL_DEF;
+    public FaceDetector() {
+    }
 
     public static FaceDetector getInstance() {
         // TODO: fix race condition
@@ -58,20 +47,13 @@ public class FaceDetector implements Serializable {
         return single_instance;
     }
 
-//    public FaceDetector() {
-//
-//    }
-
     /**
      * Detect faces on the given frame
      *
      * @param videoFrame the video frame which is being processed
      * @return output video frame with faces detected
      */
-    public VideoFrame detectFaces(VideoFrame videoFrame) throws IOException
-    {
-//        InputStream imageStream = this.getClass().getResourceAsStream("/ben_afflek_input_1.jpg");
-//        byte[] videoFrame = IOUtils.toByteArray(imageStream);
+    public VideoFrame detectFaces(VideoFrame videoFrame) throws IOException {
         Mat imageMat = imdecode(new Mat(videoFrame.data), IMREAD_UNCHANGED);
         CvArr inputImage = new IplImage(imageMat);
 
@@ -80,8 +62,6 @@ public class FaceDetector implements Serializable {
         cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
         cvEqualizeHist(grayImage, grayImage);
 
-//        InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
-//        String classifierPath = Paths.get(Test.class.getResource("/haarcascade_frontalface_alt.xml").toURI()).toFile().getPath();
         String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
         CascadeClassifier faceCascade = new CascadeClassifier();
         faceCascade.load(classifierPath);
@@ -89,8 +69,7 @@ public class FaceDetector implements Serializable {
         RectVector faces = new RectVector();
         int absoluteFaceSize = 0;
         int height = grayImage.arrayHeight();
-        if (Math.round(height * 0.2f) > 0)
-        {
+        if (Math.round(height * 0.2f) > 0) {
             absoluteFaceSize = Math.round(height * 0.2f);
         }
 
@@ -104,7 +83,18 @@ public class FaceDetector implements Serializable {
         graphics.setColor(Color.green);
 
         for (int i = 0; i < faces.size(); i++) {
-            graphics.drawRect(faces.get(i).x(),faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
+            graphics.drawRect(faces.get(i).x(), faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
+
+            double boxX = faces.get(i).x();
+            double boxY = faces.get(i).y();
+            double boxWidth = faces.get(i).width();
+            double boxHeight = faces.get(i).height();
+            double boxConfidence = -1;
+            double[] boxClasses = new double[0];
+
+            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+
+            videoFrame.recognizedBoxes.add(currentBox);
         }
 
         graphics.dispose();
@@ -115,8 +105,6 @@ public class FaceDetector implements Serializable {
 
         File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
         ImageIO.write(bufferedImage, "jpg", outputfile);
-
-        videoFrame.recognizedBoxes = faces;
 
         return videoFrame;
     }

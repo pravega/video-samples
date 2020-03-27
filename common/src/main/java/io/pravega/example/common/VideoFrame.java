@@ -10,6 +10,7 @@
  */
 package io.pravega.example.common;
 
+import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.Recognition;
 import org.bytedeco.opencv.opencv_core.RectVector;
 
@@ -45,7 +46,7 @@ public class VideoFrame {
 
     public List<Recognition> recognitions = new ArrayList<>();
 
-    public RectVector recognizedBoxes = new RectVector();
+    public List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
 
     public VideoFrame() {
     }
@@ -89,6 +90,7 @@ public class VideoFrame {
                 ", tags=" + tagsStr +
                 ", hash=" + Arrays.toString(hash) +
                 ", recognitions=" + recognitions.toString() +
+                ", recognizedBoxes=" + recognizedBoxes.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }
