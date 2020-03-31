@@ -12,6 +12,6 @@ $RELEASE \
 jupyterhub/jupyterhub \
 --namespace $NAMESPACE  \
 --version=0.8.0 \
---timeout 600 \
+--timeout 600s \
 --values secret.yaml \
 --values config.yaml
