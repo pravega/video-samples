@@ -7,7 +7,7 @@ metadata:
     name: video-data-generator
 spec:
   imageRef:
-    name: 1.9.1-scala-2.12
+    name: 1.9.1-2.12
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:

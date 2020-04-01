@@ -4,8 +4,9 @@ set -x
 ROOT_DIR=$(dirname $0)/..
 NAMESPACE=${NAMESPACE:-examples}
 
-helm  del --purge \
-${NAMESPACE}-videoprocessor
+helm  del \
+videoprocessor \
+--namespace ${NAMESPACE}
 
 kubectl wait --for=delete --timeout=300s FlinkCluster/flink-object-detector -n ${NAMESPACE}
 kubectl wait --for=delete --timeout=300s FlinkCluster/video-data-generator -n ${NAMESPACE}
