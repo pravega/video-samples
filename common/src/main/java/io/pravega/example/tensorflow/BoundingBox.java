@@ -10,6 +10,8 @@
  */
 package io.pravega.example.tensorflow;
 
+import java.util.Arrays;
+
 /**
  * Model to store the data of a bounding box
  */
@@ -80,5 +82,17 @@ public class BoundingBox {
 
     public void setClasses(double[] classes) {
         this.classes = classes;
+    }
+
+    @Override
+    public String toString() {
+        return "BoundingBox{" +
+                "x=" + x +
+                ", y=" + y +
+                ", width=" + width +
+                ", height=" + height +
+                ", confidence=" + confidence +
+                ", classes=" + Arrays.toString(classes) +
+                '}';
     }
 }

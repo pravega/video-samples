@@ -1,23 +1,21 @@
 package io.pravega.example.camerarecorder;
 
-import static org.bytedeco.opencv.global.opencv_core.*;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
-import static org.bytedeco.opencv.global.opencv_imgproc.*;
-import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
-
 import org.apache.commons.io.IOUtils;
+import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URISyntaxException;
-import java.nio.file.Paths;
+import java.nio.ByteBuffer;
+
+import static org.bytedeco.opencv.global.opencv_core.*;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
+import static org.bytedeco.opencv.global.opencv_imgproc.*;
+import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 public class Test {
     public Test() {
@@ -25,11 +23,11 @@ public class Test {
         InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
     }
 
-    public static void main (String args[]) throws IOException, URISyntaxException {
+    public static void main(String args[]) throws IOException, URISyntaxException {
         InputStream imageStream = Test.class.getResourceAsStream("/ben_afflek_input_1.jpg");
         byte[] imageBytes = IOUtils.toByteArray(imageStream);
         Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
-        CvArr inputImage = new IplImage(imageMat);
+        IplImage inputImage = new IplImage(imageMat);
 
         System.out.println(inputImage);
 
@@ -48,8 +46,7 @@ public class Test {
         RectVector faces = new RectVector();
         int absoluteFaceSize = 0;
         int height = grayImage.arrayHeight();
-        if (Math.round(height * 0.2f) > 0)
-        {
+        if (Math.round(height * 0.2f) > 0) {
             absoluteFaceSize = Math.round(height * 0.2f);
         }
 
@@ -66,11 +63,65 @@ public class Test {
         graphics.setColor(Color.green);
 
         for (int i = 0; i < faces.size(); i++) {
-            graphics.drawRect(faces.get(i).x(),faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
+            graphics.drawRect(faces.get(i).x(), faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
         }
 
-        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
-        ImageIO.write(bufferedImage, "jpg", outputfile);
+
+        CvRect box = new CvRect();
+        box.x(0);
+        box.y(0);
+        box.width(10);
+        box.height(10);
+
+//        Mat croppedimage = imageMat.submat();
+//        Size scaleSize = new Size(50,50);
+//        resize(imageMat, croppedimage, scaleSize, 10, 10, Imgproc.INTER_AREA);
+
+        Mat croppedimage = new Mat(imageMat, faces.get(0));
+
+//        System.out.println(faces.get(0));
+//        System.out.println(box);
+//
+//        cvSetImageROI(inputImage, box);
+
+//        IplImage croppedImage = cvCreateImage(cvGetSize(inputImage), inputImage.depth(), inputImage.nChannels());
+//
+//        Mat m = new Mat(croppedImage);
+//        ByteBuffer buffer = croppedImage.asByteBuffer();
+//        int sz = (int) (m.total() * m.channels());
+//        byte[] outData = new byte[sz];
+//        m.data().get(outData);
+
+//        Mat matCrop = new Mat(imageMat, faces.get(0));
+//        System.out.println("matcrop: " + matCrop);
+//
+
+
+        byte[] outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
+//        croppedimage.data().get(outData);
+        imencode(".jpg", croppedimage, outData);
+        Mat outputImage = imdecode(new Mat(outData), IMREAD_UNCHANGED);
+
+//        byte[] outData = new byte[croppedImage.getByteBuffer().remaining()];
+//        croppedImage.getByteBuffer().get(outData);
+//        ByteArrayInputStream baisBox = new ByteArrayInputStream(outData);
+//        BufferedImage bufferedImageBox = ImageIO.read(baisBox);
+//        System.out.println(outData.length);
+//        System.out.println(bufferedImageBox);
+//
+//
+//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        ImageIO.write(bufferedImageBox, "jpg", baos);
+//
+//
+////        outData = baos.toByteArray();
+////                            bufferedImage.get(frame.data);
+////                            frame.data = buffer.array();
+//
+//        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
+//        ImageIO.write(bufferedImageBox, "jpg", outputfile);
+//
+        imwrite("./camera-recorder/src/main/resources/detected_face.jpg", outputImage);
     }
 }
 

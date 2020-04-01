@@ -104,8 +104,8 @@ public class FaceDetector implements Serializable {
         ImageIO.write(bufferedImage, "jpg", baos);
         videoFrame.data = baos.toByteArray();
 
-        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
-        ImageIO.write(bufferedImage, "jpg", outputfile);
+//        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
+//        ImageIO.write(bufferedImage, "jpg", outputfile);
 
         return videoFrame;
     }

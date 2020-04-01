@@ -17,16 +17,32 @@ import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
+import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.FaceDetector;
+import io.pravega.example.tensorflow.FaceRecognizer;
 import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.bytedeco.opencv.opencv_core.CvArr;
+import org.bytedeco.opencv.opencv_core.CvRect;
+import org.bytedeco.opencv.opencv_core.IplImage;
+import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+
+import static org.bytedeco.opencv.global.opencv_core.*;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
 
 /**
@@ -105,15 +121,26 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("ChunkedVideoFrameReassembler");
 
             //  identify objects with YOLOv3
-            DataStream<VideoFrame> objectDetectedFrames = videoFrames
+            DataStream<VideoFrame> faceDetectedFrames = videoFrames
                     .map(frame -> {
                         frame = FaceDetector.getInstance().detectFaces(frame);
                         frame.hash = frame.calculateHash();
+
                         return frame;
                     });
-            objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
+
+            DataStream<VideoFrame> faceRecognizedFrames = faceDetectedFrames
+                    .map(frame -> {
+                        frame = FaceRecognizer.getInstance().recognizeFaces(frame);
+                        frame.hash = frame.calculateHash();
+
+                        return frame;
+                    });
+
+            faceRecognizedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
+
+            DataStream<ChunkedVideoFrame> chunkedVideoFrames = faceRecognizedFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
