@@ -86,27 +86,38 @@ class OutputStream(StreamBase):
     def __init__(self, pravega_client, scope, stream):
         super(OutputStream, self).__init__(pravega_client, scope, stream)
 
-    def write_video_from_file(self, filename, crop=None, size=None):
+    def write_video_from_file(self, filename, crop=None, size=None, fps=None):
         cap = cv2.VideoCapture(filename)
-        video_frames = self.opencv_video_frame_generator(cap)
+        video_frames = self.opencv_video_frame_generator(cap, fps=fps)
         cropped_video_frames = (self.cropped_video_frame(f, crop) for f in video_frames)
         resized_video_frames = (self.resized_video_frame(f, size) for f in cropped_video_frames)
         events_to_write = self.video_frame_write_generator(resized_video_frames)
         write_response = self.pravega_client.WriteEvents(events_to_write)
         return write_response
 
-    def opencv_video_frame_generator(self, vidcap):
+    def opencv_video_frame_generator(self, vidcap, fps=None):
+        if fps is None:
+            fps = vidcap.get(cv2.CAP_PROP_FPS)
+        frame_number = 0
+        t0_ms = time.time() * 1000.0
         while True:
-            pos_frames = vidcap.get(cv2.CAP_PROP_POS_FRAMES)
             success, image = vidcap.read()
             if not success:
                 return
+            timestamp = int(frame_number / (fps / 1000.0) + t0_ms)
+            sleep_sec = timestamp / 1000.0 - time.time()
+            if sleep_sec > 0.0:
+                time.sleep(sleep_sec)
+            elif sleep_sec < -5.0:
+                logging.warn(f"opencv_video_frame_generator can't keep up with real-time. sleep_sec={sleep_sec}")
+            logging.info(str(dict(frameNumber=frame_number, timestamp=timestamp)))
             video_frame = dict(
                 image_array=image,
-                frameNumber=int(pos_frames),
-                timestamp=int(time.time() * 1000),
+                frameNumber=frame_number,
+                timestamp=timestamp,
             )
             yield video_frame
+            frame_number += 1
 
     def cropped_video_frame(self, video_frame, crop):
         if crop:
