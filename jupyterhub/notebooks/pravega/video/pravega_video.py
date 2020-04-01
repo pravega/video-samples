@@ -47,18 +47,22 @@ def generate_image_bytes(width, height, camera, frame_number, random=True, forma
 
 
 class StreamBase():
-    def __init__(self, pravega_client, scope, stream, create=False):
+    def __init__(self, pravega_client, scope, stream):
         self.pravega_client = pravega_client
         self.scope = scope
         self.stream = stream
-        if create:
-            self.create_stream()
 
     def create_stream(self, min_num_segments=1):
         return self.pravega_client.CreateStream(pravega.pb.CreateStreamRequest(
             scope=self.scope,
             stream=self.stream,
             scaling_policy=pravega.pb.ScalingPolicy(min_num_segments=min_num_segments),
+        ))
+
+    def delete_stream(self):
+        return self.pravega_client.DeleteStream(pravega.pb.DeleteStreamRequest(
+            scope=self.scope,
+            stream=self.stream,
         ))
 
     def get_stream_info(self):
@@ -68,16 +72,19 @@ class StreamBase():
         ))
 
     def truncate_stream(self):
-        self.pravega_client.TruncateStream(pravega.pb.TruncateStreamRequest(
+        return self.pravega_client.TruncateStream(pravega.pb.TruncateStreamRequest(
             scope=self.scope,
             stream=self.stream,
             stream_cut=self.get_stream_info().tail_stream_cut,
         ))
 
+    def write_events(self, events_to_write):
+        return self.pravega_client.WriteEvents(events_to_write)
+
 
 class OutputStream(StreamBase):
-    def __init__(self, pravega_client, scope, stream, create=True):
-        super(OutputStream, self).__init__(pravega_client, scope, stream, create)
+    def __init__(self, pravega_client, scope, stream):
+        super(OutputStream, self).__init__(pravega_client, scope, stream)
 
     def write_video_from_file(self, filename, crop=None, size=None):
         cap = cv2.VideoCapture(filename)
@@ -95,7 +102,7 @@ class OutputStream(StreamBase):
             if not success:
                 return
             video_frame = dict(
-                image=image,
+                image_array=image,
                 frameNumber=int(pos_frames),
                 timestamp=int(time.time() * 1000),
             )
@@ -104,12 +111,12 @@ class OutputStream(StreamBase):
     def cropped_video_frame(self, video_frame, crop):
         if crop:
             left, top, right, bottom = crop
-            video_frame['image'] = video_frame['image'][top:bottom, left:right]
+            video_frame['image_array'] = video_frame['image_array'][top:bottom, left:right]
         return video_frame
 
     def resized_video_frame(self, video_frame, size):
         if size:
-            video_frame['image'] = cv2.resize(video_frame['image'], size, interpolation=cv2.INTER_NEAREST)
+            video_frame['image_array'] = cv2.resize(video_frame['image_array'], size, interpolation=cv2.INTER_NEAREST)
         return video_frame
 
     def video_frame_write_generator(self, video_frame_iter, camera=0):
@@ -118,9 +125,9 @@ class OutputStream(StreamBase):
             event_dict['camera'] = camera
             event_dict['ssrc'] = 0
 
-            success, png_array = cv2.imencode('.jpg', video_frame['image'])
+            success, png_array = cv2.imencode('.jpg', video_frame['image_array'])
             event_dict['data'] = base64.b64encode(png_array.tobytes()).decode(encoding='UTF-8')
-            del event_dict['image']
+            del event_dict['image_array']
 
             to_log_dict = event_dict.copy()
             to_log_dict['data'] = '(%d bytes)' % len(event_dict['data'])
@@ -139,8 +146,8 @@ class OutputStream(StreamBase):
 
 
 class VideoDataGenerator(StreamBase):
-    def __init__(self, pravega_client, scope, stream, create=True, camera=0, frames_per_sec=1.0, verbose=False, **kwargs):
-        super(VideoDataGenerator, self).__init__(pravega_client, scope, stream, create)
+    def __init__(self, pravega_client, scope, stream, camera=0, frames_per_sec=1.0, verbose=False, **kwargs):
+        super(VideoDataGenerator, self).__init__(pravega_client, scope, stream)
         self.camera = camera
         self.frames_per_sec = frames_per_sec
         self.verbose = verbose
@@ -207,20 +214,21 @@ class UnindexedStream(StreamBase):
         )
         return ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
 
-    def read_event_to_video_frame(self, read_event):
+    def read_event_to_video_frame(self, read_event, decode=True):
         event_json = read_event.event
         video_frame = json.loads(event_json)
-        image_png = base64.b64decode(video_frame['data'])
-        del video_frame['data']
-        image_png_array = np.frombuffer(image_png, dtype=np.uint8)
-        image_array = cv2.imdecode(image_png_array, cv2.IMREAD_UNCHANGED)
-        video_frame['image_array'] = image_array
         video_frame['timestamp'] = pd.to_datetime(video_frame['timestamp'], unit='ms', utc=True)
+        video_frame['data'] = base64.b64decode(video_frame['data'])
+        if decode:
+            image_png_array = np.frombuffer(video_frame['data'], dtype=np.uint8)
+            image_array = cv2.imdecode(image_png_array, cv2.IMREAD_UNCHANGED)
+            video_frame['image_array'] = image_array
+            del video_frame['data']
         return video_frame
 
-    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False):
+    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False, decode=True):
         read_events = self.read_events(from_stream_cut, to_stream_cut, stop_at_tail=stop_at_tail)
-        return (self.read_event_to_video_frame(read_event) for read_event in read_events)
+        return (self.read_event_to_video_frame(read_event, decode=decode) for read_event in read_events)
 
     def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None):
         read_events = self.read_video_frames(from_stream_cut, to_stream_cut)
@@ -234,6 +242,7 @@ class UnindexedStream(StreamBase):
 
 
 class IndexStream(StreamBase):
+    """Represents a Pravega Stream that stores a Stream Cut index for another Pravega Stream."""
     def index_record_write_generator(self, index_records):
         for index_record in index_records:
             rec = index_record.copy()
@@ -266,15 +275,17 @@ class IndexStream(StreamBase):
 
 # TODO: This should be based on UnindexedStream
 class IndexedStream(StreamBase):
-    def __init__(self, pravega_client, scope, stream, timestamp_col='timestamp'):
+    def __init__(self, pravega_client, scope, stream, timestamp_col='timestamp', exclude_cols=('data',)):
         super(IndexedStream, self).__init__(pravega_client, scope, stream)
         self.pravega_client = pravega_client
         self.scope = scope
         self.stream = stream
         self.timestamp_col = timestamp_col
+        self.exclude_cols = exclude_cols
         self.index_df = None
         self.unindexed_stream =  UnindexedStream(pravega_client, scope, stream)
-        self.index_stream = IndexStream(pravega_client, scope, '%s-index' % stream, create=True)
+        self.index_stream = IndexStream(pravega_client, scope, '%s-index' % stream)
+        self.index_stream.create_stream()
 
     def update_index(self, force_full=False):
         stream_info = self.get_stream_info()
@@ -309,13 +320,14 @@ class IndexedStream(StreamBase):
             yield rec
 
     def read_event_to_index(self, read_event):
+        """Convert an event to a record that will be written to the index stream."""
         event_json = read_event.event
         event = json.loads(event_json)
-        return {
-            self.timestamp_col: event[self.timestamp_col],
-            'to_stream_cut': read_event.stream_cut.text,
-            'event_pointer': read_event.event_pointer.bytes,
-        }
+        for col in self.exclude_cols:
+            if col in event: del event[col]
+        event['to_stream_cut'] = read_event.stream_cut.text
+        event['event_pointer'] = read_event.event_pointer.bytes
+        return event
 
     def load_index(self):
         print('load_index: Reading index stream %s' % self.index_stream.stream)

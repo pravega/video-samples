@@ -7,3 +7,7 @@ from .pravega_video import (
     UnindexedStream,
     IndexedStream,
 )
+
+from .transcoding import (
+    Transcoder,
+)
