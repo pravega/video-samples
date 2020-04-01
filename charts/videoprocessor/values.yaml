@@ -8,12 +8,12 @@ FlinkObjectDetectorJob:
   parallelism: 1
   enableOperatorChaining: "false"
   input:
-    stream: object-detector-input-video
+    stream: object-detector-input-video2
     minNumSegments: 1
   output:
     stream: object-detector-output-video
     minNumSegments: 1
-  startAtTail: "false"
+  startAtTail: "true"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
@@ -27,7 +27,7 @@ VideoDataGeneratorJob:
   parallelism: 1
   enableOperatorChaining: "false"
   output:
-    stream: object-detector-input-video
+    stream: generated-video
     minNumSegments: 1
   useCachedFrame: "false"
   numCameras: 1
