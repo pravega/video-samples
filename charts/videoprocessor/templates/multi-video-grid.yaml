@@ -7,7 +7,7 @@ metadata:
     name: multi-video-grid
 spec:
   imageRef:
-    name: 1.7.2
+    name: 1.9.1-2.12
   zookeeperUrl: zookeeper-client:2181
   storage:
     volumeSource:
