@@ -58,7 +58,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
 
     public void run() {
         try {
-            long start = System.currentTimeMillis();
             final String jobName = FlinkObjectDetectorJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
@@ -106,7 +105,9 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             //  identify objects with YOLOv3
             DataStream<VideoFrame> objectDetectedFrames = videoFrames
                     .map(frame -> {
-                        frame.data = TFObjectDetector.getInstance().detect(frame.data);
+                        final TFObjectDetector.DetectionResult result = TFObjectDetector.getInstance().detect(frame.data);
+                        frame.data = result.getJpegBytes();
+                        frame.recognitions = result.getRecognitions();
                         frame.hash = frame.calculateHash();
                         return frame;
                     });
@@ -138,9 +139,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .name("output-sink");
 
             chunkedVideoFrames.addSink(writer).name(getConfig().getOutputStreamConfig().toString());
-
-            long end = System.currentTimeMillis();
-            log.info("@@@@@@@@@@@  TIME TAKEN FOR FLINK PROCESS @@@@@@@@@@@  "+(end - start));
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);

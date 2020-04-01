@@ -51,10 +51,6 @@ public final class Recognition {
         return new BoxPosition(location);
     }
 
-//    public void setLocation(BoxPosition location) {
-//        this.location = location;
-//    }
-
     @Override
     public String toString() {
         return "Recognition{" +

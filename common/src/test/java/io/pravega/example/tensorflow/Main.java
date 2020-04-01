@@ -18,7 +18,7 @@ public class Main {
 
     public static void main(String[] args) {
         TFObjectDetector objectDetector = new TFObjectDetector();
-        byte[]    data =  objectDetector.detect(readAllBytesOrExit(IMAGE));
+        byte[]    data =  objectDetector.detect(readAllBytesOrExit(IMAGE)).getJpegBytes();
 
         String fIMAGE = "c:/tmp/final_output.jpg";
 

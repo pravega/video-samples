@@ -47,7 +47,7 @@ public class TFObjectDetector implements Serializable {
     }
 
     public TFObjectDetector() {
-        log.info("@@@@@@@@@@@  new TF @@@@@@@@@@@  " );
+        log.info("TFObjectDetector: initializing TensorFlow");
 
         InputStream graphFile = getClass().getResourceAsStream("/tiny-yolo-voc.pb");       // The model
         InputStream labelFile = getClass().getResourceAsStream("/yolo-voc-labels.txt");    // labels for classes used to train model
@@ -78,14 +78,15 @@ public class TFObjectDetector implements Serializable {
      * @param image the location of the image
      * @return output image with objects detected
      */
-    public byte[] detect(byte[] image) {
-        final long start = System.currentTimeMillis();
+    public DetectionResult detect(byte[] image) {
+        final long t0 = System.currentTimeMillis();
         final float[] tensorFlowOutput = executeYOLOGraph(image);
         final List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(tensorFlowOutput, LABEL_DEF);
-        final byte[] finalData = ImageUtil.getInstance().labelImage(image, recognitions);
-        final long end = System.currentTimeMillis();
-        log.info("@@@@@@@@@@@  TENSORFLOW  TIME TAKEN FOR DETECTION @@@@@@@@@@@  " + (end - start));
-        return finalData;
+        final byte[] jpegBytes = ImageUtil.getInstance().labelImage(image, recognitions);
+        final long dt = System.currentTimeMillis() - t0;
+        final double fps = 1000.0/dt;
+        log.info("detect: elapsed time for single frame: {} ms ({} fps)", dt, fps);
+        return new DetectionResult(recognitions, jpegBytes);
     }
 
     /**
@@ -118,6 +119,24 @@ public class TFObjectDetector implements Serializable {
                     return outputTensor;
                 }
             }
+        }
+    }
+
+    static public class DetectionResult {
+        private final List<Recognition> recognitions;
+        private final byte[] jpegBytes;
+
+        public DetectionResult(List<Recognition> recognitions, byte[] jpegBytes) {
+            this.recognitions = recognitions;
+            this.jpegBytes = jpegBytes;
+        }
+
+        public List<Recognition> getRecognitions() {
+            return recognitions;
+        }
+
+        public byte[] getJpegBytes() {
+            return jpegBytes;
         }
     }
 }
