@@ -26,7 +26,7 @@ public class ObjectDetectorTests {
     @Ignore
     public void Test1() throws Exception {
         byte[] inBytes = Files.readAllBytes((new File("test_truck.jpg")).toPath());
-        byte[] outBytes = TFObjectDetector.getInstance().detect(inBytes);
+        byte[] outBytes = TFObjectDetector.getInstance().detect(inBytes).getJpegBytes();
         Files.write((new File("detected_test_truck.jpg")).toPath(), outBytes);
     }
 }

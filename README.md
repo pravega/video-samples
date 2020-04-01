@@ -421,27 +421,24 @@ This project demonstrates methods to store, process, and read video with Pravega
 ## Building and Running 
 These steps are additional to the previous setup. 
  
-### Update the repository
- ```
-cd /HOME/video-samples
-
-git checkout tensorflow-gpu
-```
-`HOME` is the location of the project
- 
 ### Setup access to GPUs and Tensorflow
  
-#### Build Custom Image
+#### Build Custom Image (optional)
+
+This is only required if you wish to customize the Flink image.
 
 ```
 cd GPUTensorflowImage
 docker build .
 ```
 
+Tag the image, push it, and then edit GPUTensorflowImage/ClusterFlinkImage.yaml with the
+correct tag.
+
 #### Add Custom Flink Image to SDP
 
 ```
-kubectl create -f GPUTensorflowImage/ClusterFlinkImage.yaml
+kubectl apply -f GPUTensorflowImage/ClusterFlinkImage.yaml
 ```
 
 ### Running in IntelliJ
