@@ -20,43 +20,44 @@ scripts/deploy-k8s-components.sh
 
 ```
 export NAMESPACE=examples
-./deploy.sh
+./deploy-k8s-components.sh
+```
+
+#### Login to Jupyter Hub
+
+1. Run the following command to determine the external IP address for Jupyter Hub.
+```
 kubectl get svc/proxy-public -n examples
 ```
 
-Determine the external IP address displayed from the above command.
-Open your browser to this IP address.
-This will open Jupyter Hub.
-Enter any user name (e.g. "demo"). A session will be created for each user.
-Password authentication is disabled and can be any value.
+2. Open your browser to this IP address (http).
+
+3. Login with any user name ("videodemo" is recommended).
+   The password is in the file secret.yaml, field `auth.dummy.password`.
+
+4. Choose Jupyter Tensorflow Notebook.
+
+5. A session will be created for each user.
+
 
 ### Run Sample Notebooks
 
-In Jupyter, open a terminal.
+1. In Jupyter, open a terminal.
 ```
 cd data-project
 git clone https://github.com/pravega/video-samples
 ```
 
-Open the notebook data-project/video-samples/jupyterhub/notebooks/install_dependencies.ipynb.
-Click Kernel -> Restart Kernel and Run All Cells.
+2. Open the notebook data-project/video-samples/jupyterhub/notebooks/install_dependencies.ipynb.
+   Click Kernel -> Restart Kernel and Run All Cells.
 
-Open the notebook video_data_generator.ipynb.
+3. Open the notebook video_data_generator.ipynb.
+   Click Kernel -> Restart Kernel and Run All Cells.
 
-Edit the notebook to set the following value:
-```
-gateway = 'pravega-grpc-gateway:80'
-```
+5. Repeat for video_player.ipynb and video_player_index.ipynb.
 
-Click Kernel -> Restart Kernel and Run All Cells.
-
-Open the notebook video_player.ipynb.
-
-
-
-
-# Reference
+## Reference
 
 - [Pravega GRPC Gateway](https://github.com/pravega/pravega-grpc-gateway)
-- https://zero-to-jupyterhub.readthedocs.io
-- https://jupyter-docker-stacks.readthedocs.io
+- <https://zero-to-jupyterhub.readthedocs.io>
+- <https://jupyter-docker-stacks.readthedocs.io>

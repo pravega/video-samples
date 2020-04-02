@@ -11,7 +11,7 @@ helm upgrade --install \
 $RELEASE \
 jupyterhub/jupyterhub \
 --namespace $NAMESPACE  \
---version=0.8.0 \
+--version=0.8.2 \
 --timeout 600s \
 --values secret.yaml \
 --values config.yaml

@@ -481,6 +481,10 @@ Note: If you have GPUs on the machine it is running on, then enable GPU access u
 scripts/deploy-k8s-components.sh
 ```
 
+# Jupyter Hub
+
+See [Jupyter Hub](jupyterhub/README.md). 
+
 # References
 
 - <http://pravega.io/>

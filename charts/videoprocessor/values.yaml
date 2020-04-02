@@ -8,7 +8,7 @@ FlinkObjectDetectorJob:
   parallelism: 1
   enableOperatorChaining: "false"
   input:
-    stream: object-detector-input-video2
+    stream: object-detector-input-video
     minNumSegments: 1
   output:
     stream: object-detector-output-video
