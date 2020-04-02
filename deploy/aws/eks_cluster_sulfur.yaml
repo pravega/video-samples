@@ -1,0 +1,11 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: videodemo
+  region: us-east-1
+nodeGroups:
+  - name: standard-workers
+    instanceType: p3.2xlarge
+    desiredCapacity: 3
+    ssh:
+      publicKeyName: "faheyc@ubuntu"
