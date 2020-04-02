@@ -1,27 +1,44 @@
 hub:
   extraConfig:
+    # Below changed per https://github.com/jupyter/docker-stacks/issues/1041.
     jupyterlab: |
-      c.Spawner.cmd = ['jupyter-labhub']
+      c.Spawner.default_url = "/lab"
 
 prePuller:
   hook:
     enabled: false
 
 singleuser:
+  cpu:
+    limit: 2.0
+    guarantee: 0.5
   defaultUrl: "/lab"
   extraEnv:
     pravega_client_auth_method: "Bearer"
     pravega_client_auth_loadDynamic: "true"
+    PRAVEGA_GRPC_GATEWAY_ADDRESS: "pravega-grpc-gateway:80"
     KEYCLOAK_SERVICE_ACCOUNT_FILE: "/var/run/secrets/nautilus.dellemc.com/serviceaccount/keycloak.json"
   image:
     name: jupyter/minimal-notebook
     tag: ae5f7e104dd5
   imagePullPolicy: Always
+  memory:
+    limit: 2G
+    guarantee: 1G
   profileList:
 
-    - display_name: "Jupyter Notebook"
+    - display_name: "Jupyter TensorFlow Notebook 2020-03-17"
+      default: false
+      kubespawner_override:
+        image: jupyter/tensorflow-notebook:dc9744740e12
+
+    - display_name: "Jupyter All Spark Notebook 2020-03-17"
       default: true
-      description: "Jupyter Notebook"
+      kubespawner_override:
+        image: jupyter/all-spark-notebook:dc9744740e12
+
+    - display_name: "Jupyter All Spark Notebook 2019-04-22"
+      default: false
       kubespawner_override:
         image: jupyter/all-spark-notebook:f646d2b2a3af
 
@@ -38,3 +55,4 @@ singleuser:
         mountPath: /var/run/secrets/nautilus.dellemc.com/serviceaccount
       - name: data-project
         mountPath: /home/jovyan/data-project
+
