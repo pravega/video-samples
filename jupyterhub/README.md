@@ -18,6 +18,11 @@ scripts/deploy-k8s-components.sh
 
 ### Install Jupyter Hub on SDP
 
+1. Copy secret-example.yaml to secret.yaml.
+
+2. Use `openssl rand -hex 32` to generate two secrets and place them in secret.yaml.
+
+3. Deploy using Helm.
 ```
 export NAMESPACE=examples
 ./deploy-k8s-components.sh
