@@ -28,12 +28,12 @@ singleuser:
   profileList:
 
     - display_name: "Jupyter TensorFlow Notebook 2020-03-17"
-      default: false
+      default: true
       kubespawner_override:
         image: jupyter/tensorflow-notebook:dc9744740e12
 
     - display_name: "Jupyter All Spark Notebook 2020-03-17"
-      default: true
+      default: false
       kubespawner_override:
         image: jupyter/all-spark-notebook:dc9744740e12
 
