@@ -37,7 +37,7 @@ def generate_image_bytes(width, height, camera, frame_number, random=True, forma
         img = Image.fromarray(img_array.astype('uint8')).convert('RGB')
     else:
         img = Image.new('RGB', (width, height), (25, 25, 240, 0))
-    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf', font_size)
+    font = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf', font_size)
     draw = ImageDraw.Draw(img)
     draw.text((width//10, height//10), 'CAMERA\n %03d\nFRAME\n%05d' % (camera, frame_number), font=font, align='center')
     out_bytesio = io.BytesIO()
