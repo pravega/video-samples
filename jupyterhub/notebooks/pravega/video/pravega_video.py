@@ -247,7 +247,7 @@ class UnindexedStream(StreamBase):
             if i % show_frame_interval == 0:
                 IPython.display.clear_output(wait=True)
                 fig = plt.figure(figsize=figsize)
-                plt.title('frameNumber=%d, timestamp=%s' % (video_frame['frameNumber'], video_frame['timestamp']))
+                plt.title('frameNumber=%d, camera=%d, timestamp=%s' % (video_frame['frameNumber'], video_frame['camera'], video_frame['timestamp']))
                 plt.imshow(opencv_image_to_mpl(video_frame['image_array']));
                 plt.show()
 
