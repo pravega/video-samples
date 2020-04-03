@@ -10,7 +10,7 @@ cd
 git clone https://github.com/pravega/pravega-grpc-gateway
 cd pravega-grpc-gateway
 export DOCKER_REPOSITORY=claudiofahey
-export IMAGE_TAG=0.6.0
+export IMAGE_TAG=0.7.0
 export NAMESPACE=examples
 scripts/build-k8s-components.sh
 scripts/deploy-k8s-components.sh
