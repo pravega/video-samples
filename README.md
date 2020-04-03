@@ -235,7 +235,7 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 1. You must make the Maven repo in SDP available to your development workstation.
 ```
-NAMESPACE=examples
+export NAMESPACE=examples
 kubectl port-forward service/repo 9092:80 --namespace ${NAMESPACE} &
 ```
 

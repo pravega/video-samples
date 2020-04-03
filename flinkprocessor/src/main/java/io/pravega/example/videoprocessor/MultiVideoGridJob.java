@@ -111,10 +111,17 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ChunkedVideoFrameReassembler");
             inVideoFrames.printToErr().uid("inVideoFrames-print").name("inVideoFrames-print");
 
+            final DataStream<VideoFrame> rebalancedVideoFrames;
+            if (getConfig().isEnableRebalance()) {
+                rebalancedVideoFrames = inVideoFrames.rebalance();
+            } else {
+                rebalancedVideoFrames = inVideoFrames;
+            }
+
             // Resize all input images. This will be performed in parallel.
             int imageWidth = getConfig().getImageWidth();
-            int imageHeight = imageWidth;
-            DataStream<VideoFrame> resizedVideoFrames = inVideoFrames
+            int imageHeight = getConfig().getImageHeight();
+            DataStream<VideoFrame> resizedVideoFrames = rebalancedVideoFrames
                     .map(frame -> {
                         ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
                         frame.data = resizer.resize(frame.data);

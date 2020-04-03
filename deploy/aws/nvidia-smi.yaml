@@ -9,6 +9,10 @@ spec:
       image: nvidia/cuda:9.2-devel
       args:
         - "nvidia-smi"
+        - "-l"
+        - "1"
       resources:
         limits:
           nvidia.com/gpu: 1
+  nodeSelector:
+    kubernetes.io/hostname: "ip-192-168-62-64.ec2.internal"  # hostname label as shown by "kubectl get nodes -o yaml"
