@@ -27,11 +27,14 @@ It also includes an application that performs object detection using TensorFlow 
 
 ## Building and Running the Video Samples
 
-In the steps below, sections noted with **(Nautilus SDK Desktop)** apply only to a
-Nautilus SDK Desktop in a Kubernetes deployment of SDP.
-Sections noted with **(Local)** apply to a local workstation deployment of Pravega (standalone or Docker).
-Sections noted with **(External)** apply to a local workstation running IntelliJ that
-connects to Pravega running in an external Kubernetes deployment of SDP.
+In the steps below, only some sections will apply to your environment.
+These are identified as follows:
+
+- **(Nautilus SDK Desktop)**: Nautilus SDK Desktop in a Kubernetes deployment of SDP.
+- **(Local)**: A local workstation deployment of Pravega (standalone or Docker).
+- **(External)**: A local workstation running IntelliJ that
+  connects to Pravega running in an external Kubernetes deployment of SDP.
+- **(GPU)**: GPUs are available on Kubernetes worker nodes.
 
 ### Download this Repository
 
@@ -145,13 +148,42 @@ kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.passwor
 - Local:
   `tcp://127.0.0.1:9090`
 
-- Nautilus SDK Desktop or a Flink job running in SDP:
-  `tcp://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:9090`
+- SDP, TLS enabled:
+  The DNS name can be retrieved by running the following command and using the HOST value.
+  `kubectl get ingress -n nautilus-pravega pravega-controller`
+  The controller will have the form `tls://pravega-controller.example.com:443`.
 
-- External:
+- SDP, TLS disabled:
   The IP address and DNS name can be retrieved by running:
   `kubectl get -n nautilus-pravega svc nautilus-pravega-controller -o yaml`
-  For non-TLS, use the form `tcp://ip:9090`.
+  The controller will have the form `tcp://pravega-controller.example.com:9090`.
+
+### (GPU) Setup access to GPUs and Tensorflow
+
+#### Build Custom Image (optional)
+
+This is only required if you wish to customize the Flink image.
+
+```
+cd GPUTensorflowImage
+docker build .
+```
+
+Tag the image, push it, and then edit GPUTensorflowImage/ClusterFlinkImage.yaml with the
+correct tag.
+
+#### Add Custom Flink Image to SDP
+
+```
+kubectl apply -f GPUTensorflowImage/ClusterFlinkImage.yaml
+```
+
+#### Enable TensorFlow GPU Support
+
+If you have GPUs on the machine it is running on, then enable GPU access uncommenting the following in common/build.gradle
+```
+    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
+```
 
 ### Running the Examples in IntelliJ
 
@@ -210,7 +242,7 @@ kubectl port-forward service/repo 9092:80 --namespace ${NAMESPACE} &
 2. Build and publish your application JAR file.
 ```
 export MAVEN_USERNAME=desdp
-export MAVEN_PASSWORD=your_password
+export MAVEN_PASSWORD=$(kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.password}' | base64 -d)
 ./gradlew publish
 ```
 
@@ -294,6 +326,10 @@ export CAMERA=1000
 
 See (AppConfiguration.java)[video-player/src/main/java/io/pravega/example/videoplayer/AppConfiguration.java]
 for more options.
+
+# Jupyter Hub
+
+See [Jupyter Hub](jupyterhub/README.md).
 
 # Video Chunking
 
@@ -421,70 +457,6 @@ This project demonstrates methods to store, process, and read video with Pravega
 ## Building and Running 
 These steps are additional to the previous setup. 
  
-### Setup access to GPUs and Tensorflow
- 
-#### Build Custom Image (optional)
-
-This is only required if you wish to customize the Flink image.
-
-```
-cd GPUTensorflowImage
-docker build .
-```
-
-Tag the image, push it, and then edit GPUTensorflowImage/ClusterFlinkImage.yaml with the
-correct tag.
-
-#### Add Custom Flink Image to SDP
-
-```
-kubectl apply -f GPUTensorflowImage/ClusterFlinkImage.yaml
-```
-
-### Running in IntelliJ
-Run the FlinkObjectDetectorJob using following parameters:
-```
---controller
-tcp://127.0.0.1:9090
---scope
-examples
---input-stream
-examples-raw
---output-stream
-examples-detected
---CAMERA
-3
---startAtTail
-true
-```
-
-### Running the Examples in SDP
-
-1. You must make the Maven repo in SDP available to your development workstation.
-```
-kubectl port-forward service/repo 9092:80 --namespace examples &
-```
-
-Note: If you have GPUs on the machine it is running on, then enable GPU access uncommenting the following in common/build.gradle
-```
-    // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
-//    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
-```
-
-2. Build and publish your application JAR file.
-```
-./gradlew publish
-```
-
-3. Use Helm to start your Flink cluster and Flink applications.
-```
-scripts/deploy-k8s-components.sh
-```
-
-# Jupyter Hub
-
-See [Jupyter Hub](jupyterhub/README.md). 
-
 # References
 
 - <http://pravega.io/>

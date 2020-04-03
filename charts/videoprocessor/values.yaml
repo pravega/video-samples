@@ -16,11 +16,11 @@ FlinkObjectDetectorJob:
   startAtTail: "true"
   maxOutOfOrdernessMs: 1000
   taskManager:
-    replicas: 1
-    memory: 2G
     cpu: 2000m
-    heap: 600m
-    taskSlots: 2
+    heap: 2000m
+    memory: 8G
+    replicas: 1
+    taskSlots: 1
 
 VideoDataGeneratorJob:
   enabled: false
