@@ -34,7 +34,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         super(args);
         numCameras = getParams().getInt("numCameras", 4);
         imageWidth = getParams().getInt("imageWidth", 100);
-        chunkSizeBytes = getParams().getInt("chunkSizeBytes", 512*1024);
+        chunkSizeBytes = getParams().getInt("chunkSizeBytes", 8*1024*1024*3/4 + 1024);
         dropChunks = getParams().getBoolean("dropChunks", false);
         framesPerSec = getParams().getDouble("framesPerSec", 1.0);
         writeToPravega = getParams().getBoolean("writeToPravega", true);
