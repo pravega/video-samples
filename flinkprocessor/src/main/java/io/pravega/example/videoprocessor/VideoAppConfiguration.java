@@ -22,6 +22,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     private static Logger log = LoggerFactory.getLogger(VideoAppConfiguration.class);
 
     private final int numCameras;
+    private final int imageHeight;
     private final int imageWidth;
     private final int chunkSizeBytes;
     private final boolean dropChunks;
@@ -33,6 +34,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     public VideoAppConfiguration(String[] args) {
         super(args);
         numCameras = getParams().getInt("numCameras", 4);
+        imageHeight = getParams().getInt("imageHeight", 100);
         imageWidth = getParams().getInt("imageWidth", 100);
         chunkSizeBytes = getParams().getInt("chunkSizeBytes", 8*1024*1024*3/4 + 1024);
         dropChunks = getParams().getBoolean("dropChunks", false);
@@ -47,6 +49,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         return "VideoAppConfiguration{" +
                 super.toString() +
                 ", numCameras=" + numCameras +
+                ", imageHeight=" + imageHeight +
                 ", imageWidth=" + imageWidth +
                 ", chunkSizeBytes=" + chunkSizeBytes +
                 ", dropChunks=" + dropChunks +
@@ -59,6 +62,10 @@ public class VideoAppConfiguration extends AppConfiguration {
 
     public int getNumCameras() {
         return numCameras;
+    }
+
+    public int getImageHeight() {
+        return imageHeight;
     }
 
     public int getImageWidth() {

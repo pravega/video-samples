@@ -20,8 +20,6 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
-import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,51 +57,44 @@ public class FlinkObjectDetectorJob extends AbstractJob {
     public void run() {
         try {
             final String jobName = FlinkObjectDetectorJob.class.getName();
-            StreamExecutionEnvironment env = initializeFlinkStreaming();
+            final StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
 
-            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            final StreamCut startStreamCut;
             if (getConfig().isStartAtTail()) {
                 startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
+            } else {
+                startStreamCut = StreamCut.UNBOUNDED;
             }
 
-            FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
+            final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
 
-            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
+                    .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
                     .name("input-source");
 
-            // Assign timestamps and watermarks based on timestamp in each chunk.
-            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
-                    .assignTimestampsAndWatermarks(
-                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
-                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
-                                @Override
-                                public long extractTimestamp(ChunkedVideoFrame element) {
-                                    return element.timestamp.getTime();
-                                }
-                            })
-                    .uid("assignTimestampsAndWatermarks")
-                    .name("assignTimestampsAndWatermarks");
-            // inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
-
-            // Reassemble whole video frames from chunks.
-            boolean failOnError = false;
-            DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
-                    .keyBy("camera")
-                    .window(new ChunkedVideoFrameWindowAssigner())
-                    .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
+            // Unchunk disabled.
+            final DataStream<VideoFrame> videoFrames = inChunkedVideoFrames
+                    .map(VideoFrame::new)
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
-            //  identify objects with YOLOv3
-            DataStream<VideoFrame> objectDetectedFrames = videoFrames
+            final DataStream<VideoFrame> rebalancedVideoFrames;
+            if (getConfig().isEnableRebalance()) {
+                rebalancedVideoFrames = videoFrames.rebalance();
+            } else {
+                rebalancedVideoFrames = videoFrames;
+            }
+
+            //  identify objects with YOLOv3;
+            final DataStream<VideoFrame> objectDetectedFrames = rebalancedVideoFrames
                     .map(frame -> {
                         final TFObjectDetector.DetectionResult result = TFObjectDetector.getInstance().detect(frame.data);
                         frame.data = result.getJpegBytes();
@@ -113,19 +104,13 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
-            DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
+            final DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
 
-            chunkedVideoFrames
-                    .filter(f -> f.camera == 0 && f.frameNumber % 10 == 0)
-                    .printToErr().uid("chunkedVideoFrames-print").name("chunkedVideoFrames-print");
-
-            System.out.println("Reached chunked");
-
             // create the Pravega sink to write a stream of video frames
-            FlinkPravegaWriter<ChunkedVideoFrame> writer = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+            final FlinkPravegaWriter<ChunkedVideoFrame> writer = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
                     .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
