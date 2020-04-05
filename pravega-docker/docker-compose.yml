@@ -24,7 +24,7 @@ services:
     environment:
       ZK_URL: zookeeper:2181
       bookiePort: 3181
-    image: pravega/bookkeeper:0.6.0
+    image: pravega/bookkeeper:0.7.0
     links:
       - zookeeper
     networks:
@@ -50,7 +50,7 @@ services:
         -XX:+CrashOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
       SERVICE_HOST_IP: segmentstore
-    image: pravega/pravega:0.6.0
+    image: pravega/pravega:0.7.0
     links:
       - zookeeper
     networks:
@@ -62,7 +62,7 @@ services:
     restart: always
 
   segmentstore:
-    image: pravega/pravega:0.6.0
+    image: pravega/pravega:0.7.0
     ports:
       - "12345:12345"
     command: segmentstore
