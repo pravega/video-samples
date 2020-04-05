@@ -9,9 +9,15 @@
 cd
 git clone https://github.com/pravega/pravega-grpc-gateway
 cd pravega-grpc-gateway
+```
+
+Edit the file charts/pravega-grpc-gateway/values.yaml as needed.
+
+```
 export DOCKER_REPOSITORY=claudiofahey
 export IMAGE_TAG=0.7.0
 export NAMESPACE=examples
+
 scripts/build-k8s-components.sh
 scripts/deploy-k8s-components.sh
 ```
@@ -43,7 +49,6 @@ kubectl get svc/proxy-public -n examples
 4. Choose Jupyter Tensorflow Notebook.
 
 5. A session will be created for each user.
-
 
 ### Run Sample Notebooks
 
