@@ -100,22 +100,21 @@ docker run -it --rm -e HOST_IP -p 9090:9090 -p 10080:9091 -p 12345:12345 pravega
 curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:10080/v1/scopes
 ```
 
-### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries
+### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries (optional)
 
-This step is required when using pre-release versions of Pravega and/or SDP.
+This step is only required when using pre-release versions of Pravega and/or SDP.
 It will install required libraries in the local Maven repository.
-This can be skipped in Nautilus SDK Desktop as it has already been performed.
 
 ```
 cd
 git clone https://github.com/pravega/pravega
 pushd pravega
-git checkout r0.5
+git checkout r0.7
 ./gradlew install
 popd
 git clone https://github.com/pravega/flink-connectors
 pushd flink-connectors
-git checkout r0.5
+git checkout r0.7
 ./gradlew install
 popd
 ```
@@ -136,11 +135,6 @@ you must manually replace `${HOME}` with your actual home directory.
 export pravega_client_auth_method=Bearer
 export pravega_client_auth_loadDynamic=true
 export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
-```
-
-Obtain the "desdp" user password.
-```
-kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.password}' | base64 -d ; echo
 ```
 
 ### Determine the Pravega Controller URL
