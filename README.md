@@ -5,10 +5,12 @@
 
 ![grid-sample](images/video-samples-diagram.png)
 
-This project demonstrates methods to store, process, and read video with Pravega and Flink.
+This project demonstrates methods to store, process, and read video with Pravega and Flink
+which are key components of Dell EMC Streaming Data Platform (SDP).
 It also includes an application that performs object detection using TensorFlow and YOLO. 
 
 ## Components
+
 - Pravega: Pravega provides a new storage abstraction - a stream - for continuous and unbounded data. 
   A Pravega stream is a durable, elastic, append-only, unbounded sequence of bytes that has good performance and strong consistency.
 
@@ -30,11 +32,9 @@ It also includes an application that performs object detection using TensorFlow 
 In the steps below, only some sections will apply to your environment.
 These are identified as follows:
 
-- **(Nautilus SDK Desktop)**: Nautilus SDK Desktop in a Kubernetes deployment of SDP.
 - **(Local)**: A local workstation deployment of Pravega (standalone or Docker).
-- **(External)**: A local workstation running IntelliJ that
-  connects to Pravega running in an external Kubernetes deployment of SDP.
-- **(GPU)**: GPUs are available on Kubernetes worker nodes.
+- **(SDP)**: A deployment of Streaming Data Platform (SDP).
+- **(GPU)**: GPUs are available on SDP Kubernetes worker nodes.
 
 ### Download this Repository
 
@@ -44,18 +44,18 @@ git clone https://github.com/pravega/video-samples
 cd video-samples
 ```
 
-### (Local, External) Install Operating System
+### Install Operating System
 
 Install Ubuntu 18.04 LTS. Other operating systems can also be used but the commands below have only been tested
 on this version.
 
-### (Local, External) Install Java 8
+### Install Java 8
 
 ```
 apt-get install openjdk-8-jdk
 ```
 
-### (Local, External, Optional) Install IntelliJ
+### (Optional) Install IntelliJ
 
 Install from <https://www.jetbrains.com/idea>.
 Enable the Lombok plugin.
@@ -100,7 +100,7 @@ docker run -it --rm -e HOST_IP -p 9090:9090 -p 10080:9091 -p 12345:12345 pravega
 curl -X POST -H "Content-Type: application/json" -d '{"scopeName":"examples"}' http://localhost:10080/v1/scopes
 ```
 
-### (Local, External) Install Pravega Client and Pravega Flink Connector Libraries (optional)
+### Install Pravega Client and Pravega Flink Connector Libraries (optional)
 
 This step is only required when using pre-release versions of Pravega and/or SDP.
 It will install required libraries in the local Maven repository.
@@ -119,16 +119,24 @@ git checkout r0.7
 popd
 ```
 
-### (External) Configure SDP Authentication
+### (SDP) Ensure Kubernetes Connectivity
+
+Ensure that the following command works. Refer to the SDP User's Guide for details.
+```
+kubectl get nodes
+```
+
+### (SDP) Configure SDP Authentication
 
 Obtain the Pravega authentication credentials.
+This will be needed to allow applications on your local workstations to connect to Pravega.
 ```
 export NAMESPACE=examples
 kubectl get secret ${NAMESPACE}-pravega -n ${NAMESPACE} -o jsonpath="{.data.keycloak\.json}" | base64 -d > ${HOME}/keycloak.json
 chmod go-rw ${HOME}/keycloak.json
 ```
 
-When running the example applications, you must set the following environment variables.
+**Note:** When running the example applications, you must set the following environment variables.
 This can be done by setting the IntelliJ run configurations. If you set this in IntelliJ,
 you must manually replace `${HOME}` with your actual home directory.
 ```
@@ -148,15 +156,15 @@ export KEYCLOAK_SERVICE_ACCOUNT_FILE=${HOME}/keycloak.json
   The controller will have the form `tls://pravega-controller.example.com:443`.
 
 - SDP, TLS disabled:
-  The IP address and DNS name can be retrieved by running:
-  `kubectl get -n nautilus-pravega svc nautilus-pravega-controller -o yaml`
+  The DNS name can be retrieved by running:
+  `kubectl get -n nautilus-pravega svc nautilus-pravega-controller -o go-template=$'{{index .metadata.annotations "external-dns.alpha.kubernetes.io/hostname"}}\n'`
   The controller will have the form `tcp://pravega-controller.example.com:9090`.
 
-### (GPU) Setup access to GPUs and Tensorflow
+### Install Flink Image with TensorFlow
 
-#### Build Custom Image (optional)
+#### Build Flink Image with TensorFlow (optional)
 
-This is only required if you wish to customize the Flink image.
+This is only required if you wish to further customize the Flink image.
 
 ```
 cd GPUTensorflowImage
@@ -172,14 +180,14 @@ correct tag.
 kubectl apply -f GPUTensorflowImage/ClusterFlinkImage.yaml
 ```
 
-#### Enable TensorFlow GPU Support
+#### (GPU) Enable TensorFlow GPU Support
 
-If you have GPUs on the machine it is running on, then enable GPU access uncommenting the following in common/build.gradle
+If you have GPUs on the SDP worker nodes, then set the following in gradle.properties.
 ```
-    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
+enableGPU=true
 ```
 
-### Running the Examples in IntelliJ
+### Running the Examples in IntelliJ (optional)
 
 Run the Flink `VideoDataGeneratorJob` using the following parameters:
 ```
@@ -225,7 +233,7 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 ![grid-sample](images/grid-sample.png)
 
-### Running the Examples in SDP
+### Running the Examples in SDP (optional)
 
 1. You must make the Maven repo in SDP available to your development workstation.
 ```
@@ -255,7 +263,7 @@ terminate, restart with the new JAR file, and resume from the last savepoint.
 Note: You may use the script `scripts/uninstall.sh` to delete your Flink application and cluster.
 This will also delete any savepoints.
 
-### Viewing Logs in SDP
+### Viewing Logs in SDP (optional)
 
 To troubleshoot a failed job, begin with the following command.
 ```
@@ -286,7 +294,7 @@ kubectl logs video-data-generator-jobmanager-0 -n examples -c server | less
 You may want to use the kubectl logs `--follow`, `--tail`, and `--previous` flags.
 You may also use the Kubernetes UI to view these logs.
 
-## Camera Recorder Application
+## Camera Recorder Application (optional)
 
 The Camera Recorder application reads images from a USB camera and writes them to
 a Pravega stream.
@@ -303,7 +311,7 @@ export OUTPUT_STREAM_NAME=video1
 See (AppConfiguration.java)[camera-recorder/src/main/java/io/pravega/example/camerarecorder/AppConfiguration.java]
 for more options.
 
-## Video Player Application
+## Video Player Application (optional)
 
 The Video Player application reads images from a Pravega stream and displays
 them in a window on the screen.
@@ -323,148 +331,13 @@ for more options.
 
 # Jupyter Hub
 
+Jupyter Hub provides a Python notebook interface.
 See [Jupyter Hub](jupyterhub/README.md).
 
-# Video Chunking
+# Chunking
 
-The Pravega Event API is limited to 1 MiB events.
-To allow storage of objects larger than 1 MiB, such as video frames and images,
-objects must be split into chunks of 1 MiB or less.
+See [Chunking](chunking.md).
 
-The logical object that is generally stored for video is the video frame.
-In this example, the [VideoFrame](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/VideoFrame.java)
-class stores a video frame.
-It has a timestamp and a byte array containing a PNG-encoded image.
-The size of the image is limited only by the JVM which limits arrays to 2 GiB.
-
-Note: If you are storing a video **transport stream**, such as Real-time Transport Protocol,
-HTTP Live Streaming, or MPEG Transport Stream (broadcast video), these are already packetized into
-small packets of 188 or 1500 bytes. These can be stored in Pravega as-is. However, due to the complexity
-involved in decoding such transport streams, it is often easier to store individual video frames
-as ordinary images using the methods described in this project.
-
-## Writing Video to Pravega
-
-Before a `VideoFrame` instance can be written to Pravega, it is split into
-one or more [ChunkedVideoFrame](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/ChunkedVideoFrame.java)
-instances.
-A `ChunkedVideoFrame` is a subclass of `VideoFrame` and it adds two 16-bit integers,
-`ChunkIndex` and `FinalChunkIndex`.
-`ChunkIndex` is a 0-based counter for this `ChunkedVideoFrame` within the `VideoFrame`.
-`FinalChunkIndex` is the value of the last `ChunkIndex` for this `VideoFrame` and is equal to the number
-of chunks minus 1.
-For example, a 1.5 MiB image can be split into three 0.5 MiB chunks with {ChunkIndex, FinalChunkIndex} pairs of
-{0,2}, {1,2}, {2,2}.
-
-As implemented in `VideoFrameChunker`, the first chunk will contain the first 0.5 MB of the image,
-the second chunk will contain the second 0.5 MB of the image,
-and so on. The last chunk may be smaller than the other chunks.
-
-`ChunkedVideoFrame` instances are then serialized into JSON using `ChunkedVideoFrameSerializationSchema` and
-it is this JSON that is written to the Pravega stream.
-JSON is widely supported, simple to use, and easy to inspect.
-However, because it requires base-64 encoding for byte arrays, it has a 33% storage overhead
-compared to more efficient encodings such as Avro and Protobuf.
-
-If a non-transactional Pravega writer were to fail while writing chunks of video, this could result in only some
-of the chunks being written. Although this can easily be handled by the reassembly process, this could cause high
-memory usage for the state of the reassembly process. To avoid this, Pravega transactions can be used to keep
-chunks for the same image within a single transaction.
-
-For an example of a Flink video writer job, see
-[VideoDataGeneratorJob](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/VideoDataGeneratorJob.java).
-
-## Reading Video from Pravega
-
-To read video frames from Pravega, the Pravega reader first reads the JSON-encoded `ChunkedVideoFrame`
-and deserializes it.
-
-Next, a series of Flink operations is performed.
-```java
-DataStream<VideoFrame> videoFrames = chunkedVideoFrames
-    .keyBy("camera")
-    .window(new ChunkedVideoFrameWindowAssigner())
-    .process(new ChunkedVideoFrameReassembler());
-```
-
-The `keyBy` function enables parallel execution of different cameras.
-As new events are read from Pravega from multiple Flink tasks in parallel, events
-from the same camera will be grouped together and handled by the same task.
-
-The `window` function groups `ChunkedVideoFrame` instances by camera and timestamp.
-It also defines a default trigger function that watches for
-`ChunkedVideoFrame` instances where `ChunkIndex` equals `FinalChunkIndex`.
-When this occurs, it returns
-`FIRE_AND_PURGE` which tells it to call the `process` function and then it purges the
-video frame from the state.
-
-Flink watermarks are used during reassembly to purge the state of video frames with missing chunks.
-If a non-transactional Pravega writer wrote only 2 of 3 chunks, these chunks would be purged from the
-Flink state after 1 second, thus freeing memory.
-
-The `ChunkedVideoFrameReassembler` process function concatenates the byte arrays from all `ChunkedVideoFrame` instances
-and outputs `VideoFrame` instances.
-It checks for missing chunks and out-of-order chunks.
-It also validates that the SHA-1 hash of the data matches the hash calculated when it was written to Pravega.
-Note that this check can be removed for high-throughput applications as Pravega and Flink
-have additional layers of data consistency checks.
-
-For an example of a Flink video reader job, see
-[VideoReaderJob](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/VideoReaderJob.java).
-
-For a complete job that reads video from Pravega, processes it, and writes the processed video,
-see [MultiVideoGridJob](flinkprocessor/src/main/java/io/pravega/example/videoprocessor/MultiVideoGridJob.java).
-
-# Limitations
-
-As of Pravega 0.5.0, the watermarks feature ((Issue 3344)[https://github.com/pravega/pravega/issues/3344])
-is not yet available. This means a Flink application that requires watermarks,
-for instance, one that uses event time windows, must assign watermarks using
-`assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor(1000))`.
-This generally works well when reading the most recent events at the tail of the stream.
-However, it generally fails to produce accurate watermarks when performing non-tail reads
-such as when reprocessing historical events or restarting from old checkpoints.
-
-Either of the following methods may provide a workaround for this limitation.
-
-- Set minNumSegments to 1 and disable segment scaling.
-  With only a single segment, `BoundedOutOfOrdernessTimestampExtractor` will work as expected.
-  This will limit stream throughput.
-  
-- Use a Flink batch job for any historical processing.
-  Configure Flink streaming jobs to begin at the tail of the input Pravega stream(s).
-
-# Object Detection
-This project demonstrates methods to store, process, and read video with Pravega and Flink.
- 
-## Overview
-
-![object-detection-architecture](images/object-detection-arch.png)
- 
-## Additional Components
-
-- GPU: GPUs are essential for increased performance of processing data.
-- CUDA: To utilize the GPUs, NVIDIA CUDA libraries are required. CUDA 10.0 is used in the project.
-  For more information, see <`https://developer.nvidia.com/hpc`>
-- Tensorflow
- 
-## Building and Running 
-These steps are additional to the previous setup. 
- 
 # References
 
 - <http://pravega.io/>
-
-# Appendix
-
-## Memory Usage of the Flink Video Reader
-
-A Flink task must store in memory all `ChunkedVideoFrame` instances which it has read until the final chunk for that
-frame has been read or a session timeout occurs. A single Flink task that is reading from multiple Pravega segments
-may receive chunks from interleaved frames, this requiring multiple partial frames to be buffered. To avoid out-of-memory
-errors, each Flink task should have enough memory to buffer its share of Pravega segments.
-For example, if you have 12 Pravega segments and 3 Flink reader tasks, you should account for 4 frames to be buffered
-for each Flink reader task.
-
-If you are using a non-transactional writer, you should also account for additional frames to be buffered.
-If interruptions are rare, a single additional frame should be sufficient.
