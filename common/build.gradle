@@ -28,7 +28,7 @@ dependencies {
     compile group: 'org.tensorflow', name: 'tensorflow', version: '1.15.0'
     compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.15.0'
 
-    // Below is required for GPU support with TensorFlow.
-    // Please read the requirements for the GPU support here: https://www.tensorflow.org/install/install_java
-    compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
+    if (enableGPU.toBoolean()) {
+        compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: '1.15.0'
+    }
 }
