@@ -56,3 +56,7 @@ singleuser:
       - name: data-project
         mountPath: /home/jovyan/data-project
 
+proxy:
+  service:
+    annotations:
+      external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.frightful-four.eaglemonk.intranet.nautilus-platform-dev.com"
