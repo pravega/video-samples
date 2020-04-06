@@ -14,12 +14,6 @@ import logging
 from itertools import islice
 
 
-def ignore_non_events(read_events):
-    for read_event in read_events:
-        if len(read_event.event) > 0:
-            yield read_event
-
-
 def opencv_image_to_mpl(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -215,6 +209,7 @@ class UnindexedStream(StreamBase):
         super(UnindexedStream, self).__init__(pravega_client, scope, stream)
 
     def read_events(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False):
+        """Read events from a Pravega stream. Returned events will be byte arrays."""
         if stop_at_tail:
             to_stream_cut = self.get_stream_info().tail_stream_cut
         read_events_request = pravega.pb.ReadEventsRequest(
@@ -223,26 +218,36 @@ class UnindexedStream(StreamBase):
             from_stream_cut=from_stream_cut,
             to_stream_cut=to_stream_cut,
         )
-        return ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
+        return self.pravega_client.ReadEvents(read_events_request)
 
-    def read_event_to_video_frame(self, read_event, decode=True):
+    def read_event_to_video_frame(self, read_event):
+        """Convert a read event to a video frame dict. This decodes the JSON and converts the timestamp."""
         event_json = read_event.event
         video_frame = json.loads(event_json)
         video_frame['timestamp'] = pd.to_datetime(video_frame['timestamp'], unit='ms', utc=True)
-        video_frame['data'] = base64.b64decode(video_frame['data'])
-        if decode:
-            image_png_array = np.frombuffer(video_frame['data'], dtype=np.uint8)
-            image_array = cv2.imdecode(image_png_array, cv2.IMREAD_UNCHANGED)
-            video_frame['image_array'] = image_array
-            del video_frame['data']
+        return video_frame
+    
+    def decode_video_frame_to_image_array(self, video_frame):
+        """Decodes the data field (JPEG or PNG) of a video frame dict."""
+        b64decoded_data = base64.b64decode(video_frame['data'])
+        encoded_image = np.frombuffer(b64decoded_data, dtype=np.uint8)
+        video_frame['image_array'] = cv2.imdecode(encoded_image, cv2.IMREAD_UNCHANGED)
+        del video_frame['data']
         return video_frame
 
-    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False, decode=True):
+    def read_video_frames(self, from_stream_cut=None, to_stream_cut=None, stop_at_tail=False, cameras=None):
+        """Read decoded video frames from a Pravega stream. Cameras can be filtered."""
         read_events = self.read_events(from_stream_cut, to_stream_cut, stop_at_tail=stop_at_tail)
-        return (self.read_event_to_video_frame(read_event, decode=decode) for read_event in read_events)
+        encoded_video_frames = (self.read_event_to_video_frame(read_event) for read_event in read_events)
+        if cameras is None:
+            filtered_video_frames = encoded_video_frames
+        else:
+            filtered_video_frames = (f for f in encoded_video_frames if f['camera'] in cameras)
+        return (self.decode_video_frame_to_image_array(f) for f in filtered_video_frames)
 
-    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None):
-        read_events = self.read_video_frames(from_stream_cut, to_stream_cut)
+    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None, cameras=None):
+        """Play a video from a Pravega stream using a Jupyter notebook."""
+        read_events = self.read_video_frames(from_stream_cut, to_stream_cut, cameras=cameras)
         for i, video_frame in enumerate(read_events):
             if i % show_frame_interval == 0:
                 IPython.display.clear_output(wait=True)
@@ -281,7 +286,7 @@ class IndexStream(StreamBase):
             from_stream_cut=None,
             to_stream_cut=to_stream_cut,
         )
-        return (json.loads(read_event.event) for read_event in ignore_non_events(self.pravega_client.ReadEvents(read_events_request)))
+        return (json.loads(read_event.event) for read_event in self.pravega_client.ReadEvents(read_events_request))
 
 
 # TODO: This should be based on UnindexedStream
@@ -318,7 +323,7 @@ class IndexedStream(StreamBase):
             to_stream_cut=to_stream_cut,
         )
         print('update_index: Reading stream %s and writing index stream %s' % (self.stream, self.index_stream.stream))
-        read_events = ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
+        read_events = self.pravega_client.ReadEvents(read_events_request)
         index_records = self.index_record_generator(read_events, from_stream_cut.text)
         self.index_stream.append_index_records(index_records, truncate=truncate)
         self.load_index()
@@ -385,7 +390,7 @@ class IndexedStream(StreamBase):
             from_stream_cut=stream_cuts.from_stream_cut,
             to_stream_cut=stream_cuts.to_stream_cut,
         )
-        return ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
+        return self.pravega_client.ReadEvents(read_events_request)
 
     def read_event_to_video_frame(self, read_event):
         event_json = read_event.event
@@ -422,7 +427,7 @@ class IndexedStream(StreamBase):
             from_stream_cut=stream_cuts.from_stream_cut,
             to_stream_cut=stream_cuts.to_stream_cut,
         )
-        read_events = ignore_non_events(self.pravega_client.ReadEvents(read_events_request))
+        read_events = self.pravega_client.ReadEvents(read_events_request)
         video_frames = (self.read_event_to_video_frame(e) for e in read_events)
         return pd.DataFrame(video_frames)
 

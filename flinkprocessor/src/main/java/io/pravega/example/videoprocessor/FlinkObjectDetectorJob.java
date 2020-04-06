@@ -93,13 +93,12 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 rebalancedVideoFrames = videoFrames;
             }
 
-            //  identify objects with YOLOv3;
+            // Identify objects with YOLOv3.
             final DataStream<VideoFrame> objectDetectedFrames = rebalancedVideoFrames
                     .map(frame -> {
                         final TFObjectDetector.DetectionResult result = TFObjectDetector.getInstance().detect(frame.data);
                         frame.data = result.getJpegBytes();
                         frame.recognitions = result.getRecognitions();
-                        frame.hash = frame.calculateHash();
                         return frame;
                     });
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
@@ -109,7 +108,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
 
-            // create the Pravega sink to write a stream of video frames
+            // Create the Pravega sink to write a stream of video frames.
             final FlinkPravegaWriter<ChunkedVideoFrame> writer = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
@@ -122,8 +121,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .addSink(writer)
                     .uid("output-sink")
                     .name("output-sink");
-
-            chunkedVideoFrames.addSink(writer).name(getConfig().getOutputStreamConfig().toString());
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
