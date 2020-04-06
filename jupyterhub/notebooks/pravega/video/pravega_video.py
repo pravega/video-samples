@@ -226,7 +226,7 @@ class UnindexedStream(StreamBase):
         video_frame = json.loads(event_json)
         video_frame['timestamp'] = pd.to_datetime(video_frame['timestamp'], unit='ms', utc=True)
         return video_frame
-    
+
     def decode_video_frame_to_image_array(self, video_frame):
         """Decodes the data field (JPEG or PNG) of a video frame dict."""
         b64decoded_data = base64.b64decode(video_frame['data'])
