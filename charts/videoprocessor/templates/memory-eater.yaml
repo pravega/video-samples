@@ -1,0 +1,65 @@
+{{- if .Values.MemoryEaterJob.enabled }}
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkCluster
+metadata:
+  name: memory-eater
+  labels:
+    name: memory-eater
+spec:
+  imageRef:
+    name: 1.9.1-2.12
+  zookeeperUrl: zookeeper-client:2181
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ ReadWriteOnce ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    cpu: 250m
+  taskManager:
+    replicas: {{ .Values.MemoryEaterJob.taskManager.replicas }}
+    memory: {{ .Values.MemoryEaterJob.taskManager.memory }}
+    cpu: {{ .Values.MemoryEaterJob.taskManager.cpu }}
+    numberOfTaskSlots: {{ .Values.MemoryEaterJob.taskManager.taskSlots }}
+---
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  name: memory-eater
+  labels:
+    app: videoprocessor
+    component: MemoryEaterJob
+    release: {{ $.Release.Name }}
+spec:
+  flinkVersion: 1.9.1
+  clusterSelector:
+    name: memory-eater
+  mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  mainClass: io.pravega.example.flinkprocessor.MemoryEaterJob
+  parallelism: 1
+  state: started
+  parameters:
+    - name: checkpointIntervalMs
+      value: {{ .Values.MemoryEaterJob.checkpointIntervalMs | quote }}
+    - name: input-minNumSegments
+      value: {{ .Values.MemoryEaterJob.input.minNumSegments | quote }}
+    - name: input-stream
+      value: {{ .Values.MemoryEaterJob.input.stream | quote }}
+    - name: output-minNumSegments
+      value: {{ .Values.MemoryEaterJob.output.minNumSegments | quote }}
+    - name: output-stream
+      value: {{ .Values.MemoryEaterJob.output.stream | quote }}
+    - name: scope
+      value: {{ $.Release.Namespace | quote }}
+    - name: startAtTail
+      value: {{ .Values.MemoryEaterJob.startAtTail | quote }}
+{{- end }}
