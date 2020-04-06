@@ -4,7 +4,7 @@ mavenCoordinate:
   version: 0.1.0
 
 FlinkObjectDetectorJob:
-  enabled: true
+  enabled: false
   checkpointIntervalMs: 10000
   enableOperatorChaining: "true"
   input:
@@ -79,4 +79,21 @@ VideoReaderJob:
     replicas: 1
     memory: 1G
     cpu: 250m
+    taskSlots: 1
+
+MemoryEaterJob:
+  enabled: true
+  checkpointIntervalMs: 10000
+  input:
+    minNumSegments: 1
+    stream: memory-eater-in
+  output:
+    minNumSegments: 1
+    stream: memory-eater-out
+  parallelism: 1
+  startAtTail: "false"
+  taskManager:
+    cpu: 100m
+    memory: 1G
+    replicas: 1
     taskSlots: 1
