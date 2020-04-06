@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 set -ex
-scripts/validate-values.py praxagora-values.yaml,scripts/pre-install/values.yaml
+export CLUSTER_NAME=${CLUSTER_NAME:-frightful-four}
+scripts/validate-values.py ${CLUSTER_NAME}-values.yaml,scripts/pre-install/values.yaml
