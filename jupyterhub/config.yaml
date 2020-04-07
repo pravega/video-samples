@@ -60,3 +60,4 @@ proxy:
   service:
     annotations:
       external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.frightful-four.eaglemonk.intranet.nautilus-platform-dev.com"
+      #external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.microbe.eaglemonk.intranet.nautilus-platform-dev.com"
