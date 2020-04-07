@@ -78,7 +78,7 @@ services:
         -Dbookkeeper.bkEnsembleSize=1
         -Dbookkeeper.bkAckQuorumSize=1
         -Dbookkeeper.bkWriteQuorumSize=1
-        -Xmx2000m
+        -Xmx4000m
         -XX:OnError="kill -9 p%"
         -XX:+ExitOnOutOfMemoryError
         -XX:+CrashOnOutOfMemoryError
@@ -91,7 +91,7 @@ services:
         ipv4_address: 172.28.1.41
     restart: always
     volumes:
-      - /tmp/pravega-tier2:/pravega-tier2
+      - /mnt/home/faheyc/pravega-tier2:/pravega-tier2
 
 networks:
   pravega_net:
