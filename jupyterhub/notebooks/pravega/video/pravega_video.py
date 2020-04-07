@@ -12,6 +12,8 @@ from matplotlib import pyplot as plt
 import time
 import logging
 from itertools import islice
+import ipywidgets
+from ipywidgets import Layout
 
 
 def opencv_image_to_mpl(img):
@@ -242,13 +244,32 @@ class UnindexedStream(StreamBase):
             filtered_video_frames = (f for f in encoded_video_frames if f['camera'] in cameras)
         return (self.decode_video_frame(f) for f in filtered_video_frames)
 
-    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1, figsize=None, cameras=None):
+    def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1,
+                   cameras=None, tz='America/Los_Angeles', strftime='%Y-%m-%d %I:%M:%S.%f %p %z', buffer_sec=0.0):
         """Play a video from a Pravega stream using a Jupyter notebook."""
         read_events = self.read_video_frames(from_stream_cut, to_stream_cut, cameras=cameras)
+        header_output = ipywidgets.Output()
+        body_output = ipywidgets.Output()
+        IPython.display.display(header_output, body_output)
         for i, video_frame in enumerate(read_events):
             if i % show_frame_interval == 0:
-                IPython.display.clear_output(wait=True)
-                IPython.display.display(IPython.display.Image(data=video_frame['data']))
+                timestamp = video_frame['timestamp']
+                sleep_sec = buffer_sec - (pd.Timestamp.utcnow() - timestamp).total_seconds()
+                if sleep_sec > 0.0:
+                    time.sleep(sleep_sec)
+                dt = str(pd.Timestamp.utcnow() - timestamp)
+                timestamp_value = '%s  (%s)' % (timestamp, timestamp.astimezone(tz).strftime(strftime))
+                timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, value=timestamp_value, layout=Layout(width='50%'))
+                dt_widget = ipywidgets.Text(description='Age', disabled=True, value=dt, layout=Layout(width='25%'))
+                camera_widget = ipywidgets.Text(description='Camera', disabled=True, value=str(video_frame['camera']), layout=Layout(width='15%'))
+                header_widget = ipywidgets.HBox([camera_widget, timestamp_widget, dt_widget])
+                img_widget = IPython.display.Image(data=video_frame['data'])
+                with header_output:
+                    IPython.display.clear_output(wait=True)
+                    IPython.display.display(header_widget)
+                with body_output:
+                    IPython.display.clear_output(wait=True)
+                    IPython.display.display(img_widget)
 
 
 class IndexStream(StreamBase):
