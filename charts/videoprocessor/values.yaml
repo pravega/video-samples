@@ -26,29 +26,29 @@ FlinkObjectDetectorJob:
     taskSlots: 1
 
 MultiVideoGridJob:
-  enabled: false
+  enabled: true
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 0.25
-  imageHeight: 187
+  framesPerSec: 2.5
+  imageHeight: 188
   imageWidth: 621
   input:
     minNumSegments: 1
-    stream: object-detector-output-video
+    stream: object-detector-input-video
   output:
     minNumSegments: 1
-    stream: object-detector-output-grid-video
-  maxOutOfOrdernessMs: 1000
-  parallelism: 4
+    stream: object-detector-input-grid-video
+  maxOutOfOrdernessMs: 10
+  parallelism: 4    # Should match number of cameras
   readerParallelism: 1
   rebalance: "true"
   startAtTail: "true"
   taskManager:
-    cpu: 4000m
+    cpu: 5000m      # Should equal 1000m * (number of cameras + 1)
     memory: 8G
     replicas: 1
-    taskSlots: 4
+    taskSlots: 4    # Should match parallelism
 
 VideoDataGeneratorJob:
   enabled: false
@@ -82,7 +82,7 @@ VideoReaderJob:
     taskSlots: 1
 
 MemoryEaterJob:
-  enabled: true
+  enabled: false
   checkpointIntervalMs: 10000
   input:
     minNumSegments: 1
