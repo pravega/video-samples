@@ -55,7 +55,7 @@ public class AppConfiguration {
         checkpointIntervalMs = getParams().getLong("checkpointIntervalMs", 10000);
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
-        enableRebalance = getParams().getBoolean("rebalance", false);
+        enableRebalance = getParams().getBoolean("rebalance", true);
         startAtTail = getParams().getBoolean("startAtTail", true);
         maxOutOfOrdernessMs = getParams().getLong("maxOutOfOrdernessMs", 1000);
     }

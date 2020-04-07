@@ -10,7 +10,11 @@
  */
 package io.pravega.example.videoprocessor;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -81,7 +85,12 @@ public class ImageGridBuilder {
     public byte[] getOutputImageBytes(String format) {
         try {
             ByteArrayOutputStream outStream = new ByteArrayOutputStream();
-            ImageIO.write(outImage, format, outStream);
+            ImageWriter writer = ImageIO.getImageWritersByFormatName(format).next();
+            ImageWriteParam writeParam = writer.getDefaultWriteParam();
+            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            writeParam.setCompressionQuality(0.5f);
+            writer.setOutput(new MemoryCacheImageOutputStream(outStream));
+            writer.write(null, new IIOImage(outImage, null, null), writeParam);
             return outStream.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException(e);

@@ -149,7 +149,7 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Split output video frames into chunks of 1 MB or less.
             DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
-                    .flatMap(new VideoFrameChunker())
+                    .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .setParallelism(1)
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
@@ -215,7 +215,7 @@ public class MultiVideoGridJob extends AbstractJob {
             videoFrame.frameNumber = frameNumber;
             ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, accum.images.size());
             builder.addImages(accum.images);
-            videoFrame.data = builder.getOutputImageBytes("png");
+            videoFrame.data = builder.getOutputImageBytes("jpg");
             videoFrame.hash = videoFrame.calculateHash();
             videoFrame.tags = new HashMap<String,String>();
             videoFrame.tags.put("numCameras", Integer.toString(accum.images.size()));
