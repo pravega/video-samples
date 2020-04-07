@@ -5,6 +5,7 @@ from .pravega_video import (
     VideoDataGenerator,
     UnindexedStream,
     IndexedStream,
+    VideoPlayer,
 )
 
 from .transcoding import (
