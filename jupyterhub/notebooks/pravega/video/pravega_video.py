@@ -15,6 +15,7 @@ from itertools import islice
 import ipywidgets
 from ipywidgets import Layout, interact, interactive, fixed, interact_manual
 import threading
+import traceback
 
 
 def opencv_image_to_mpl(img):
@@ -228,6 +229,8 @@ class UnindexedStream(StreamBase):
         event_json = read_event.event
         video_frame = json.loads(event_json)
         video_frame['timestamp'] = pd.to_datetime(video_frame['timestamp'], unit='ms', utc=True)
+        video_frame['to_stream_cut'] = read_event.stream_cut.text
+        video_frame['event_pointer'] = read_event.event_pointer.bytes
         return video_frame
 
     def decode_video_frame(self, video_frame):
@@ -243,12 +246,13 @@ class UnindexedStream(StreamBase):
             filtered_video_frames = encoded_video_frames
         else:
             filtered_video_frames = (f for f in encoded_video_frames if f['camera'] in cameras)
-        return (self.decode_video_frame(f) for f in filtered_video_frames)
+        video_frames = (self.decode_video_frame(f) for f in filtered_video_frames)
+        return video_frames, read_events
 
     def play_video(self, from_stream_cut=None, to_stream_cut=None, show_frame_interval=1,
                    cameras=None, tz='America/Los_Angeles', strftime='%Y-%m-%d %I:%M:%S.%f %p %z', buffer_sec=0.0):
         """Play a video from a Pravega stream using a Jupyter notebook."""
-        read_events = self.read_video_frames(from_stream_cut, to_stream_cut, cameras=cameras)
+        read_events = self.read_video_frames(from_stream_cut, to_stream_cut, cameras=cameras)[0]
         header_output = ipywidgets.Output()
         body_output = ipywidgets.Output()
         IPython.display.display(header_output, body_output)
@@ -453,8 +457,7 @@ class IndexedStream(StreamBase):
         fetch_event_response = self.pravega_client.FetchEvent(fetch_event_request)
         return pd.Series(self.read_event_to_video_frame(fetch_event_response))
 
-    def get_single_video_frame_by_index(self, index):
-        index_rec = self.index_df.iloc[index]
+    def get_single_video_frame_by_index(self, index_rec):
         event_pointer_bytes = base64.b64decode(index_rec.event_pointer)
         fetch_event_request = pravega.pb.FetchEventRequest(
             scope=self.scope,
@@ -472,149 +475,141 @@ class IndexedStream(StreamBase):
 
 
 class VideoPlayer():
-    def __init__(self, indexed_stream, figsize=(12,10),
-                 tz='America/Los_Angeles', strftime='%Y-%m-%d %I:%M:%S.%f %p %z'):
+    def __init__(self,
+                 indexed_stream,
+                 tz='America/Los_Angeles',
+                 strftime='%Y-%m-%d %I:%M:%S.%f %p %z'):
         self.indexed_stream = indexed_stream
-        self.figsize = figsize
+        self.filtered_index_df = self.indexed_stream.index_df
         self.tz = tz
         self.strftime = strftime
         self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer', 'ssrc', 'frameNumber',
                                     'chunkIndex', 'finalChunkIndex', 'tags', 'hash', 'recognitions', 'data']
+        self.playing_flag = False
+        self.stop_flag = False
+        self.video_frames = None
+        self.read_events_call = None
+        self.video_frame = None
 
         self.frame_number_widget = ipywidgets.IntSlider(
             description='Frame',
             min=0,
-            max=len(self.indexed_stream.index_df) - 1,
+            max=len(self.filtered_index_df) - 1,
             step=1,
-            value=0,
-            style={'description_width': 'initial'})
-        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True)
-        self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True)
-        self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True)
-        self.play_button = ipywidgets.Button(description="Play")
+            value=len(self.filtered_index_df) - 1,
+            style={'description_width': 'initial'},
+            layout=Layout(width='100%'),
+        )
+        self.camera_widget = ipywidgets.IntText(description='Camera', value=0, layout=Layout(width='10%'))
+        self.play_button = ipywidgets.Button(description=u'\u25B6', layout=Layout(width='4em'))
         self.play_button.on_click(lambda b: self.play())
-        self.stop_button = ipywidgets.ToggleButton(description="Stop")
-        # self.stop_button.on_click(lambda b: self.stop())
-        self.out = ipywidgets.Output()
+        self.fast_forward_button = ipywidgets.ToggleButton(description=u'\u25B6\u25B6', layout=Layout(width='4em'))
+        self.stop_button = ipywidgets.Button(description=u'\u2B1B', layout=Layout(width='4em'))
+        self.stop_button.on_click(lambda b: self.stop())
+        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, layout=Layout(width='50%'))
+        self.dt_widget = ipywidgets.Text(description='Age', disabled=True, layout=Layout(width='25%'))
         self.image_widget = ipywidgets.Image()
+        self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True, layout=Layout(width='100%'))
+        self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True, layout=Layout(width='100%'))
         self.children = [
             self.frame_number_widget,
+            self.camera_widget,
             self.play_button,
+            self.fast_forward_button,
             self.stop_button,
             self.timestamp_widget,
+            self.dt_widget,
+            self.image_widget,
             self.streamcut_widget,
             self.fields_widget,
-            self.out,
-            self.image_widget,
         ]
-        self.widget = ipywidgets.VBox(self.children)
+        self.widget = ipywidgets.VBox(
+            self.children,
+            layout=Layout(
+                display='flex',
+                flex_flow='row wrap',
+                justify_content='flex-start',
+                align_items='flex-start'))
+
+        self.camera_widget.observe(self.on_filter_change, names='value')
         self.frame_number_widget.observe(self.update, names='value')
         self.widget.on_displayed(self.update)
 
+    def on_filter_change(self, *args):
+        camera = self.camera_widget.get_interact_value()
+        self.filtered_index_df = self.indexed_stream.index_df[self.indexed_stream.index_df.camera == camera]
+        self.frame_number_widget.max = len(self.filtered_index_df) - 1
+        self.update()
+
     def update(self, *args):
-        # pass
-        # with self.out:
-        #     IPython.display.clear_output(wait=True)
+        """Called when user changes frame or camera control.
+        Get a single video frame using the Pravega fetchEvent API and display it."""
         frame_number = self.frame_number_widget.get_interact_value()
-        # print('update: frame_number=%d' % frame_number)
-        video_frame = self.indexed_stream.get_single_video_frame_by_index(frame_number)
+        index_rec = self.filtered_index_df.iloc[frame_number]
+        video_frame = self.indexed_stream.get_single_video_frame_by_index(index_rec)
         self.show_frame(video_frame)
 
     def show_frame(self, video_frame):
-        # print('show_frame: frameNumber=%d' % video_frame['frameNumber'])
+        """Display a video frame."""
         timestamp = video_frame['timestamp']
         self.timestamp_widget.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
-        # self.streamcut_widget.value = video_frame['from_stream_cut']
+        dt = pd.Timestamp.utcnow() - timestamp
+        self.dt_widget.value = str(dt)
+        self.streamcut_widget.value = video_frame['to_stream_cut']
         fields = video_frame.copy()
         for col in self.fields_exclude_cols:
             if col in fields: del fields[col]
         self.fields_widget.value = str(fields.to_dict())
         self.image_widget.value = video_frame['data']
-        # with self.out:
-                # IPython.display.clear_output(wait=True)
-                # IPython.display.display(IPython.display.Image(data=video_frame['data']))
+        self.video_frame = video_frame
 
     def play(self):
-        frame_number = self.frame_number_widget.get_interact_value()
-        # print(f'play from frame_number {frame_number}')
-        from_stream_cut = None
-        self.read_events = self.indexed_stream.unindexed_stream.read_video_frames(from_stream_cut, to_stream_cut=None, cameras=[0])
+        """Begin playing video frames from the current frame."""
+        if self.playing_flag:
+            return
+        if self.video_frame is None:
+            from_stream_cut = None
+        else:
+            from_stream_cut = pravega.pb.StreamCut(text=self.video_frame['to_stream_cut'])
+        self.stop_flag = False
+        self.video_frames, self.read_events_call = self.indexed_stream.unindexed_stream.read_video_frames(
+            from_stream_cut=from_stream_cut, to_stream_cut=None, cameras=[self.camera_widget.value])
         thread = threading.Thread(target=self.play_worker)
+        self.playing_flag = True
         thread.start()
-        # for video_frame in read_events:
-        #     self.show_frame(pd.Series(video_frame))
-        #     time.sleep(1.0)
+
+    def stop(self):
+        self.stop_flag = True
+        if self.read_events_call:
+            self.read_events_call.cancel()
+            self.read_events_call = None
 
     def play_worker(self):
-        for video_frame in self.read_events:
-            if self.stop_button.value:
-                print('play_worker: stopping')
-                break
-            # print('play_worker: working, frameNumber=%d' % video_frame['frameNumber'])
-            self.show_frame(pd.Series(video_frame))
-            time.sleep(1.0/10.0)
-
-    def move_to_prev_frame(self):
-        self.frame_number_widget.value = self.frame_number_widget.value - 1
-
-    def move_to_next_frame(self):
-        self.frame_number_widget.value = self.frame_number_widget.value + 1
+        """Background thread for playback."""
+        print('play_worker: BEGIN')
+        initialized = False
+        video_t0 = None
+        system_t0 = None
+        try:
+            for video_frame in self.video_frames:
+                timestamp = video_frame['timestamp']
+                if self.fast_forward_button.value or not initialized:
+                    # No speed limit
+                    video_t0 = timestamp
+                    system_t0 = pd.Timestamp.utcnow()
+                    initialized = True
+                else:
+                    # 1x speed
+                    lag_sec = (system_t0 - video_t0).total_seconds()
+                    sleep_sec = lag_sec - (pd.Timestamp.utcnow() - timestamp).total_seconds()
+                    if sleep_sec > 0.0:
+                        time.sleep(sleep_sec)
+                self.show_frame(pd.Series(video_frame))
+        except Exception as e:
+            if not self.stop_flag:
+                logging.error('VideoPlayer.play_worker: ' + traceback.format_exc())
+        self.playing_flag = False
+        print('play_worker: END')
 
     def interact(self):
         IPython.display.display(self.widget)
-        # w = interactive(
-        #     self.show,
-        #     frame_number=ipywidgets.IntSlider(
-        #         description='Frame',
-        #         min=0,
-        #         max=len(self.indexed_stream.index_df)-1,
-        #         step=1,
-        #         value=0,
-        #         style={'description_width': 'initial'}))
-        # self.widget = w
-        # self.frame_number_widget = w.children[0]
-        # self.output_widget = ipywidgets.Output()
-        # self.timestamp_label = ipywidgets.Text(description='Timestamp', disabled=True)
-        # self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True)
-        # self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True)
-
-        # self.play_widget = ipywidgets.Play(
-        #     value=0,
-        #     min=0,
-        #     max=len(self.indexed_stream.index_df)-1,
-        #     step=1,
-        #     interval=100,  # milliseconds between frames when playing
-        #     description="Press play",
-        #     disabled=False
-        # )
-        # ipywidgets.jslink((self.play_widget, 'value'), (self.frame_number_widget, 'value'))
-
-        # prev_button = ipywidgets.Button(description="<")
-        # prev_button.on_click(lambda b: self.move_to_prev_frame())
-        # next_button = ipywidgets.Button(description=">")
-        # next_button.on_click(lambda b: self.move_to_next_frame())
-        # buttons = (prev_button, next_button)
-        # labels = (self.timestamp_label, self.streamcut_widget, self.fields_widget)
-        # image_widget = w.children[-1]
-
-        # w.children = (self.frame_number_widget, self.play_widget) + labels + buttons + (image_widget, self.output_widget)
-
-        # layout = w.layout
-        # w.layout.display = 'flex'
-        # w.layout.flex_flow = 'row wrap'
-        # w.layout.justify_content = 'flex-start'
-        # w.layout.align_items = 'flex-start'
-        # self.frame_number_widget.layout.width = '100%'
-        # for child in labels:
-        #     child.layout.width = '100%'
-        # for child in buttons:
-        #     child.layout.width = '10%'
-        # image_widget.layout.width = '100%'
-        # self.output_widget.layout.width = '100%'
-        #
-        # display(self.widget)
-
-# def play_worker():
-#     while True:
-#         print('working')
-#         time.sleep(1.0)
