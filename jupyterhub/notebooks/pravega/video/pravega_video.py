@@ -14,6 +14,7 @@ import logging
 from itertools import islice
 import ipywidgets
 from ipywidgets import Layout, interact, interactive, fixed, interact_manual
+import threading
 
 
 def opencv_image_to_mpl(img):
@@ -480,16 +481,78 @@ class VideoPlayer():
         self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer', 'ssrc', 'frameNumber',
                                     'chunkIndex', 'finalChunkIndex', 'tags', 'hash', 'recognitions', 'data']
 
-    def show(self, frame_number):
+        self.frame_number_widget = ipywidgets.IntSlider(
+            description='Frame',
+            min=0,
+            max=len(self.indexed_stream.index_df) - 1,
+            step=1,
+            value=0,
+            style={'description_width': 'initial'})
+        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True)
+        self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True)
+        self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True)
+        self.play_button = ipywidgets.Button(description="Play")
+        self.play_button.on_click(lambda b: self.play())
+        self.stop_button = ipywidgets.ToggleButton(description="Stop")
+        # self.stop_button.on_click(lambda b: self.stop())
+        self.out = ipywidgets.Output()
+        self.image_widget = ipywidgets.Image()
+        self.children = [
+            self.frame_number_widget,
+            self.play_button,
+            self.stop_button,
+            self.timestamp_widget,
+            self.streamcut_widget,
+            self.fields_widget,
+            self.out,
+            self.image_widget,
+        ]
+        self.widget = ipywidgets.VBox(self.children)
+        self.frame_number_widget.observe(self.update, names='value')
+        self.widget.on_displayed(self.update)
+
+    def update(self, *args):
+        # pass
+        # with self.out:
+        #     IPython.display.clear_output(wait=True)
+        frame_number = self.frame_number_widget.get_interact_value()
+        # print('update: frame_number=%d' % frame_number)
         video_frame = self.indexed_stream.get_single_video_frame_by_index(frame_number)
+        self.show_frame(video_frame)
+
+    def show_frame(self, video_frame):
+        # print('show_frame: frameNumber=%d' % video_frame['frameNumber'])
         timestamp = video_frame['timestamp']
-        self.timestamp_label.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
-        self.streamcut_widget.value = video_frame['from_stream_cut']
+        self.timestamp_widget.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
+        # self.streamcut_widget.value = video_frame['from_stream_cut']
         fields = video_frame.copy()
         for col in self.fields_exclude_cols:
             if col in fields: del fields[col]
         self.fields_widget.value = str(fields.to_dict())
-        IPython.display.display(IPython.display.Image(data=video_frame['data']))
+        self.image_widget.value = video_frame['data']
+        # with self.out:
+                # IPython.display.clear_output(wait=True)
+                # IPython.display.display(IPython.display.Image(data=video_frame['data']))
+
+    def play(self):
+        frame_number = self.frame_number_widget.get_interact_value()
+        # print(f'play from frame_number {frame_number}')
+        from_stream_cut = None
+        self.read_events = self.indexed_stream.unindexed_stream.read_video_frames(from_stream_cut, to_stream_cut=None, cameras=[0])
+        thread = threading.Thread(target=self.play_worker)
+        thread.start()
+        # for video_frame in read_events:
+        #     self.show_frame(pd.Series(video_frame))
+        #     time.sleep(1.0)
+
+    def play_worker(self):
+        for video_frame in self.read_events:
+            if self.stop_button.value:
+                print('play_worker: stopping')
+                break
+            # print('play_worker: working, frameNumber=%d' % video_frame['frameNumber'])
+            self.show_frame(pd.Series(video_frame))
+            time.sleep(1.0/10.0)
 
     def move_to_prev_frame(self):
         self.frame_number_widget.value = self.frame_number_widget.value - 1
@@ -498,54 +561,60 @@ class VideoPlayer():
         self.frame_number_widget.value = self.frame_number_widget.value + 1
 
     def interact(self):
-        w = interactive(
-            self.show,
-            frame_number=ipywidgets.IntSlider(
-                description='Frame',
-                min=0,
-                max=len(self.indexed_stream.index_df)-1,
-                step=1,
-                value=0,
-                style={'description_width': 'initial'}))
-        self.widget = w
-        self.frame_number_widget = w.children[0]
-        self.output_widget = ipywidgets.Output()
-        self.timestamp_label = ipywidgets.Text(description='Timestamp', disabled=True)
-        self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True)
-        self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True)
+        IPython.display.display(self.widget)
+        # w = interactive(
+        #     self.show,
+        #     frame_number=ipywidgets.IntSlider(
+        #         description='Frame',
+        #         min=0,
+        #         max=len(self.indexed_stream.index_df)-1,
+        #         step=1,
+        #         value=0,
+        #         style={'description_width': 'initial'}))
+        # self.widget = w
+        # self.frame_number_widget = w.children[0]
+        # self.output_widget = ipywidgets.Output()
+        # self.timestamp_label = ipywidgets.Text(description='Timestamp', disabled=True)
+        # self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True)
+        # self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True)
 
-        self.play_widget = ipywidgets.Play(
-            value=0,
-            min=0,
-            max=len(self.indexed_stream.index_df)-1,
-            step=1,
-            interval=100,  # milliseconds between frames when playing
-            description="Press play",
-            disabled=False
-        )
-        ipywidgets.jslink((self.play_widget, 'value'), (self.frame_number_widget, 'value'))
+        # self.play_widget = ipywidgets.Play(
+        #     value=0,
+        #     min=0,
+        #     max=len(self.indexed_stream.index_df)-1,
+        #     step=1,
+        #     interval=100,  # milliseconds between frames when playing
+        #     description="Press play",
+        #     disabled=False
+        # )
+        # ipywidgets.jslink((self.play_widget, 'value'), (self.frame_number_widget, 'value'))
 
-        prev_button = ipywidgets.Button(description="<")
-        prev_button.on_click(lambda b: self.move_to_prev_frame())
-        next_button = ipywidgets.Button(description=">")
-        next_button.on_click(lambda b: self.move_to_next_frame())
-        buttons = (prev_button, next_button)
-        labels = (self.timestamp_label, self.streamcut_widget, self.fields_widget)
-        image_widget = w.children[-1]
+        # prev_button = ipywidgets.Button(description="<")
+        # prev_button.on_click(lambda b: self.move_to_prev_frame())
+        # next_button = ipywidgets.Button(description=">")
+        # next_button.on_click(lambda b: self.move_to_next_frame())
+        # buttons = (prev_button, next_button)
+        # labels = (self.timestamp_label, self.streamcut_widget, self.fields_widget)
+        # image_widget = w.children[-1]
 
-        w.children = (self.frame_number_widget, self.play_widget) + labels + buttons + (image_widget, self.output_widget)
+        # w.children = (self.frame_number_widget, self.play_widget) + labels + buttons + (image_widget, self.output_widget)
 
-        layout = w.layout
-        w.layout.display = 'flex'
-        w.layout.flex_flow = 'row wrap'
-        w.layout.justify_content = 'flex-start'
-        w.layout.align_items = 'flex-start'
-        self.frame_number_widget.layout.width = '100%'
-        for child in labels:
-            child.layout.width = '100%'
-        for child in buttons:
-            child.layout.width = '10%'
-        image_widget.layout.width = '100%'
-        self.output_widget.layout.width = '100%'
+        # layout = w.layout
+        # w.layout.display = 'flex'
+        # w.layout.flex_flow = 'row wrap'
+        # w.layout.justify_content = 'flex-start'
+        # w.layout.align_items = 'flex-start'
+        # self.frame_number_widget.layout.width = '100%'
+        # for child in labels:
+        #     child.layout.width = '100%'
+        # for child in buttons:
+        #     child.layout.width = '10%'
+        # image_widget.layout.width = '100%'
+        # self.output_widget.layout.width = '100%'
+        #
+        # display(self.widget)
 
-        display(self.widget)
+# def play_worker():
+#     while True:
+#         print('working')
+#         time.sleep(1.0)
