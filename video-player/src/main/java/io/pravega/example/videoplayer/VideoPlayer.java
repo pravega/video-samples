@@ -10,6 +10,7 @@
  */
 package io.pravega.example.videoplayer;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
@@ -84,6 +85,8 @@ public class VideoPlayer implements Runnable {
 
             final long timeoutMs = 1000;
             final ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
             log.info("gamma={}", CanvasFrame.getDefaultGamma());
             final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega", 1.0);
             OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();

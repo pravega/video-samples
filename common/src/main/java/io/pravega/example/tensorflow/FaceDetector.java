@@ -73,36 +73,38 @@ public class FaceDetector implements Serializable {
             absoluteFaceSize = Math.round(height * 0.2f);
         }
 
+        System.out.println(cvarrToMat(grayImage));
+
         // perform face detection
         faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, 0 | CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
 
 //        BufferedImage bufferedImage = ImageIO.read(imageStream);
-        ByteArrayInputStream bais = new ByteArrayInputStream(videoFrame.data);
-        BufferedImage bufferedImage = ImageIO.read(bais);
+//        ByteArrayInputStream bais = new ByteArrayInputStream(videoFrame.data);
+//        BufferedImage bufferedImage = ImageIO.read(bais);
 
-        Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
-        graphics.setColor(Color.green);
+//        Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
+//        graphics.setColor(Color.green);
+
+
 
         for (int i = 0; i < faces.size(); i++) {
-            graphics.drawRect(faces.get(i).x(), faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
-
-            double boxX = faces.get(i).x();
-            double boxY = faces.get(i).y();
-            double boxWidth = faces.get(i).width();
-            double boxHeight = faces.get(i).height();
-            double boxConfidence = -1;
-            double[] boxClasses = new double[0];
+            double boxX = Math.max(faces.get(i).x()-10,0);
+            double boxY = Math.max(faces.get(i).y()-10,0);
+            double boxWidth = Math.min(faces.get(i).width()+20,imageMat.arrayWidth());
+            double boxHeight = Math.min(faces.get(i).height()+20,imageMat.arrayHeight());
+            double boxConfidence = -1.0;
+            double[] boxClasses = new double[1];
 
             BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
 
             videoFrame.recognizedBoxes.add(currentBox);
         }
 
-        graphics.dispose();
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(bufferedImage, "jpg", baos);
-        videoFrame.data = baos.toByteArray();
+//        graphics.dispose();
+//
+//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        ImageIO.write(bufferedImage, "jpg", baos);
+//        videoFrame.data = baos.toByteArray();
 
 //        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
 //        ImageIO.write(bufferedImage, "jpg", outputfile);

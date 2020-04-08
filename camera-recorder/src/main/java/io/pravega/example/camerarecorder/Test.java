@@ -1,9 +1,14 @@
 package io.pravega.example.camerarecorder;
 
+import io.pravega.example.tensorflow.BoundingBox;
+import io.pravega.example.tensorflow.BoxPosition;
+import io.pravega.example.tensorflow.ImageUtil;
+import io.pravega.example.tensorflow.Recognition;
 import org.apache.commons.io.IOUtils;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
+import org.bytedeco.opencv.opencv_objdetect.CvHaarClassifierCascade;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -11,6 +16,8 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
@@ -19,12 +26,12 @@ import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 public class Test {
     public Test() {
-        InputStream inputImage = getClass().getResourceAsStream("/ben_afflek_input_1.jpg");
+        InputStream inputImage = getClass().getResourceAsStream("/TJ_now.jpg");
         InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
     }
 
     public static void main(String args[]) throws IOException, URISyntaxException {
-        InputStream imageStream = Test.class.getResourceAsStream("/ben_afflek_input_1.jpg");
+        InputStream imageStream = Test.class.getResourceAsStream("/TJ_now.jpg");
         byte[] imageBytes = IOUtils.toByteArray(imageStream);
         Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
         IplImage inputImage = new IplImage(imageMat);
@@ -62,65 +69,62 @@ public class Test {
         Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
         graphics.setColor(Color.green);
 
+
+
+        List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
+
         for (int i = 0; i < faces.size(); i++) {
-            graphics.drawRect(faces.get(i).x(), faces.get(i).y(), faces.get(i).width(), faces.get(i).height());
+//            double boxX = Math.max(faces.get(i).x() - 10, 0);
+//            double boxY = Math.max(faces.get(i).y() - 10, 0);
+            double boxX = faces.get(i).x() - 20;
+            double boxY = faces.get(i).y() - 20;
+            double boxWidth = faces.get(i).width() + 40;
+            double boxHeight = faces.get(i).height() + 40;
+            double boxConfidence = -1.0;
+            double[] boxClasses = new double[1];
+
+//            System.out.println("Rect Width: " + faces.get(i).width() + 20 + ", Height:" + faces.get(i).height() + 20);
+
+
+//            graphics.drawRect((int) boxX, (int) boxY, (int) boxWidth, (int) boxHeight);
+
+            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+            System.out.println("Rect x:" + currentBox.getX() + ", Y: " + currentBox.getY());
+            System.out.println("Bounding Box X:" + currentBox.getX() + ", Y: " + currentBox.getY());
+
+            recognizedBoxes.add(currentBox);
         }
 
 
-        CvRect box = new CvRect();
-        box.x(0);
-        box.y(0);
-        box.width(10);
-        box.height(10);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(bufferedImage, "jpg", baos);
+        byte[] outData;
+        outData = baos.toByteArray();
 
-//        Mat croppedimage = imageMat.submat();
-//        Size scaleSize = new Size(50,50);
-//        resize(imageMat, croppedimage, scaleSize, 10, 10, Imgproc.INTER_AREA);
+//        Mat croppedimage = new Mat(imageMat, faces.get(0));
+//        byte[] outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
+//        imencode(".jpg", croppedimage, outData);
 
-        Mat croppedimage = new Mat(imageMat, faces.get(0));
+        for(BoundingBox currentFace: recognizedBoxes) {
 
-//        System.out.println(faces.get(0));
-//        System.out.println(box);
-//
-//        cvSetImageROI(inputImage, box);
+            Recognition recognition = new Recognition(1, "Thejas", (float)1,
+                    new BoxPosition((float) (currentFace.getX()),
+                            (float) (currentFace.getY()),
+                            (float) currentFace.getWidth(),
+                            (float) currentFace.getHeight()));
+//            frame.recognitions.add(recognition);
 
-//        IplImage croppedImage = cvCreateImage(cvGetSize(inputImage), inputImage.depth(), inputImage.nChannels());
-//
-//        Mat m = new Mat(croppedImage);
-//        ByteBuffer buffer = croppedImage.asByteBuffer();
-//        int sz = (int) (m.total() * m.channels());
-//        byte[] outData = new byte[sz];
-//        m.data().get(outData);
+            System.out.println("Recognition location X: " + recognition.getLocation().getLeft() + ", Height:" + recognition.getLocation().getTop());
 
-//        Mat matCrop = new Mat(imageMat, faces.get(0));
-//        System.out.println("matcrop: " + matCrop);
-//
+            outData= ImageUtil.getInstance().labelFace(outData, recognition);
+        }
 
-
-        byte[] outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
-//        croppedimage.data().get(outData);
-        imencode(".jpg", croppedimage, outData);
         Mat outputImage = imdecode(new Mat(outData), IMREAD_UNCHANGED);
 
-//        byte[] outData = new byte[croppedImage.getByteBuffer().remaining()];
-//        croppedImage.getByteBuffer().get(outData);
-//        ByteArrayInputStream baisBox = new ByteArrayInputStream(outData);
-//        BufferedImage bufferedImageBox = ImageIO.read(baisBox);
-//        System.out.println(outData.length);
-//        System.out.println(bufferedImageBox);
-//
-//
-//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//        ImageIO.write(bufferedImageBox, "jpg", baos);
-//
-//
-////        outData = baos.toByteArray();
-////                            bufferedImage.get(frame.data);
-////                            frame.data = buffer.array();
-//
 //        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
-//        ImageIO.write(bufferedImageBox, "jpg", outputfile);
-//
+//        ImageIO.write(bufferedImage, "jpg", outputfile);
+
+
         imwrite("./camera-recorder/src/main/resources/detected_face.jpg", outputImage);
     }
 }

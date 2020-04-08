@@ -14,6 +14,8 @@ package io.pravega.example.tensorflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
+import org.tensorflow.framework.ConfigProto;
+import org.tensorflow.framework.GPUOptions;
 
 import java.io.InputStream;
 import java.io.Serializable;
@@ -36,6 +38,7 @@ public class TFObjectDetector implements Serializable {
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final List<String> LABEL_DEF;
+    private final ConfigProto config;
 
     public static TFObjectDetector getInstance() {
         // TODO: fix race condition
@@ -49,6 +52,13 @@ public class TFObjectDetector implements Serializable {
     public TFObjectDetector() {
         log.info("@@@@@@@@@@@  new TF @@@@@@@@@@@  " );
 
+        config = ConfigProto.newBuilder()
+                .setGpuOptions(GPUOptions.newBuilder()
+                        .setAllowGrowth(true)
+                        .setPerProcessGpuMemoryFraction(0.04)
+                        .build()
+                ).build();
+
         InputStream graphFile = getClass().getResourceAsStream("/tiny-yolo-voc.pb");       // The model
         InputStream labelFile = getClass().getResourceAsStream("/yolo-voc-labels.txt");    // labels for classes used to train model
 
@@ -56,7 +66,7 @@ public class TFObjectDetector implements Serializable {
         LABEL_DEF = IOUtil.readAllLinesOrExit(labelFile);
         Graph graph = new Graph();
         graph.importGraphDef(GRAPH_DEF);
-        session = new Session(graph);
+        session = new Session(graph, config.toByteArray());
         GraphBuilder graphBuilder = new GraphBuilder(graph);
 
         imagePreprocessingOutput =

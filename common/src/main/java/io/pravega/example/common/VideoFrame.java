@@ -48,6 +48,8 @@ public class VideoFrame {
 
     public List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
 
+    public List<float[]> embeddings = new ArrayList<float[]>();
+
     public VideoFrame() {
     }
 
@@ -61,6 +63,7 @@ public class VideoFrame {
         this.tags = frame.tags;
         this.recognitions = frame.recognitions;
         this.recognizedBoxes = frame.recognizedBoxes;
+        this.embeddings = frame.embeddings;
     }
 
     @Override
@@ -91,6 +94,7 @@ public class VideoFrame {
                 ", hash=" + Arrays.toString(hash) +
                 ", recognitions=" + recognitions.toString() +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
+                ", embeddings=" + embeddings.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

@@ -12,19 +12,26 @@ package io.pravega.example.tensorflow;
 
 
 import io.pravega.example.common.VideoFrame;
-import org.bytedeco.opencv.opencv_core.CvArr;
-import org.bytedeco.opencv.opencv_core.Mat;
-import org.bytedeco.opencv.opencv_core.Rect;
+import org.apache.commons.io.IOUtils;
+import org.bytedeco.opencv.opencv_core.*;
+import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
+import scala.concurrent.java8.FuturesConvertersImpl;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.FloatBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
+import static org.bytedeco.opencv.global.opencv_core.*;
+import static org.bytedeco.opencv.global.opencv_core.cvarrToMat;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
+import static org.bytedeco.opencv.global.opencv_imgproc.*;
+import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 /**
  * ObjectDetector class to detect objects using pre-trained models with TensorFlow Java API.
@@ -41,6 +48,7 @@ public class FaceRecognizer implements Serializable {
 
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
+
 
     public static FaceRecognizer getInstance() {
         // TODO: fix race condition
@@ -74,27 +82,41 @@ public class FaceRecognizer implements Serializable {
                         graphBuilder.constant("scale", SCALE));
     }
 
-    public VideoFrame recognizeFaces(VideoFrame frame) {
+    public void recognizeFaces(VideoFrame frame) throws IOException {
+        frame.recognizedBoxes = this.detectFaces(frame.data);
+
         Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
-        for(BoundingBox currentFace: frame.recognizedBoxes) {
+        for(int i=0; i< frame.recognizedBoxes.size(); i++){
+            BoundingBox currentFace = frame.recognizedBoxes.get(i);
             byte[] croppedFace = cropFace(currentFace, imageMat);
-            embeddFace(croppedFace);
-        }
+            frame.embeddings.add(embeddFace(croppedFace));
 
-        return frame;
+            String match = matchEmbedding(frame.embeddings.get(i));
+
+            if(match != "") {
+                Recognition recognition = new Recognition(1, match, (float)1,
+                        new BoxPosition((float) (currentFace.getX()),
+                                (float) (currentFace.getY()),
+                                (float) (currentFace.getWidth()),
+                                (float) (currentFace.getHeight())));
+//                log.info("leftInt =" + recognition.getLocation().getLeftInt());
+
+                frame.data= ImageUtil.getInstance().labelFace(frame.data, recognition);
+            }
+        }
     }
 
-    private void embeddFace(byte[] image) {
+    public float[] embeddFace(byte[] image) {
         final float[] embeddings = executeGraph(image);
 
 
-
+        return embeddings;
 //        final List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(tensorFlowOutput, LABEL_DEF);
 //        final byte[] finalData = ImageUtil.getInstance().labelImage(image, recognitions);
     }
 
-    private float[] executeGraph(byte[] jpegBytes) {
+    public float[] executeGraph(byte[] jpegBytes) {
         // Preprocess image (decode JPEG and resize)
         try (final Tensor<?> jpegTensor = Tensor.create(jpegBytes)) {
             final List<Tensor<?>> imagePreprocessorOutputs = session
@@ -105,18 +127,16 @@ public class FaceRecognizer implements Serializable {
             assert imagePreprocessorOutputs.size() == 1;
 
             try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class);
-                final Tensor<Boolean> preprocessedPhaseTrainTensor = Tensor.create(true).expect(Boolean.class)) {
-                // YOLO object detection
+                final Tensor<Boolean> preprocessedPhaseTrainTensor = Tensor.create(false).expect(Boolean.class)) {
                 final List<Tensor<?>> detectorOutputs = session
                         .runner()
                         .feed("input", preprocessedInputTensor)
-                        .feed("phase_train", preprocessedInputTensor)
+                        .feed("phase_train", preprocessedPhaseTrainTensor)
                         .fetch("embeddings")
                         .run();
-                assert detectorOutputs.size() == 1;
+//                assert detectorOutputs.size() == 1;
                 try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
-                    System.out.println(resultTensor.shape());
-                    final float[] outputTensor = new float[(int)resultTensor.shape()[0]];
+                    final float[] outputTensor = new float[(int)resultTensor.shape()[1]];
                     final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
                     resultTensor.writeTo(floatBuffer);
                     return outputTensor;
@@ -126,12 +146,92 @@ public class FaceRecognizer implements Serializable {
     }
 
 
-    private byte[] cropFace(BoundingBox cropBox, Mat faceData) {
+    public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
         Rect cropArea = new Rect((int) cropBox.getX(), (int) cropBox.getY(), (int) cropBox.getWidth(), (int) cropBox.getHeight());
         Mat croppedImage = new Mat(faceData, cropArea);
         byte[] outData = new byte[(int)(croppedImage.total()*croppedImage.elemSize())];
         imencode(".jpg", croppedImage, outData);
 
         return outData;
+    }
+
+    public String matchEmbedding(float[] otherEmbedding) {
+        try{
+            VideoFrame origFrame = new VideoFrame();
+            InputStream origImage = getClass().getResourceAsStream("/TJ_now.jpg");
+            origFrame.data = IOUtils.toByteArray(origImage);
+            FaceDetector.getInstance().detectFaces(origFrame);
+            Mat imageMat = imdecode(new Mat(origFrame.data), IMREAD_UNCHANGED);
+            origFrame.data = cropFace(origFrame.recognizedBoxes.get(0), imageMat);
+
+            float[] origEmbedding = embeddFace(origFrame.data);
+
+            double diff = compareEmbeddings(origEmbedding, otherEmbedding);
+
+            log.info("distance is " + diff);
+
+            String match = "";
+
+            if(diff < 1.05) {
+                match = "Thejas";
+            }
+
+            return match;
+        } catch(Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double compareEmbeddings(float[] origEmbedding, float[] otherEmbedding) {
+        double sumDiffSq = 0;
+
+        for(int i=0; i< origEmbedding.length; i++) {
+            sumDiffSq += Math.pow(origEmbedding[i] - otherEmbedding[i], 2);
+        }
+
+        return Math.sqrt(sumDiffSq);
+    }
+
+    public List<BoundingBox> detectFaces(byte[] imageBytes) throws IOException {
+        Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
+        CvArr inputImage = new IplImage(imageMat);
+
+        CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
+
+        cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
+        cvEqualizeHist(grayImage, grayImage);
+
+        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml"; // face detection model configuration
+        CascadeClassifier faceCascade = new CascadeClassifier();
+        faceCascade.load(classifierPath);
+
+        RectVector faces = new RectVector();
+        int absoluteFaceSize = 0;
+        int height = grayImage.arrayHeight();
+        if (Math.round(height * 0.2f) > 0) {
+            absoluteFaceSize = Math.round(height * 0.2f);
+        }
+
+        System.out.println(cvarrToMat(grayImage));
+
+        // perform face detection
+        faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, 0 | CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
+
+        List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
+
+        for (int i = 0; i < faces.size(); i++) {
+            double boxX = Math.max(faces.get(i).x()-10,0);
+            double boxY = Math.max(faces.get(i).y()-10,0);
+            double boxWidth = Math.min(faces.get(i).width()+20,imageMat.arrayWidth());
+            double boxHeight = Math.min(faces.get(i).height()+20,imageMat.arrayHeight());
+            double boxConfidence = -1.0;
+            double[] boxClasses = new double[1];
+
+            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+
+            recognizedBoxes.add(currentBox);
+        }
+
+        return recognizedBoxes;
     }
 }

@@ -120,19 +120,19 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
-            //  identify objects with YOLOv3
-            DataStream<VideoFrame> faceDetectedFrames = videoFrames
+//            //  identify objects with YOLOv3
+//            DataStream<VideoFrame> faceDetectedFrames = videoFrames
+//                    .map(frame -> {
+//                        frame = FaceDetector.getInstance().detectFaces(frame);
+//                        frame.hash = frame.calculateHash();
+//
+//                        return frame;
+//                    });
+
+
+            DataStream<VideoFrame> faceRecognizedFrames = videoFrames
                     .map(frame -> {
-                        frame = FaceDetector.getInstance().detectFaces(frame);
-                        frame.hash = frame.calculateHash();
-
-                        return frame;
-                    });
-
-
-            DataStream<VideoFrame> faceRecognizedFrames = faceDetectedFrames
-                    .map(frame -> {
-                        frame = FaceRecognizer.getInstance().recognizeFaces(frame);
+                        FaceRecognizer.getInstance().recognizeFaces(frame);
                         frame.hash = frame.calculateHash();
 
                         return frame;
