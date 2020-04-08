@@ -299,17 +299,16 @@ class IndexStream(StreamBase):
         self.pravega_client.WriteEvents(events_to_write)
 
     def read_index_records(self):
-        to_stream_cut = self.get_stream_info().tail_stream_cut
+        stream_info = self.get_stream_info()
         read_events_request = pravega.pb.ReadEventsRequest(
             scope=self.scope,
             stream=self.stream,
-            from_stream_cut=None,
-            to_stream_cut=to_stream_cut,
+            from_stream_cut=stream_info.head_stream_cut,
+            to_stream_cut=stream_info.tail_stream_cut,
         )
         return (json.loads(read_event.event) for read_event in self.pravega_client.ReadEvents(read_events_request))
 
 
-# TODO: This should be based on UnindexedStream
 class IndexedStream(StreamBase):
     def __init__(self, pravega_client, scope, stream, timestamp_col='timestamp', exclude_cols=('data',)):
         super(IndexedStream, self).__init__(pravega_client, scope, stream)
@@ -323,29 +322,38 @@ class IndexedStream(StreamBase):
         self.index_stream = IndexStream(pravega_client, scope, '%s-index' % stream)
         self.index_stream.create_stream()
 
-    def update_index(self, force_full=False):
-        stream_info = self.get_stream_info()
+    def index_builder(self, force_full=False, stop_at_tail=True):
         if self.index_df is None and not force_full:
             self.load_index()
+        stream_info = self.get_stream_info()
         if self.index_df is None or force_full:
-            print('update_index: Performing full index generation')
+            print('index_builder: Performing full index generation')
             from_stream_cut = stream_info.head_stream_cut
             truncate = True
         else:
-            print('update_index: Performing incremental index update')
+            print('index_builder: Performing incremental index update')
             from_stream_cut = pravega.pb.StreamCut(text=self.index_df.iloc[-1].to_stream_cut)
             truncate = False
-        to_stream_cut = stream_info.tail_stream_cut
+        if stop_at_tail:
+            to_stream_cut = stream_info.tail_stream_cut
+        else:
+            to_stream_cut = None
         read_events_request = pravega.pb.ReadEventsRequest(
             scope=self.scope,
             stream=self.stream,
             from_stream_cut=from_stream_cut,
             to_stream_cut=to_stream_cut,
         )
-        print('update_index: Reading stream %s and writing index stream %s' % (self.stream, self.index_stream.stream))
+        print('index_builder: Reading stream %s and writing index stream %s' % (self.stream, self.index_stream.stream))
         read_events = self.pravega_client.ReadEvents(read_events_request)
         index_records = self.index_record_generator(read_events, from_stream_cut.text)
         self.index_stream.append_index_records(index_records, truncate=truncate)
+
+    def continuous_index_builder(self, force_full=False):
+        self.index_builder(force_full=force_full, stop_at_tail=False)
+
+    def update_index(self, force_full=False):
+        self.index_builder(force_full=force_full, stop_at_tail=True)
         self.load_index()
 
     def index_record_generator(self, read_events, from_stream_cut):
@@ -500,14 +508,16 @@ class VideoPlayer():
             style={'description_width': 'initial'},
             layout=Layout(width='100%'),
         )
-        self.camera_widget = ipywidgets.IntText(description='Camera', value=0, layout=Layout(width='10%'))
+        self.camera_widget = ipywidgets.IntText(description='Camera', value=0, layout=Layout(width='13%'))
         self.play_button = ipywidgets.Button(description=u'\u25B6', layout=Layout(width='4em'))
         self.play_button.on_click(lambda b: self.play())
-        self.fast_forward_button = ipywidgets.ToggleButton(description=u'\u25B6\u25B6', layout=Layout(width='4em'))
+        self.fast_forward_button = ipywidgets.ToggleButton(description=u'\u25B6\u25B6', tooltip='Play at maximum speed', layout=Layout(width='4em'))
+        self.live_button = ipywidgets.Button(description='Live', tooltip='Play from the tail', layout=Layout(width='4em'))
+        self.live_button.on_click(lambda b: self.live())
         self.stop_button = ipywidgets.Button(description=u'\u2B1B', layout=Layout(width='4em'))
         self.stop_button.on_click(lambda b: self.stop())
-        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, layout=Layout(width='50%'))
-        self.dt_widget = ipywidgets.Text(description='Age', disabled=True, layout=Layout(width='25%'))
+        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, layout=Layout(width='45%'))
+        self.dt_widget = ipywidgets.Text(description='Age', disabled=True, layout=Layout(width='20%'))
         self.image_widget = ipywidgets.Image()
         self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True, layout=Layout(width='100%'))
         self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True, layout=Layout(width='100%'))
@@ -516,6 +526,7 @@ class VideoPlayer():
             self.camera_widget,
             self.play_button,
             self.fast_forward_button,
+            self.live_button,
             self.stop_button,
             self.timestamp_widget,
             self.dt_widget,
@@ -533,6 +544,7 @@ class VideoPlayer():
 
         self.camera_widget.observe(self.on_filter_change, names='value')
         self.frame_number_widget.observe(self.update, names='value')
+        self.on_filter_change()
         self.widget.on_displayed(self.update)
 
     def on_filter_change(self, *args):
@@ -552,6 +564,7 @@ class VideoPlayer():
     def show_frame(self, video_frame):
         """Display a video frame."""
         timestamp = video_frame['timestamp']
+        # print(f'show_frame={timestamp}')
         self.timestamp_widget.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
         dt = pd.Timestamp.utcnow() - timestamp
         self.dt_widget.value = str(dt)
@@ -563,11 +576,14 @@ class VideoPlayer():
         self.image_widget.value = video_frame['data']
         self.video_frame = video_frame
 
-    def play(self):
+    def play(self, start_at_tail=False):
         """Begin playing video frames from the current frame."""
         if self.playing_flag:
             return
-        if self.video_frame is None:
+        if start_at_tail:
+            stream_info = self.indexed_stream.unindexed_stream.get_stream_info()
+            from_stream_cut = stream_info.tail_stream_cut
+        elif self.video_frame is None:
             from_stream_cut = None
         else:
             from_stream_cut = pravega.pb.StreamCut(text=self.video_frame['to_stream_cut'])
@@ -578,11 +594,17 @@ class VideoPlayer():
         self.playing_flag = True
         thread.start()
 
+    def live(self):
+        self.stop()
+        self.play(start_at_tail=True)
+
     def stop(self):
         self.stop_flag = True
         if self.read_events_call:
             self.read_events_call.cancel()
             self.read_events_call = None
+        while self.playing_flag:
+            time.sleep(0.1)
 
     def play_worker(self):
         """Background thread for playback."""
