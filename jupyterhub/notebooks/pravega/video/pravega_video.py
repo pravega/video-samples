@@ -18,6 +18,9 @@ import threading
 import traceback
 
 
+FONT_FILENAME = '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf'
+
+
 def opencv_image_to_mpl(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -35,11 +38,19 @@ def generate_image_bytes(width, height, camera, frame_number, random=True, forma
         img = Image.fromarray(img_array.astype('uint8')).convert('RGB')
     else:
         img = Image.new('RGB', (width, height), (25, 25, 240, 0))
-    font = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf', font_size)
+    font = ImageFont.truetype(FONT_FILENAME, font_size)
     draw = ImageDraw.Draw(img)
     draw.text((width//10, height//10), 'CAMERA\n %03d\nFRAME\n%05d' % (camera, frame_number), font=font, align='center')
     out_bytesio = io.BytesIO()
     img.save(out_bytesio, format=format, quality=quality, subsampling=subsampling, compress_level=compress_level)
+    out_bytes = out_bytesio.getvalue()
+    return out_bytes
+
+
+def generate_blank_image(width, height, format='JPEG'):
+    img = Image.new('RGB', (width, height), (25, 25, 240, 0))
+    out_bytesio = io.BytesIO()
+    img.save(out_bytesio, format=format)
     out_bytes = out_bytesio.getvalue()
     return out_bytes
 
@@ -360,14 +371,19 @@ class IndexedStream(UnindexedStream):
         event['event_pointer'] = read_event.event_pointer.bytes
         return event
 
-    def load_index(self):
+    def load_index(self, limit=None):
         print('load_index: Reading index stream %s' % self.index_stream.stream)
-        index_records = list(self.index_stream.read_index_records())
+        index_records = self.index_stream.read_index_records()
+        if limit:
+            index_records = islice(index_records, limit)
+        index_records = list(index_records)
         if len(index_records) > 0:
             df = pd.DataFrame(index_records)
             df[self.timestamp_col] = pd.to_datetime(df[self.timestamp_col], unit='ms', utc=True)
             df = df.set_index([self.timestamp_col])
             self.index_df = df
+        else:
+            self.index_df = None
 
     def get_stream_cuts_for_time_window(self, ts0, ts1=None, count=None):
         """Get a pair of from and to stream cuts that can be used to read events starting at timestamp ts0 (inclusive).
@@ -451,13 +467,34 @@ class IndexedStream(UnindexedStream):
 
 class VideoPlayer():
     def __init__(self,
-                 indexed_stream,
+                 pravega_client=None,
+                 scope=None,
+                 stream=None,
                  tz='America/Los_Angeles',
-                 strftime='%Y-%m-%d %I:%M:%S.%f %p %z'):
-        self.indexed_stream = indexed_stream
-        self.filtered_index_df = self.indexed_stream.index_df
+                 strftime='%Y-%m-%d %I:%M:%S.%f %p %z',
+                 index_limit=10000):
+
+        if isinstance(stream, IndexedStream):
+            self.pravega_client = stream.pravega_client
+            self.scope = stream.scope
+            self.stream_name = stream.stream
+            self.indexed_stream = stream
+        elif isinstance(stream, UnindexedStream):
+            self.pravega_client = stream.pravega_client
+            self.scope = stream.scope
+            self.stream_name = stream.stream
+            self.indexed_stream = None
+        else:
+            self.pravega_client = pravega_client
+            self.scope = scope
+            self.stream_name = '' if stream is None else stream
+            self.indexed_stream = None
+
         self.tz = tz
         self.strftime = strftime
+        self.index_limit = index_limit
+
+        self.filtered_index_df = None
         self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer', 'ssrc', 'frameNumber',
                                     'chunkIndex', 'finalChunkIndex', 'tags', 'hash', 'recognitions', 'data']
         self.playing_flag = False
@@ -465,17 +502,23 @@ class VideoPlayer():
         self.video_frames = None
         self.read_events_call = None
         self.video_frame = None
+        self.stream_names = self.get_streams()
 
+        self.stream_widget = ipywidgets.Dropdown(
+            description='Stream',
+            options=[''] + self.stream_names,
+            value=self.stream_name,
+        )
         self.frame_number_widget = ipywidgets.IntSlider(
             description='Frame',
             min=0,
-            max=len(self.filtered_index_df) - 1,
+            max=0,
             step=1,
-            value=len(self.filtered_index_df) - 1,
+            value=0,
             style={'description_width': 'initial'},
             layout=Layout(width='100%'),
         )
-        self.camera_widget = ipywidgets.IntText(description='Camera', value=0, layout=Layout(width='13%'))
+        self.camera_widget = ipywidgets.IntText(description='Camera', value=0, layout=Layout(width='15%'))
         self.play_button = ipywidgets.Button(description=u'\u25B6', layout=Layout(width='4em'))
         self.play_button.on_click(lambda b: self.play())
         self.fast_forward_button = ipywidgets.ToggleButton(description=u'\u25B6\u25B6', tooltip='Play at maximum speed', layout=Layout(width='4em'))
@@ -483,18 +526,19 @@ class VideoPlayer():
         self.live_button.on_click(lambda b: self.live())
         self.stop_button = ipywidgets.Button(description=u'\u2B1B', layout=Layout(width='4em'))
         self.stop_button.on_click(lambda b: self.stop())
-        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, layout=Layout(width='45%'))
-        self.dt_widget = ipywidgets.Text(description='Age', disabled=True, layout=Layout(width='20%'))
-        self.image_widget = ipywidgets.Image()
+        self.timestamp_widget = ipywidgets.Text(description='Timestamp', disabled=True, layout=Layout(width='60%'))
+        self.dt_widget = ipywidgets.Text(description='Age', disabled=True, layout=Layout(width='30%'))
+        self.image_widget = ipywidgets.Image(value=self.get_no_frame_image(), layout=Layout(width='99%', object_fit='contain'))
         self.streamcut_widget = ipywidgets.Text(description='Stream Cut', disabled=True, layout=Layout(width='100%'))
         self.fields_widget = ipywidgets.Textarea(description='Fields', disabled=True, layout=Layout(width='100%'))
         self.children = [
-            self.frame_number_widget,
-            self.camera_widget,
             self.play_button,
             self.fast_forward_button,
             self.live_button,
             self.stop_button,
+            self.stream_widget,
+            self.camera_widget,
+            self.frame_number_widget,
             self.timestamp_widget,
             self.dt_widget,
             self.image_widget,
@@ -509,39 +553,65 @@ class VideoPlayer():
                 justify_content='flex-start',
                 align_items='flex-start'))
 
+        self.stream_widget.observe(self.on_stream_change, names='value')
         self.camera_widget.observe(self.on_filter_change, names='value')
-        self.frame_number_widget.observe(self.update, names='value')
+        self.frame_number_widget.observe(self.on_frame_number_change, names='value')
         self.on_filter_change()
-        self.widget.on_displayed(self.update)
+        self.widget.on_displayed(self.on_frame_number_change)
+
+    def on_stream_change(self, *args):
+        """Called when stream is changed by user."""
+        stream_name = self.stream_widget.get_interact_value()
+        self.stream_name = stream_name
+        self.indexed_stream = IndexedStream(self.pravega_client, self.scope, self.stream_name)
+        self.indexed_stream.load_index(self.index_limit)
+        self.on_filter_change()
 
     def on_filter_change(self, *args):
-        camera = self.camera_widget.get_interact_value()
-        self.filtered_index_df = self.indexed_stream.index_df[self.indexed_stream.index_df.camera == camera]
-        self.frame_number_widget.max = len(self.filtered_index_df) - 1
-        self.update()
+        """Called when camera is changed by user."""
+        if self.indexed_stream is None or self.indexed_stream.index_df is None:
+            self.filtered_index_df = None
+            self.frame_number_widget.max = 0
+            self.on_frame_number_change()
+        else:
+            camera = self.camera_widget.get_interact_value()
+            self.filtered_index_df = self.indexed_stream.index_df[self.indexed_stream.index_df.camera == camera]
+            self.frame_number_widget.max = max(0, len(self.filtered_index_df) - 1)
+            self.on_frame_number_change()
 
-    def update(self, *args):
-        """Called when user changes frame or camera control.
+    def on_frame_number_change(self, *args):
+        """Called when user changes frame.
         Get a single video frame using the Pravega fetchEvent API and display it."""
         frame_number = self.frame_number_widget.get_interact_value()
-        index_rec = self.filtered_index_df.iloc[frame_number]
-        video_frame = self.indexed_stream.get_single_video_frame_by_index(index_rec)
-        self.show_frame(video_frame)
+        if self.filtered_index_df is None or len(self.filtered_index_df) <= frame_number:
+            self.show_frame(None)
+        else:
+            index_rec = self.filtered_index_df.iloc[frame_number]
+            video_frame = self.indexed_stream.get_single_video_frame_by_index(index_rec)
+            self.show_frame(video_frame)
 
     def show_frame(self, video_frame):
         """Display a video frame."""
-        timestamp = video_frame['timestamp']
-        # print(f'show_frame={timestamp}')
-        self.timestamp_widget.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
-        dt = pd.Timestamp.utcnow() - timestamp
-        self.dt_widget.value = str(dt)
-        self.streamcut_widget.value = video_frame['to_stream_cut']
-        fields = video_frame.copy()
-        for col in self.fields_exclude_cols:
-            if col in fields: del fields[col]
-        self.fields_widget.value = str(fields.to_dict())
-        self.image_widget.value = video_frame['data']
-        self.video_frame = video_frame
+        if video_frame is None:
+            self.timestamp_widget.value = ''
+            self.dt_widget.value = ''
+            self.streamcut_widget.value = ''
+            self.fields_widget.value = ''
+            self.image_widget.value = self.get_no_frame_image()
+            self.video_frame = None
+        else:
+            timestamp = video_frame['timestamp']
+            # print(f'show_frame={timestamp}')
+            self.timestamp_widget.value = '%s  (%s)' % (timestamp, timestamp.astimezone(self.tz).strftime(self.strftime))
+            dt = pd.Timestamp.utcnow() - timestamp
+            self.dt_widget.value = str(dt)
+            self.streamcut_widget.value = video_frame['to_stream_cut']
+            fields = video_frame.copy()
+            for col in self.fields_exclude_cols:
+                if col in fields: del fields[col]
+            self.fields_widget.value = str(fields.to_dict())
+            self.image_widget.value = video_frame['data']
+            self.video_frame = video_frame
 
     def play(self, start_at_tail=False):
         """Begin playing video frames from the current frame."""
@@ -602,3 +672,10 @@ class VideoPlayer():
 
     def interact(self):
         IPython.display.display(self.widget)
+
+    def get_streams(self):
+        streams = self.pravega_client.ListStreams(pravega.pb.ListStreamsRequest(scope=self.scope))
+        return sorted(list((s.stream for s in streams if not s.stream.startswith('_') and not s.stream.endswith('-index'))))
+
+    def get_no_frame_image(self, width=100):
+        return generate_blank_image(width, int(width*9/16))
