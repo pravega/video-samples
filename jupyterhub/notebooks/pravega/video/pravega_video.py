@@ -11,11 +11,13 @@ import pravega.grpc_gateway as pravega
 from matplotlib import pyplot as plt
 import time
 import logging
-from itertools import islice
+from itertools import islice, cycle
 import ipywidgets
 from ipywidgets import Layout, interact, interactive, fixed, interact_manual
 import threading
 import traceback
+import random
+import glob
 
 
 FONT_FILENAME = '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf'
@@ -556,7 +558,10 @@ class VideoPlayer():
         self.stream_widget.observe(self.on_stream_change, names='value')
         self.camera_widget.observe(self.on_filter_change, names='value')
         self.frame_number_widget.observe(self.on_frame_number_change, names='value')
-        self.on_filter_change()
+        if self.stream_name != '' and self.indexed_stream is None:
+            self.on_stream_change()
+        else:
+            self.on_filter_change()
         self.widget.on_displayed(self.on_frame_number_change)
 
     def on_stream_change(self, *args):
@@ -679,3 +684,49 @@ class VideoPlayer():
 
     def get_no_frame_image(self, width=100):
         return generate_blank_image(width, int(width*9/16))
+
+
+class ImageFileSequenceLoader():
+    def __init__(self, scope, stream, camera_filespecs, fps=1.0):
+        self.scope = scope
+        self.stream = stream
+        self.fps = fps
+        self.camera_files = [sorted(glob.glob(f)) for f in camera_filespecs]
+        no_matches = [s for s,f in zip(camera_filespecs, self.camera_files) if len(f) == 0]
+        if no_matches:
+            raise Exception(f'No matching files: {no_matches}')
+        self.frame_iterators = [cycle(f) for f in self.camera_files]
+
+    def event_generator(self):
+        frame_number = 0
+        t0_ms = time.time() * 1000.0
+        ssrc = random.randint(0, 2**30)
+        while True:
+            timestamp = int(frame_number / (self.fps / 1000.0) + t0_ms)
+            sleep_sec = timestamp / 1000.0 - time.time()
+            print(f'frame_number={frame_number}, sleep_sec={sleep_sec:0.3f}', end='\r')
+            if sleep_sec > 0.0:
+                time.sleep(sleep_sec)
+            elif sleep_sec < -5.0:
+                logging.warn(f"can't keep up with real-time. sleep_sec={sleep_sec}")
+            for camera, frame_iterator in enumerate(self.frame_iterators):
+                filename = next(frame_iterator)
+                with open(filename, 'rb') as f:
+                    file_bytes = f.read()
+                event_dict = dict(
+                    camera=camera,
+                    data=base64.b64encode(file_bytes).decode(encoding='UTF-8'),
+                    frameNumber=frame_number,
+                    ssrc=ssrc + camera,
+                    timestamp=timestamp,
+                )
+                event_json = json.dumps(event_dict)
+                event_bytes = event_json.encode(encoding='UTF-8')
+                event_to_write = pravega.pb.WriteEventsRequest(
+                    scope=self.scope,
+                    stream=self.stream,
+                    event=event_bytes,
+                    routing_key=str(camera),
+                )
+                yield event_to_write
+            frame_number += 1
