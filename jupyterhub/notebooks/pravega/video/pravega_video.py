@@ -687,11 +687,11 @@ class VideoPlayer():
 
 
 class ImageFileSequenceLoader():
-    def __init__(self, scope, stream, camera_filespecs, fps=1.0):
+    def __init__(self, scope, stream, camera_filespecs, fps=1.0, step=1):
         self.scope = scope
         self.stream = stream
         self.fps = fps
-        self.camera_files = [sorted(glob.glob(f)) for f in camera_filespecs]
+        self.camera_files = [sorted(glob.glob(f))[0::step] for f in camera_filespecs]
         no_matches = [s for s,f in zip(camera_filespecs, self.camera_files) if len(f) == 0]
         if no_matches:
             raise Exception(f'No matching files: {no_matches}')
