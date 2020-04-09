@@ -137,7 +137,7 @@ public class MultiVideoGridJob extends AbstractJob {
             // Then these images are combined in a square grid.
             // To maintain ordering in the output images, we use parallelism of 1 for all subsequent operations.
             long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
-            int camera = 1000;
+            int camera = 0;
             int ssrc = new Random().nextInt();
             DataStream<VideoFrame> outVideoFrames = resizedVideoFrames
                     .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
