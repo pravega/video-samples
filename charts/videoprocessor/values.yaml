@@ -30,15 +30,15 @@ MultiVideoGridJob:
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 2.5
-  imageHeight: 188
-  imageWidth: 621
+  framesPerSec: 10.0
+  imageHeight: 720
+  imageWidth: 1365
   input:
     minNumSegments: 1
-    stream: object-detector-input-video
+    stream: safety-and-security-1
   output:
     minNumSegments: 1
-    stream: object-detector-input-grid-video
+    stream: safety-and-security-grid-1
   maxOutOfOrdernessMs: 10
   parallelism: 4    # Should match number of cameras
   readerParallelism: 1
