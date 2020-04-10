@@ -155,6 +155,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ImageAggregator");
 
             DataStream<OrderedImageAggregatorResult> ordered = aggResults.process(new ProcessFunction<ImageAggregatorResult, OrderedImageAggregatorResult>() {
+                // TODO: This needs to go in Flink state to handle recovery.
                 long index = 0;
 
                 @Override
@@ -188,15 +189,13 @@ public class MultiVideoGridJob extends AbstractJob {
 
             KeyedStream<OrderedVideoFrame, Integer> keyed0 = outVideoFrames0.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
             KeyedStream<OrderedVideoFrame, Integer> keyed1 = outVideoFrames1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-//            KeyedStream<OrderedVideoFrame, Tuple1> keyed1 = outVideoFrames1.keyBy((KeySelector<OrderedVideoFrame, Tuple1>) value -> Tuple1.of(value.value.camera));
-//            KeyedStream<OrderedVideoFrame, Tuple1> keyed0 = outVideoFrames0.keyBy(outVideoFrames0);
-            keyed0.printToErr();
-            keyed1.printToErr();
+//            keyed0.printToErr();
+//            keyed1.printToErr();
 
             ConnectedStreams<OrderedVideoFrame, OrderedVideoFrame> connected = keyed0.connect(keyed1);
 
             DataStream<OrderedVideoFrame> combined = connected.process(new OrderedVideoFrameCoProcessFunction());
-//            combined.printToErr();
+            combined.printToErr();
 
             DataStream<VideoFrame> outVideoFrames = combined.map(x -> x.value);
 
@@ -262,6 +261,7 @@ public class MultiVideoGridJob extends AbstractJob {
         }
 
         public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int camera, int ssrc, int frameNumber) {
+            log.info("asVideoFrame: BEGIN: frameNumber={}", frameNumber);
             final long t0 = System.currentTimeMillis();
             VideoFrame videoFrame = new VideoFrame();
             videoFrame.camera = camera;
@@ -275,12 +275,16 @@ public class MultiVideoGridJob extends AbstractJob {
             videoFrame.hash = videoFrame.calculateHash();
             videoFrame.tags = new HashMap<>();
             videoFrame.tags.put("numCameras", Integer.toString(images.size()));
+
+            long sleepTime = new Random().nextInt(1000);
+            // long sleepTime = (frameNumber % 2 == 0)
             try {
-                Thread.sleep(new Random().nextInt(1000));
+                Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            log.info("asVideoFrame: TIME={}", System.currentTimeMillis() - t0);
+
+            log.info("asVideoFrame: END: frameNumber={}, TIME={}", frameNumber, System.currentTimeMillis() - t0);
             log.trace("asVideoFrame: videoFrame={}", videoFrame);
             return videoFrame;
         }
