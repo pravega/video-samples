@@ -42,11 +42,14 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
             // We can emit this element now.
             out.collect(value);
             nextOutputIndex++;
-            final OrderedVideoFrame buffered = outOfOrderElementsState.get(nextOutputIndex);
-            // Check if we can emit a buffered element.
-            if (buffered != null) {
+            // Emit buffered elements.
+            for(;;) {
+                final OrderedVideoFrame buffered = outOfOrderElementsState.get(nextOutputIndex);
+                if (buffered == null) {
+                    break;
+                }
                 // Emit the buffered element now.
-                log.info("CLAUDIO Emitting buffered element {}", value);
+                log.info("CLAUDIO Emitting buffered element; nextOutputIndex={}, buffered={}", nextOutputIndex, buffered);
                 out.collect(buffered);
                 outOfOrderElementsState.remove(nextOutputIndex);
                 nextOutputIndex++;
@@ -54,7 +57,7 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
             nextOutputIndexState.update(nextOutputIndex);
         } else if (nextOutputIndex < value.index) {
             // Add early element to buffer.
-            log.info("CLAUDIO Buffering early element {}", value);
+            log.info("CLAUDIO Buffering early element; nextOutputIndex={}, value={}", nextOutputIndex, value);
             outOfOrderElementsState.put(value.index, value);
         } else {
             throw new IllegalStateException(MessageFormat.format("Unexpected element order; nextOutputIndex={0}, value.index={1}", nextOutputIndex, value.index));
