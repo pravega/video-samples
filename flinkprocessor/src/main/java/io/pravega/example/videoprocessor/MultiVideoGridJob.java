@@ -275,6 +275,11 @@ public class MultiVideoGridJob extends AbstractJob {
             videoFrame.hash = videoFrame.calculateHash();
             videoFrame.tags = new HashMap<>();
             videoFrame.tags.put("numCameras", Integer.toString(images.size()));
+            try {
+                Thread.sleep(new Random().nextInt(1000));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             log.info("asVideoFrame: TIME={}", System.currentTimeMillis() - t0);
             log.trace("asVideoFrame: videoFrame={}", videoFrame);
             return videoFrame;

@@ -29,7 +29,7 @@ public class ImageResizer {
     private final int outputWidth;
     private final int outputHeight;
 
-    private final Random random = new Random();
+//    private final Random random = new Random();
 
     public ImageResizer(int outputWidth, int outputHeight) {
         this.outputWidth = outputWidth;
@@ -59,9 +59,9 @@ public class ImageResizer {
             g2d.drawImage(scaledImage, 0, 0, null);
             g2d.dispose();
             ImageIO.write(outImage, "png", outStream);
-            Thread.sleep(random.nextInt(1000));
+//            Thread.sleep(random.nextInt(1000));
             log.info("resize: TIME={}", System.currentTimeMillis() - t0);
-        } catch (IOException|InterruptedException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
