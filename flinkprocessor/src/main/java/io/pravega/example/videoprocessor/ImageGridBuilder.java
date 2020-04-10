@@ -87,8 +87,10 @@ public class ImageGridBuilder {
             ByteArrayOutputStream outStream = new ByteArrayOutputStream();
             ImageWriter writer = ImageIO.getImageWritersByFormatName(format).next();
             ImageWriteParam writeParam = writer.getDefaultWriteParam();
-            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            writeParam.setCompressionQuality(0.5f);
+            if (format.equals("jpg")) {
+                writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                writeParam.setCompressionQuality(0.5f);
+            }
             writer.setOutput(new MemoryCacheImageOutputStream(outStream));
             writer.write(null, new IIOImage(outImage, null, null), writeParam);
             return outStream.toByteArray();

@@ -10,18 +10,26 @@
  */
 package io.pravega.example.videoprocessor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.util.Random;
 
 
 /**
  * Resizes images to a fixed size.
  */
 public class ImageResizer {
+    private static Logger log = LoggerFactory.getLogger(ImageResizer.class);
+
     private final int outputWidth;
     private final int outputHeight;
+
+    private final Random random = new Random();
 
     public ImageResizer(int outputWidth, int outputHeight) {
         this.outputWidth = outputWidth;
@@ -43,6 +51,7 @@ public class ImageResizer {
 
     public void resize(InputStream inStream, OutputStream outStream) {
         try {
+            final long t0 = System.currentTimeMillis();
             BufferedImage inImage = ImageIO.read(inStream);
             Image scaledImage = inImage.getScaledInstance(outputWidth, outputHeight, Image.SCALE_SMOOTH);
             BufferedImage outImage = new BufferedImage(outputWidth, outputHeight, inImage.getType());
@@ -50,7 +59,9 @@ public class ImageResizer {
             g2d.drawImage(scaledImage, 0, 0, null);
             g2d.dispose();
             ImageIO.write(outImage, "png", outStream);
-        } catch (IOException e) {
+            Thread.sleep(random.nextInt(1000));
+            log.info("resize: TIME={}", System.currentTimeMillis() - t0);
+        } catch (IOException|InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
