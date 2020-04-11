@@ -172,7 +172,7 @@ public class MultiVideoGridJob extends AbstractJob {
             }).setParallelism(1);
 //            ordered.printToErr();
 
-            final int parallelism = 3;  // TODO: broken >2
+            final int parallelism = 5;
             final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
                     .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
 
@@ -186,18 +186,26 @@ public class MultiVideoGridJob extends AbstractJob {
             final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
                     .map(splitStream::getSideOutput).collect(Collectors.toList());
 
-            Stream<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = splits.stream().map(ds -> ds.map(aggResult ->
-                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index))));
+            List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = splits.stream().map(ds -> ds.map(aggResult ->
+                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index))))
+                    .collect(Collectors.toList());
 
-            DataStream<OrderedVideoFrame> combined = orderedVideoFrames.reduce((ds1, ds2) -> {
-                KeyedStream<OrderedVideoFrame, Integer> keyed1 = ds1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                KeyedStream<OrderedVideoFrame, Integer> keyed2 = ds2.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                return keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction());
-            }).get();
+            DataStream<OrderedVideoFrame> reduced = orderedVideoFrames.get(0);
+            for (int operator = 0 ; operator < parallelism - 1 ; operator++) {
+                KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator+1).keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                reduced = keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction(operator, parallelism));
+            }
 
-            combined.printToErr();
+//            DataStream<OrderedVideoFrame> combined = orderedVideoFrames.reduce((ds1, ds2) -> {
+//                KeyedStream<OrderedVideoFrame, Integer> keyed1 = ds1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+//                KeyedStream<OrderedVideoFrame, Integer> keyed2 = ds2.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+//                return keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction());
+//            }).get();
 
-            DataStream<VideoFrame> outVideoFrames = combined.map(x -> x.value);
+            reduced.printToErr();
+
+            DataStream<VideoFrame> outVideoFrames = reduced.map(x -> x.value);
 
             outVideoFrames.printToErr().setParallelism(1).uid("outVideoFrames-print").name("outVideoFrames-print");
 
