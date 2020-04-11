@@ -16,8 +16,15 @@ import java.util.Optional;
 class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoFrame, OrderedVideoFrame, OrderedVideoFrame> {
     private static Logger log = LoggerFactory.getLogger(OrderedVideoFrameCoProcessFunction.class);
 
+    private final int operator;
+    private final int parallelism;
     private ValueState<Long> nextOutputIndexState;
     private MapState<Long, OrderedVideoFrame> outOfOrderElementsState;
+
+    public OrderedVideoFrameCoProcessFunction(int operator, int parallelism) {
+        this.operator = operator;
+        this.parallelism = parallelism;
+    }
 
     @Override
     public void open(Configuration parameters) throws Exception {
@@ -40,7 +47,7 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
         if (nextOutputIndex == value.index) {
             // We can emit this element now.
             out.collect(value);
-            nextOutputIndex++;
+            nextOutputIndex = OrderedParallelOperator.getNextIndexToEmit(nextOutputIndex, operator, parallelism);
             // Emit buffered elements.
             for(;;) {
                 final OrderedVideoFrame buffered = outOfOrderElementsState.get(nextOutputIndex);
@@ -51,7 +58,7 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
                 log.info("CLAUDIO Emitting buffered element; nextOutputIndex={}, buffered={}", nextOutputIndex, buffered);
                 out.collect(buffered);
                 outOfOrderElementsState.remove(nextOutputIndex);
-                nextOutputIndex++;
+                nextOutputIndex = OrderedParallelOperator.getNextIndexToEmit(nextOutputIndex, operator, parallelism);
             }
             nextOutputIndexState.update(nextOutputIndex);
         } else if (nextOutputIndex < value.index) {
