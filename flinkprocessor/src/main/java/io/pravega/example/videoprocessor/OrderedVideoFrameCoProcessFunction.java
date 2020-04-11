@@ -1,6 +1,5 @@
 package io.pravega.example.videoprocessor;
 
-import io.pravega.example.common.VideoFrame;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
