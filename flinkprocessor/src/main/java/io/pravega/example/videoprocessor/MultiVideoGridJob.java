@@ -18,20 +18,26 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.ConnectedStreams;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
@@ -82,22 +88,24 @@ public class MultiVideoGridJob extends AbstractJob {
     public void run() {
         try {
             final String jobName = MultiVideoGridJob.class.getName();
-            StreamExecutionEnvironment env = initializeFlinkStreaming();
+            final StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
 
-            StreamCut startStreamCut = StreamCut.UNBOUNDED;
+            final StreamCut startStreamCut;
             if (getConfig().isStartAtTail()) {
                 startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
+            } else {
+                startStreamCut = StreamCut.UNBOUNDED;
             }
 
             // Read chunked video frames from Pravega.
-            FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
+            final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
@@ -105,7 +113,7 @@ public class MultiVideoGridJob extends AbstractJob {
             inChunkedVideoFrames.printToErr();
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
-            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
                         new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
                                 Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
@@ -132,9 +140,9 @@ public class MultiVideoGridJob extends AbstractJob {
             }
 
             // Resize all input images. This will be performed in parallel.
-            int imageWidth = getConfig().getImageWidth();
-            int imageHeight = getConfig().getImageHeight();
-            DataStream<VideoFrame> resizedVideoFrames = rebalancedVideoFrames
+            final int imageWidth = getConfig().getImageWidth();
+            final int imageHeight = getConfig().getImageHeight();
+            final DataStream<VideoFrame> resizedVideoFrames = rebalancedVideoFrames
                     .map(frame -> {
                         ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
                         frame.data = resizer.resize(frame.data);
@@ -145,38 +153,50 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ImageResizer");
 //            resizedVideoFrames.printToErr().uid("resizedVideoFrames-print").name("resizedVideoFrames-print");;
 
+            // Assign each input camera to an output monitor.
+            final int numOutputMonitors = 2;
+            final KeyedStream<VideoFrame, Integer> resizedKeyedVideoFrames =
+                    resizedVideoFrames.keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera % numOutputMonitors);
+
             // Aggregate resized images.
             // For each time window, we take the last image from each camera.
             // Then these images are combined in a square grid.
             // To maintain ordering in the output images, we use parallelism of 1 for all subsequent operations.
-            long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
-            int camera = 0;
-            int ssrc = new Random().nextInt();
-            DataStream<ImageAggregatorResult> aggResults = resizedVideoFrames
-                    .windowAll(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-                    .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc))
-                    .setParallelism(1)
+            final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
+            final int camera = 0;
+            final int ssrc = new Random().nextInt();
+            final DataStream<ImageAggregatorResult> aggResults = resizedKeyedVideoFrames
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .aggregate(new ImageAggregator(imageWidth, imageHeight, camera, ssrc), new ImageAggregatorProcessWindowFunction())
+//                    .setParallelism(1)
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
+            aggResults.printToErr();
 
-            //aggResults.
+            final KeyedStream<ImageAggregatorResult, Integer> keyedAggResults = aggResults.keyBy((KeySelector<ImageAggregatorResult, Integer>) value -> value.camera);
 
-            DataStream<OrderedImageAggregatorResult> ordered = aggResults.process(new ProcessFunction<ImageAggregatorResult, OrderedImageAggregatorResult>() {
-                // TODO: This needs to go in Flink state to handle recovery.
-                long index = 0;
+            final DataStream<OrderedImageAggregatorResult> ordered = keyedAggResults.process(new KeyedProcessFunction<Integer, ImageAggregatorResult, OrderedImageAggregatorResult>() {
+                private ValueState<Long> indexState;
+
+                @Override
+                public void open(Configuration parameters) throws Exception {
+                    indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
+                }
 
                 @Override
                 public void processElement(ImageAggregatorResult value, Context ctx, Collector<OrderedImageAggregatorResult> out) throws Exception {
-                    out.collect(new OrderedImageAggregatorResult(index++, value));
+                    final long index = Optional.ofNullable(indexState.value()).orElse(0L);
+                    out.collect(new OrderedImageAggregatorResult(index, value));
+                    indexState.update(index + 1);
                 }
             }).setParallelism(1);
 //            ordered.printToErr();
 
-            final int parallelism = 5;
+            final int parallelism = env.getParallelism();
             final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
                     .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
 
-            SingleOutputStreamOperator<Integer> splitStream = ordered.process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
+            final SingleOutputStreamOperator<Integer> splitStream = ordered.process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
                 @Override
                 public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
                     ctx.output(outputTags.get((int) value.index % parallelism), value);
@@ -186,31 +206,25 @@ public class MultiVideoGridJob extends AbstractJob {
             final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
                     .map(splitStream::getSideOutput).collect(Collectors.toList());
 
-            List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = splits.stream().map(ds -> ds.map(aggResult ->
-                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index))))
+            final List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = splits.stream().map(ds -> ds.map(aggResult ->
+                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index))))
                     .collect(Collectors.toList());
 
             DataStream<OrderedVideoFrame> reduced = orderedVideoFrames.get(0);
             for (int operator = 0 ; operator < parallelism - 1 ; operator++) {
-                KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator+1).keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                final KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                final KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator+1).keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
                 reduced = keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction(operator, parallelism));
             }
 
-//            DataStream<OrderedVideoFrame> combined = orderedVideoFrames.reduce((ds1, ds2) -> {
-//                KeyedStream<OrderedVideoFrame, Integer> keyed1 = ds1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-//                KeyedStream<OrderedVideoFrame, Integer> keyed2 = ds2.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-//                return keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction());
-//            }).get();
-
             reduced.printToErr();
 
-            DataStream<VideoFrame> outVideoFrames = reduced.map(x -> x.value);
+            final DataStream<VideoFrame> outVideoFrames = reduced.map(x -> x.value);
 
             outVideoFrames.printToErr().setParallelism(1).uid("outVideoFrames-print").name("outVideoFrames-print");
 
             // Split output video frames into chunks of 8 MiB or less.
-            DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
+            final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
 //                    .setParallelism(1)
                     .uid("VideoFrameChunker")
@@ -218,7 +232,7 @@ public class MultiVideoGridJob extends AbstractJob {
 //            outChunkedVideoFrames.printToErr().setParallelism(1).uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.
-            FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+            final FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
                     .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
@@ -239,6 +253,7 @@ public class MultiVideoGridJob extends AbstractJob {
     }
 
     public static class ImageAggregatorAccum {
+        public int camera;
         // Map from camera to last image data.
         public Map<Integer, byte[]> images = new HashMap<>();
         // Maximum timestamp from cameras.
@@ -248,6 +263,7 @@ public class MultiVideoGridJob extends AbstractJob {
         }
 
         public ImageAggregatorAccum(ImageAggregatorAccum accum) {
+            this.camera = accum.camera;
             this.images = accum.images;
             this.timestamp = accum.timestamp;
         }
@@ -255,7 +271,8 @@ public class MultiVideoGridJob extends AbstractJob {
         @Override
         public String toString() {
             return "ImageAggregatorAccum{" +
-                    "timestamp=" + timestamp +
+                    "camera=" + camera +
+                    ",timestamp=" + timestamp +
                     '}';
         }
     }
@@ -268,7 +285,7 @@ public class MultiVideoGridJob extends AbstractJob {
             super(accum);
         }
 
-        public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int camera, int ssrc, int frameNumber) {
+        public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int ssrc, int frameNumber) {
             log.info("asVideoFrame: BEGIN: frameNumber={}", frameNumber);
             final long t0 = System.currentTimeMillis();
             VideoFrame videoFrame = new VideoFrame();
@@ -283,6 +300,7 @@ public class MultiVideoGridJob extends AbstractJob {
             videoFrame.hash = videoFrame.calculateHash();
             videoFrame.tags = new HashMap<>();
             videoFrame.tags.put("numCameras", Integer.toString(images.size()));
+            videoFrame.tags.put("cameras", images.keySet().toString());
 
             long sleepTime = new Random().nextInt(1000);
             // long sleepTime = (frameNumber % 2 == 0)
@@ -299,8 +317,8 @@ public class MultiVideoGridJob extends AbstractJob {
     }
 
     public static class OrderedImageAggregatorResult {
-        public long index;
-        public ImageAggregatorResult value;
+        final public long index;
+        final public ImageAggregatorResult value;
 
         public OrderedImageAggregatorResult(long index, ImageAggregatorResult value) {
             this.index = index;
@@ -344,26 +362,6 @@ public class MultiVideoGridJob extends AbstractJob {
             return new ImageAggregatorResult(accum);
         }
 
-//        @Override
-//        public VideoFrame getResult(ImageAggregatorAccum accum) {
-//            final long t0 = System.currentTimeMillis();
-//            VideoFrame videoFrame = new VideoFrame();
-//            videoFrame.camera = camera;
-//            videoFrame.ssrc = ssrc;
-//            videoFrame.timestamp = accum.timestamp;
-//            videoFrame.frameNumber = frameNumber;
-//            ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, accum.images.size());
-//            builder.addImages(accum.images);
-//            videoFrame.data = builder.getOutputImageBytes("jpg");
-////            videoFrame.hash = videoFrame.calculateHash();
-//            videoFrame.tags = new HashMap<String,String>();
-//            videoFrame.tags.put("numCameras", Integer.toString(accum.images.size()));
-//            log.info("getResult: TIME={}", System.currentTimeMillis() - t0);
-//            log.trace("getResult: videoFrame={}", videoFrame);
-//            frameNumber++;
-//            return videoFrame;
-//        }
-
         @Override
         public ImageAggregatorAccum add(VideoFrame value, ImageAggregatorAccum accum) {
             log.trace("add: value={}", value);
@@ -378,7 +376,16 @@ public class MultiVideoGridJob extends AbstractJob {
             log.info("merge: a={}, b={}", a, b);
             return null;
         }
+    }
 
+    public static class ImageAggregatorProcessWindowFunction extends ProcessWindowFunction<ImageAggregatorResult, ImageAggregatorResult, Integer, TimeWindow> {
+        @Override
+        public void process(Integer key, Context context, Iterable<ImageAggregatorResult> elements, Collector<ImageAggregatorResult> out) throws Exception {
+            elements.forEach(element -> {
+                element.camera = key;
+                out.collect(element);
+            });
+        }
     }
 
 }
