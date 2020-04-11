@@ -39,8 +39,13 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.Timestamp;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.lang.Math.max;
 
@@ -154,6 +159,8 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
 
+            //aggResults.
+
             DataStream<OrderedImageAggregatorResult> ordered = aggResults.process(new ProcessFunction<ImageAggregatorResult, OrderedImageAggregatorResult>() {
                 // TODO: This needs to go in Flink state to handle recovery.
                 long index = 0;
@@ -165,36 +172,29 @@ public class MultiVideoGridJob extends AbstractJob {
             }).setParallelism(1);
 //            ordered.printToErr();
 
-            final OutputTag<OrderedImageAggregatorResult> outputTag0 = new OutputTag<>("0", TypeInformation.of(OrderedImageAggregatorResult.class));
-            final OutputTag<OrderedImageAggregatorResult> outputTag1 = new OutputTag<>("1", TypeInformation.of(OrderedImageAggregatorResult.class));
+            final int parallelism = 3;  // TODO: broken >2
+            final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
+                    .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
 
-            SingleOutputStreamOperator<Integer> split = ordered.process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
+            SingleOutputStreamOperator<Integer> splitStream = ordered.process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
                 @Override
                 public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
-                    if (value.index % 2 == 0) {
-                        ctx.output(outputTag0, value);
-                    } else {
-                        ctx.output(outputTag1, value);
-                    }
+                    ctx.output(outputTags.get((int) value.index % parallelism), value);
                 }
             });
-//            split.printToErr();
-            DataStream<OrderedImageAggregatorResult> split0 = split.getSideOutput(outputTag0);
-            DataStream<OrderedImageAggregatorResult> split1 = split.getSideOutput(outputTag1);
 
-            DataStream<OrderedVideoFrame> outVideoFrames0 = split0.map(aggResult ->
-                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index)));
-            DataStream<OrderedVideoFrame> outVideoFrames1 = split1.map(aggResult ->
-                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index)));
+            final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
+                    .map(splitStream::getSideOutput).collect(Collectors.toList());
 
-            KeyedStream<OrderedVideoFrame, Integer> keyed0 = outVideoFrames0.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-            KeyedStream<OrderedVideoFrame, Integer> keyed1 = outVideoFrames1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-//            keyed0.printToErr();
-//            keyed1.printToErr();
+            Stream<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = splits.stream().map(ds -> ds.map(aggResult ->
+                    new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, camera, ssrc, (int) aggResult.index))));
 
-            ConnectedStreams<OrderedVideoFrame, OrderedVideoFrame> connected = keyed0.connect(keyed1);
+            DataStream<OrderedVideoFrame> combined = orderedVideoFrames.reduce((ds1, ds2) -> {
+                KeyedStream<OrderedVideoFrame, Integer> keyed1 = ds1.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                KeyedStream<OrderedVideoFrame, Integer> keyed2 = ds2.keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                return keyed1.connect(keyed2).process(new OrderedVideoFrameCoProcessFunction());
+            }).get();
 
-            DataStream<OrderedVideoFrame> combined = connected.process(new OrderedVideoFrameCoProcessFunction());
             combined.printToErr();
 
             DataStream<VideoFrame> outVideoFrames = combined.map(x -> x.value);
