@@ -30,7 +30,7 @@ MultiVideoGridJob:
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 4.0
+  framesPerSec: 6.0
   imageHeight: 720
   imageWidth: 1280
   input:
