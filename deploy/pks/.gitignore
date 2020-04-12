@@ -1,3 +1,4 @@
 nautilus-dist-master/
 *.log
 *-values.yaml
+env-local.sh
