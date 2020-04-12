@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -ex
-export CLUSTER_NAME=${CLUSTER_NAME:-frightful-four}
-scripts/validate-values.py ${CLUSTER_NAME}-values.yaml,scripts/pre-install/values.yaml
+source ./env-local.sh
+nautilus-dist-master/decks-install config set registry devops-repo.isus.emc.com:8116/nautilus
+nautilus-dist-master/scripts/validate-values.py ${CLUSTER_NAME}-values.yaml,nautilus-dist-master/scripts/pre-install/values.yaml

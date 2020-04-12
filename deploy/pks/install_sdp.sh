@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-export CLUSTER_NAME=${CLUSTER_NAME:-frightful-four}
-./decks-install config set registry devops-repo.isus.emc.com:8116/nautilus
-./decks-install apply --kustomize ./manifests/ --repo ./charts/ --values ${CLUSTER_NAME}-values.yaml,scripts/pre-install/values.yaml
+source ./env-local.sh
+nautilus-dist-master/decks-install apply \
+  --kustomize nautilus-dist-master/manifests/ \
+  --repo nautilus-dist-master/charts/ \
+  --values ${CLUSTER_NAME}-values.yaml,nautilus-dist-master/scripts/pre-install/values.yaml
