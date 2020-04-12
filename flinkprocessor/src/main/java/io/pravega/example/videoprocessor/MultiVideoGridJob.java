@@ -146,16 +146,6 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("lastVideoFramePerCamera")
                     .name("lastVideoFramePerCamera");
 
-            // Rebalance (round-robin) to all task slots.
-            // input parallelism:  # of cameras
-            // output parallelism: default parallelism
-//            final DataStream<VideoFrame> rebalancedVideoFrames;
-//            if (getConfig().isEnableRebalance()) {
-//                rebalancedVideoFrames = lastVideoFramePerCamera.rebalance();
-//            } else {
-//                rebalancedVideoFrames = lastVideoFramePerCamera;
-//            }
-
             // Resize all input images.
             // Operator: ImageResizer
             // Effective parallelism: default parallelism
@@ -204,96 +194,22 @@ public class MultiVideoGridJob extends AbstractJob {
 
             final int ssrc = new Random().nextInt();
 
-            final DataStream<VideoFrame> outVideoFrames;
-            if (false) {
-                // TODO: REMOVE OBSOLETE SECTION
+            // Build output images and encode as JPEG.
+            // Effective parallelism: default parallelism
+            final DataStream<VideoFrame> videoFrames = aggResults
+                    .rebalance() // ensure that successive frames are round robin distributed to different subtasks
+                    .map(aggResult -> new VideoFrame(aggResult.asVideoFrame(imageWidth, imageHeight, ssrc)))
+                    .uid("asVideoFrame")
+                    .name("asVideoFrame");
 
-                // Assign sequential index. This will be used as the frame number.
-                // Operator: assignSequentialIndex
-                // Effective parallelism: hash of monitor
-                final DataStream<OrderedImageAggregatorResult> assignSequentialIndex = aggResults
-                        .keyBy((KeySelector<ImageAggregatorResult, Integer>) value -> value.camera)
-                        .process(new KeyedProcessFunction<Integer, ImageAggregatorResult, OrderedImageAggregatorResult>() {
-                            private ValueState<Long> indexState;
-
-                            @Override
-                            public void open(Configuration parameters) throws Exception {
-                                indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
-                            }
-
-                            @Override
-                            public void processElement(ImageAggregatorResult value, Context ctx, Collector<OrderedImageAggregatorResult> out) throws Exception {
-                                final long index = Optional.ofNullable(indexState.value()).orElse(0L);
-                                out.collect(new OrderedImageAggregatorResult(index, value));
-                                indexState.update(index + 1);
-                            }
-                        })
-                        .uid("assignSequentialIndex")
-                        .name("assignSequentialIndex");
-
-                final int parallelism = env.getParallelism();
-                final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
-                        .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
-
-                final SingleOutputStreamOperator<Integer> splitStream = assignSequentialIndex
-                        .rebalance() // ensure that frames are round robin distributed to different subtasks
-                        .process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
-                            @Override
-                            public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
-                                ctx.output(outputTags.get((int) value.index % parallelism), value);
-                            }
-                        })
-                        .uid("splitStream")
-                        .name("splitStream");
-
-                final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
-                        .map(splitStream::getSideOutput).collect(Collectors.toList());
-
-                final List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = IntStream.range(0, parallelism).boxed()
-                        .map(i ->
-                                splits.get(i).map(aggResult ->
-                                        new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc))
-                                )
-                                        .uid("asVideoFrame-" + i)
-                                        .name("asVideoFrame-" + i)
-                        )
-                        .collect(Collectors.toList());
-
-                DataStream<OrderedVideoFrame> reduced = orderedVideoFrames.get(0);
-                for (int operator = 0; operator < parallelism - 1; operator++) {
-                    final KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced
-                            .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                    final KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator + 1)
-                            .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                    reduced = keyed1
-                            .connect(keyed2)
-                            .process(new OrderedVideoFrameCoProcessFunction(operator, parallelism))
-                            .uid("reduce-" + operator)
-                            .name("reduce-" + operator);
-                }
-
-                outVideoFrames = reduced
-                        .map(x -> x.value)
-                        .uid("outVideoFrames")
-                        .name("outVideoFrames");
-            } else {
-                // Build output images and encode as JPEG.
-                // Effective parallelism: default parallelism
-                final DataStream<VideoFrame> videoFrames = aggResults
-                        .rebalance() // ensure that successive frames are round robin distributed to different subtasks
-                        .map(aggResult -> new VideoFrame(aggResult.asVideoFrame(imageWidth, imageHeight, ssrc)))
-                        .uid("asVideoFrame")
-                        .name("asVideoFrame");
-
-                // Ensure ordering.
-                // Effective parallelism: hash of monitor
-                outVideoFrames = videoFrames
-                        .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-                        .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-                        .maxBy("timestamp")
-                        .uid("outVideoFrames")
-                        .name("outVideoFrames");
-            }
+            // Ensure ordering.
+            // Effective parallelism: hash of monitor
+            final DataStream<VideoFrame> outVideoFrames = videoFrames
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .maxBy("timestamp")
+                    .uid("outVideoFrames")
+                    .name("outVideoFrames");
 
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
@@ -388,24 +304,6 @@ public class MultiVideoGridJob extends AbstractJob {
             log.info("asVideoFrame: END: frameNumber={}, TIME={}", frameNumber, System.currentTimeMillis() - t0);
             log.trace("asVideoFrame: videoFrame={}", videoFrame);
             return videoFrame;
-        }
-    }
-
-    public static class OrderedImageAggregatorResult {
-        final public long index;
-        final public ImageAggregatorResult value;
-
-        public OrderedImageAggregatorResult(long index, ImageAggregatorResult value) {
-            this.index = index;
-            this.value = value;
-        }
-
-        @Override
-        public String toString() {
-            return "OrderedImageAggregatorResult{" +
-                    "index=" + index +
-                    ", value=" + value +
-                    '}';
         }
     }
 }
