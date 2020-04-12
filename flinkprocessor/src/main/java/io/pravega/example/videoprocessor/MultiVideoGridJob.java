@@ -17,7 +17,6 @@ import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
-import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -180,48 +179,58 @@ public class MultiVideoGridJob extends AbstractJob {
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> getMonitorFromCamera(value.camera))
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .process(new ProcessWindowFunction<VideoFrame, ImageAggregatorResult, Integer, TimeWindow>() {
-                         @Override
-                         public void process(Integer camera, Context context, Iterable<VideoFrame> elements, Collector<ImageAggregatorResult> out) throws Exception {
-                             final ImageAggregatorResult result = new ImageAggregatorResult();
-                             elements.forEach(element -> {
-                                 result.camera = camera;
-                                 result.timestamp = new Timestamp(max(result.timestamp.getTime(), element.timestamp.getTime()));
-                                 result.videoFrames.put(element.camera, element);
-                             });
-                             out.collect(result);
-                         }
-                     })
-                    .uid("ImageAggregator")
-                    .name("ImageAggregator");
-
-            // Assign sequential index. This will be used as the frame number.
-            // Operator: assignSequentialIndex
-            // Effective parallelism: hash of monitor
-            final DataStream<OrderedImageAggregatorResult> assignSequentialIndex = aggResults
-                    .keyBy((KeySelector<ImageAggregatorResult, Integer>) value -> value.camera)
-                    .process(new KeyedProcessFunction<Integer, ImageAggregatorResult, OrderedImageAggregatorResult>() {
-                        private ValueState<Long> indexState;
+                        private ValueState<Integer> frameNumberState;
 
                         @Override
                         public void open(Configuration parameters) throws Exception {
-                            indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
+                            frameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("frameNumber", Integer.class));
                         }
 
                         @Override
-                        public void processElement(ImageAggregatorResult value, Context ctx, Collector<OrderedImageAggregatorResult> out) throws Exception {
-                            final long index = Optional.ofNullable(indexState.value()).orElse(0L);
-                            out.collect(new OrderedImageAggregatorResult(index, value));
-                            indexState.update(index + 1);
+                        public void process(Integer camera, Context context, Iterable<VideoFrame> elements, Collector<ImageAggregatorResult> out) throws Exception {
+                            final ImageAggregatorResult result = new ImageAggregatorResult();
+                            elements.forEach(element -> {
+                                 result.camera = camera;
+                                 result.timestamp = new Timestamp(max(result.timestamp.getTime(), element.timestamp.getTime()));
+                                 result.videoFrames.put(element.camera, element);
+                            });
+                            result.frameNumber = Optional.ofNullable(frameNumberState.value()).orElse(0) + 1;
+                            frameNumberState.update(result.frameNumber);
+                            out.collect(result);
                         }
                     })
-                    .uid("assignSequentialIndex")
-                    .name("assignSequentialIndex");
+                    .uid("ImageAggregator")
+                    .name("ImageAggregator");
 
             final int ssrc = new Random().nextInt();
 
             final DataStream<VideoFrame> outVideoFrames;
             if (false) {
                 // TODO: REMOVE OBSOLETE SECTION
+
+                // Assign sequential index. This will be used as the frame number.
+                // Operator: assignSequentialIndex
+                // Effective parallelism: hash of monitor
+                final DataStream<OrderedImageAggregatorResult> assignSequentialIndex = aggResults
+                        .keyBy((KeySelector<ImageAggregatorResult, Integer>) value -> value.camera)
+                        .process(new KeyedProcessFunction<Integer, ImageAggregatorResult, OrderedImageAggregatorResult>() {
+                            private ValueState<Long> indexState;
+
+                            @Override
+                            public void open(Configuration parameters) throws Exception {
+                                indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
+                            }
+
+                            @Override
+                            public void processElement(ImageAggregatorResult value, Context ctx, Collector<OrderedImageAggregatorResult> out) throws Exception {
+                                final long index = Optional.ofNullable(indexState.value()).orElse(0L);
+                                out.collect(new OrderedImageAggregatorResult(index, value));
+                                indexState.update(index + 1);
+                            }
+                        })
+                        .uid("assignSequentialIndex")
+                        .name("assignSequentialIndex");
+
                 final int parallelism = env.getParallelism();
                 final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
                         .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
@@ -243,7 +252,7 @@ public class MultiVideoGridJob extends AbstractJob {
                 final List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = IntStream.range(0, parallelism).boxed()
                         .map(i ->
                                 splits.get(i).map(aggResult ->
-                                        new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index))
+                                        new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc))
                                 )
                                         .uid("asVideoFrame-" + i)
                                         .name("asVideoFrame-" + i)
@@ -270,9 +279,9 @@ public class MultiVideoGridJob extends AbstractJob {
             } else {
                 // Build output images and encode as JPEG.
                 // Effective parallelism: default parallelism
-                final DataStream<VideoFrame> videoFrames = assignSequentialIndex
+                final DataStream<VideoFrame> videoFrames = aggResults
                         .rebalance() // ensure that successive frames are round robin distributed to different subtasks
-                        .map(aggResult -> new VideoFrame(aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index)))
+                        .map(aggResult -> new VideoFrame(aggResult.asVideoFrame(imageWidth, imageHeight, ssrc)))
                         .uid("asVideoFrame")
                         .name("asVideoFrame");
 
@@ -316,6 +325,7 @@ public class MultiVideoGridJob extends AbstractJob {
         }
     }
 
+    // TODO: Make this configurable.
     static int camerasPerMonitor = 2;
 
     static int getMonitorFromCamera(final int camera) {
@@ -332,6 +342,7 @@ public class MultiVideoGridJob extends AbstractJob {
         public Map<Integer, VideoFrame> videoFrames = new HashMap<>();
         // Maximum timestamp from cameras.
         public Timestamp timestamp = new Timestamp(0);
+        public int frameNumber;
 
         public ImageAggregatorAccum() {
         }
@@ -341,6 +352,7 @@ public class MultiVideoGridJob extends AbstractJob {
             return "ImageAggregatorAccum{" +
                     "camera=" + camera +
                     ",timestamp=" + timestamp +
+                    ",frameNumber=" + frameNumber +
                     '}';
         }
     }
@@ -349,7 +361,7 @@ public class MultiVideoGridJob extends AbstractJob {
         public ImageAggregatorResult() {
         }
 
-        public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int ssrc, int frameNumber) {
+        public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int ssrc) {
             log.info("asVideoFrame: BEGIN: frameNumber={}", frameNumber);
             final ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, videoFrames.size());
             videoFrames.forEach((camera, frame) -> builder.addImage(getPositionInMonitorFromCamera(camera), frame.data));
