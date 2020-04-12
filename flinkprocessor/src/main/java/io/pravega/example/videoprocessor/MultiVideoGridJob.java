@@ -96,7 +96,7 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Read chunked video frames from Pravega.
             // Operator: input-source
-            // parallelism: min of # of segments, getReaderParallelism()
+            // Effective parallelism: min of # of segments, getReaderParallelism()
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
@@ -111,7 +111,7 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
             // Operator: assignTimestampsAndWatermarks
-            // parallelism: min of # of segments, getReaderParallelism()
+            // Effective parallelism: min of # of segments, getReaderParallelism()
             final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
                         new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
@@ -127,7 +127,7 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Unchunk (disabled).
             // Operator: ChunkedVideoFrameReassembler
-            // parallelism: min of # of segments, getReaderParallelism()
+            // Effective parallelism: default parallelism (implicit rebalance before operator)
             final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .map(VideoFrame::new)
                     .uid("ChunkedVideoFrameReassembler")
@@ -135,13 +135,13 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // For each camera and window, get the most recent frame.
             // Operator: lastVideoFramePerCamera
-            // input parallelism: min of # of segments, getReaderParallelism()
-            // output parallelism: # of cameras
+            // Effective parallelism: hash of camera
             final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             final int imageWidth = getConfig().getImageWidth();
             final int imageHeight = getConfig().getImageHeight();
             final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    // TODO: Use a sliding window.
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .maxBy("timestamp")
                     .uid("lastVideoFramePerCamera")
@@ -150,18 +150,19 @@ public class MultiVideoGridJob extends AbstractJob {
             // Rebalance (round-robin) to all task slots.
             // input parallelism:  # of cameras
             // output parallelism: default parallelism
-            final DataStream<VideoFrame> rebalancedVideoFrames;
-            if (getConfig().isEnableRebalance()) {
-                rebalancedVideoFrames = lastVideoFramePerCamera.rebalance();
-            } else {
-                rebalancedVideoFrames = lastVideoFramePerCamera;
-            }
+//            final DataStream<VideoFrame> rebalancedVideoFrames;
+//            if (getConfig().isEnableRebalance()) {
+//                rebalancedVideoFrames = lastVideoFramePerCamera.rebalance();
+//            } else {
+//                rebalancedVideoFrames = lastVideoFramePerCamera;
+//            }
 
             // Resize all input images.
             // Operator: ImageResizer
-            // parallelism: default parallelism
+            // Effective parallelism: default parallelism
             lastVideoFramePerCamera.printToErr();
-            final DataStream<VideoFrame> resizedVideoFrames = rebalancedVideoFrames
+            final DataStream<VideoFrame> resizedVideoFrames = lastVideoFramePerCamera
+                    .rebalance()
                     .map(frame -> {
                         ImageResizer resizer = new ImageResizer(imageWidth, imageHeight);
                         frame.data = resizer.resize(frame.data);
@@ -174,8 +175,7 @@ public class MultiVideoGridJob extends AbstractJob {
 
             // Aggregate resized images. This only adds images to a hash map. The actual work is done later to increase parallelism.
             // Operator: ImageAggregator
-            // input parallelism: # of cameras
-            // output parallelism: # of monitors
+            // Effective parallelism: hash of monitor
             final DataStream<ImageAggregatorResult> aggResults = resizedVideoFrames
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> getMonitorFromCamera(value.camera))
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
@@ -194,9 +194,9 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
 
-            // Assign sequential index.
+            // Assign sequential index. This will be used as the frame number.
             // Operator: assignSequentialIndex
-            // parallelism: # of monitors
+            // Effective parallelism: hash of monitor
             final DataStream<OrderedImageAggregatorResult> assignSequentialIndex = aggResults
                     .keyBy((KeySelector<ImageAggregatorResult, Integer>) value -> value.camera)
                     .process(new KeyedProcessFunction<Integer, ImageAggregatorResult, OrderedImageAggregatorResult>() {
@@ -217,65 +217,86 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("assignSequentialIndex")
                     .name("assignSequentialIndex");
 
-            final int parallelism = env.getParallelism();
-            final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
-                    .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
-
-            final SingleOutputStreamOperator<Integer> splitStream = assignSequentialIndex
-                    .rebalance() // ensure that frames are round robin distributed to different tasks
-                    .process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
-                        @Override
-                        public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
-                            ctx.output(outputTags.get((int) value.index % parallelism), value);
-                        }
-                    })
-                    .uid("splitStream")
-                    .name("splitStream");
-
-            final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
-                    .map(splitStream::getSideOutput).collect(Collectors.toList());
-
             final int ssrc = new Random().nextInt();
-            final List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = IntStream.range(0, parallelism).boxed()
-                    .map(i ->
-                        splits.get(i).map(aggResult ->
-                                new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index))
+
+            final DataStream<VideoFrame> outVideoFrames;
+            if (false) {
+                // TODO: REMOVE OBSOLETE SECTION
+                final int parallelism = env.getParallelism();
+                final List<OutputTag<OrderedImageAggregatorResult>> outputTags = IntStream.range(0, parallelism).boxed()
+                        .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
+
+                final SingleOutputStreamOperator<Integer> splitStream = assignSequentialIndex
+                        .rebalance() // ensure that frames are round robin distributed to different subtasks
+                        .process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
+                            @Override
+                            public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
+                                ctx.output(outputTags.get((int) value.index % parallelism), value);
+                            }
+                        })
+                        .uid("splitStream")
+                        .name("splitStream");
+
+                final List<DataStream<OrderedImageAggregatorResult>> splits = outputTags.stream()
+                        .map(splitStream::getSideOutput).collect(Collectors.toList());
+
+                final List<SingleOutputStreamOperator<OrderedVideoFrame>> orderedVideoFrames = IntStream.range(0, parallelism).boxed()
+                        .map(i ->
+                                splits.get(i).map(aggResult ->
+                                        new OrderedVideoFrame(aggResult.index, aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index))
+                                )
+                                        .uid("asVideoFrame-" + i)
+                                        .name("asVideoFrame-" + i)
                         )
-                        .uid("asVideoFrame-" + i)
-                        .name("asVideoFrame-" + i)
-                    )
-                    .collect(Collectors.toList());
+                        .collect(Collectors.toList());
 
-            DataStream<OrderedVideoFrame> reduced = orderedVideoFrames.get(0);
-            for (int operator = 0 ; operator < parallelism - 1 ; operator++) {
-                final KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced
-                        .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                final KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator+1)
-                        .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
-                reduced = keyed1
-                        .connect(keyed2)
-                        .process(new OrderedVideoFrameCoProcessFunction(operator, parallelism))
-                        .uid("reduce-" + operator)
-                        .name("reduce-" + operator);
+                DataStream<OrderedVideoFrame> reduced = orderedVideoFrames.get(0);
+                for (int operator = 0; operator < parallelism - 1; operator++) {
+                    final KeyedStream<OrderedVideoFrame, Integer> keyed1 = reduced
+                            .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                    final KeyedStream<OrderedVideoFrame, Integer> keyed2 = orderedVideoFrames.get(operator + 1)
+                            .keyBy((KeySelector<OrderedVideoFrame, Integer>) value -> value.value.camera);
+                    reduced = keyed1
+                            .connect(keyed2)
+                            .process(new OrderedVideoFrameCoProcessFunction(operator, parallelism))
+                            .uid("reduce-" + operator)
+                            .name("reduce-" + operator);
+                }
+
+                outVideoFrames = reduced
+                        .map(x -> x.value)
+                        .uid("outVideoFrames")
+                        .name("outVideoFrames");
+            } else {
+                // Build output images and encode as JPEG.
+                // Effective parallelism: default parallelism
+                final DataStream<VideoFrame> videoFrames = assignSequentialIndex
+                        .rebalance() // ensure that successive frames are round robin distributed to different subtasks
+                        .map(aggResult -> new VideoFrame(aggResult.value.asVideoFrame(imageWidth, imageHeight, ssrc, (int) aggResult.index)))
+                        .uid("asVideoFrame")
+                        .name("asVideoFrame");
+
+                // Ensure ordering.
+                // Effective parallelism: hash of monitor
+                outVideoFrames = videoFrames
+                        .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                        .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                        .maxBy("timestamp")
+                        .uid("outVideoFrames")
+                        .name("outVideoFrames");
             }
-
-//            reduced.printToErr();
-
-            final DataStream<VideoFrame> outVideoFrames = reduced
-                    .map(x -> x.value)
-                    .uid("outVideoFrames")
-                    .name("outVideoFrames");
 
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
             // Split output video frames into chunks of 8 MiB or less.
+            // Effective parallelism: hash of monitor
             final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
-//            outChunkedVideoFrames.printToErr().setParallelism(1).uid("outChunkedVideoFrames-print").name("outChunkedVideoFrames-print");
 
             // Write chunks to Pravega encoded as JSON.
+            // Effective parallelism: hash of monitor
             final FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
@@ -315,12 +336,6 @@ public class MultiVideoGridJob extends AbstractJob {
         public ImageAggregatorAccum() {
         }
 
-//        public ImageAggregatorAccum(ImageAggregatorAccum accum) {
-//            this.camera = accum.camera;
-//            this.videoFrames = accum.videoFrames;
-//            this.timestamp = accum.timestamp;
-//        }
-
         @Override
         public String toString() {
             return "ImageAggregatorAccum{" +
@@ -334,10 +349,6 @@ public class MultiVideoGridJob extends AbstractJob {
         public ImageAggregatorResult() {
         }
 
-//        public ImageAggregatorResult(ImageAggregatorAccum accum) {
-//            super(accum);
-//        }
-//
         public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int ssrc, int frameNumber) {
             log.info("asVideoFrame: BEGIN: frameNumber={}", frameNumber);
             final ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, videoFrames.size());
