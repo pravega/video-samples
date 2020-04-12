@@ -157,9 +157,9 @@ public class MultiVideoGridJob extends AbstractJob {
                 rebalancedVideoFrames = lastVideoFramePerCamera;
             }
 
-            // Resize all input images. Frames within each input camera will be processed sequentially.
+            // Resize all input images.
             // Operator: ImageResizer
-            // parallelism: # of cameras
+            // parallelism: default parallelism
             lastVideoFramePerCamera.printToErr();
             final DataStream<VideoFrame> resizedVideoFrames = rebalancedVideoFrames
                     .map(frame -> {
@@ -222,6 +222,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .map(i -> new OutputTag<>(i.toString(), TypeInformation.of(OrderedImageAggregatorResult.class))).collect(Collectors.toList());
 
             final SingleOutputStreamOperator<Integer> splitStream = assignSequentialIndex
+                    .rebalance() // ensure that frames are round robin distributed to different tasks
                     .process(new ProcessFunction<OrderedImageAggregatorResult, Integer>() {
                         @Override
                         public void processElement(OrderedImageAggregatorResult value, Context ctx, Collector<Integer> out) throws Exception {
