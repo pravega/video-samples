@@ -51,6 +51,7 @@ public class ImageResizer {
 
     public void resize(InputStream inStream, OutputStream outStream) {
         try {
+            log.info("resize: BEGIN");
             final long t0 = System.currentTimeMillis();
             BufferedImage inImage = ImageIO.read(inStream);
             Image scaledImage = inImage.getScaledInstance(outputWidth, outputHeight, Image.SCALE_SMOOTH);
@@ -60,7 +61,7 @@ public class ImageResizer {
             g2d.dispose();
             ImageIO.write(outImage, "png", outStream);
 //            Thread.sleep(random.nextInt(1000));
-            log.info("resize: TIME={}", System.currentTimeMillis() - t0);
+            log.info("resize: END: TIME={}", System.currentTimeMillis() - t0);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
