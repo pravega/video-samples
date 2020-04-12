@@ -498,7 +498,7 @@ class VideoPlayer():
 
         self.filtered_index_df = None
         self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer', 'ssrc', 'frameNumber',
-                                    'chunkIndex', 'finalChunkIndex', 'tags', 'hash', 'recognitions', 'data']
+                                    'chunkIndex', 'finalChunkIndex', 'hash', 'recognitions', 'data']
         self.playing_flag = False
         self.stop_flag = False
         self.video_frames = None

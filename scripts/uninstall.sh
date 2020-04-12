@@ -1,15 +1,15 @@
 #! /bin/bash
-set -x
+set -ex
 
 ROOT_DIR=$(dirname $0)/..
 NAMESPACE=${NAMESPACE:-examples}
 
 helm  del \
 videoprocessor \
---namespace ${NAMESPACE}
+--namespace ${NAMESPACE} || true
 
-kubectl wait --for=delete --timeout=300s FlinkCluster/flink-object-detector -n ${NAMESPACE}
-kubectl wait --for=delete --timeout=300s FlinkCluster/video-data-generator -n ${NAMESPACE}
-kubectl wait --for=delete --timeout=300s FlinkCluster/multi-video-grid -n ${NAMESPACE}
-kubectl wait --for=delete --timeout=300s FlinkCluster/video-reader -n ${NAMESPACE}
-kubectl wait --for=delete --timeout=300s FlinkCluster/memory-eater -n ${NAMESPACE}
+kubectl wait --for=delete --timeout=300s FlinkCluster/flink-object-detector -n ${NAMESPACE} || true
+kubectl wait --for=delete --timeout=300s FlinkCluster/video-data-generator -n ${NAMESPACE} || true
+kubectl wait --for=delete --timeout=300s FlinkCluster/multi-video-grid -n ${NAMESPACE} || true
+kubectl wait --for=delete --timeout=300s FlinkCluster/video-reader -n ${NAMESPACE} || true
+kubectl wait --for=delete --timeout=300s FlinkCluster/memory-eater -n ${NAMESPACE} || true

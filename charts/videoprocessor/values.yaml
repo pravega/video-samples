@@ -30,24 +30,24 @@ MultiVideoGridJob:
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 10.0
+  framesPerSec: 1.0
   imageHeight: 720
-  imageWidth: 1365
+  imageWidth: 1280
   input:
     minNumSegments: 1
-    stream: safety-and-security-1
+    stream: examples/multi-video-grid-input
   output:
     minNumSegments: 1
-    stream: safety-and-security-grid-1
+    stream: examples/multi-video-grid-output
   maxOutOfOrdernessMs: 10
-  parallelism: 4    # Should match number of cameras
+  parallelism: 8    # Should match number of cameras
   readerParallelism: 1
   rebalance: "true"
   startAtTail: "true"
   taskManager:
     cpu: 5000m      # Should equal 1000m * (number of cameras + 1)
     memory: 8G
-    replicas: 1
+    replicas: 2
     taskSlots: 4    # Should match parallelism
 
 VideoDataGeneratorJob:
