@@ -497,7 +497,7 @@ class VideoPlayer():
         self.index_limit = index_limit
 
         self.filtered_index_df = None
-        self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer', 'ssrc', 'frameNumber',
+        self.fields_exclude_cols = ['image_array', 'timestamp', 'to_stream_cut', 'from_stream_cut', 'event_pointer',
                                     'chunkIndex', 'finalChunkIndex', 'hash', 'recognitions', 'data']
         self.playing_flag = False
         self.stop_flag = False
@@ -687,10 +687,11 @@ class VideoPlayer():
 
 
 class ImageFileSequenceLoader():
-    def __init__(self, scope, stream, camera_filespecs, fps=1.0, step=1):
+    def __init__(self, scope, stream, camera_filespecs, fps=1.0, step=1, first_camera=0):
         self.scope = scope
         self.stream = stream
         self.fps = fps
+        self.first_camera = first_camera
         self.camera_files = [sorted(glob.glob(f))[0::step] for f in camera_filespecs]
         no_matches = [s for s,f in zip(camera_filespecs, self.camera_files) if len(f) == 0]
         if no_matches:
@@ -714,7 +715,7 @@ class ImageFileSequenceLoader():
                 with open(filename, 'rb') as f:
                     file_bytes = f.read()
                 event_dict = dict(
-                    camera=camera,
+                    camera=camera + self.first_camera,
                     data=base64.b64encode(file_bytes).decode(encoding='UTF-8'),
                     frameNumber=frame_number,
                     ssrc=ssrc + camera,
