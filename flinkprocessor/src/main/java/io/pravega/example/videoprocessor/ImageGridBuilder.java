@@ -30,7 +30,8 @@ import java.util.Map;
 public class ImageGridBuilder {
     private final int imageWidth;
     private final int imageHeight;
-    private final int gridCount;
+    private final int numColumns;
+    private final int numRows;
     private final int margin;
     private final int statusWidth;
     private final BufferedImage outImage;
@@ -39,16 +40,18 @@ public class ImageGridBuilder {
      *
      * @param imageWidth    Width of each input image.
      * @param imageHeight   Height of each input image.
-     * @param numImages     Number of images.
+     * @param numColumns    Number of columns.
+     * @param numRows       Number of rows.
      */
-    public ImageGridBuilder(int imageWidth, int imageHeight, int numImages) {
+    public ImageGridBuilder(int imageWidth, int imageHeight, int numColumns, int numRows) {
         this.imageWidth = imageWidth;
         this.imageHeight = imageHeight;
-        gridCount = (int) Math.ceil(Math.sqrt(numImages));
+        this.numColumns = numColumns;
+        this.numRows = numRows;
         margin = 1;
         statusWidth = 0;
-        int outputWidth = (imageWidth + margin) * gridCount - margin + statusWidth;
-        int outputHeight = (imageHeight + margin) * gridCount - margin;
+        int outputWidth = (imageWidth + margin) * this.numColumns - margin + statusWidth;
+        int outputHeight = (imageHeight + margin) * this.numRows - margin;
         outImage = new BufferedImage(outputWidth, outputHeight, BufferedImage.TYPE_INT_RGB);
     }
 
@@ -61,8 +64,8 @@ public class ImageGridBuilder {
         try {
             ByteArrayInputStream inStream = new ByteArrayInputStream(image);
             BufferedImage inImage = ImageIO.read(inStream);
-            int x = (position % gridCount) * (imageWidth + margin);
-            int y = (position / gridCount) * (imageHeight + margin);
+            int x = (position % numColumns) * (imageWidth + margin);
+            int y = (position / numColumns) * (imageHeight + margin);
             outImage.getRaster().setRect(x, y, inImage.getData());
         } catch (IOException e) {
             throw new RuntimeException(e);

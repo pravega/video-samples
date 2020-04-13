@@ -19,41 +19,32 @@ import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.KeyedStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Timestamp;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static java.lang.Math.max;
 
 /**
  * A Flink job that reads images from multiple cameras stored in a Pravega stream, combines them
- * into a square grid of images (like a security camera monitor), and writes the resulting
+ * into a NxM grid of images (like a security camera monitor), and writes the resulting
  * images to another Pravega stream.
- * Images are chunked into 512 KB chunks to allow for very large images.
  */
 public class MultiVideoGridJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(MultiVideoGridJob.class);
@@ -81,7 +72,15 @@ public class MultiVideoGridJob extends AbstractJob {
 
     public void run() {
         try {
+            final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
+            final int numColumns = getConfig().getParams().getInt("numColumns", 2);
+            final int numRows = getConfig().getParams().getInt("numRows", 2);
+            final int camerasPerMonitor = getConfig().getParams().getInt("camerasPerMonitor", numColumns * numRows);
+            final int imageWidth = getConfig().getImageWidth() / numColumns;
+            final int imageHeight = getConfig().getImageHeight() / numRows;
+            final int ssrc = new Random().nextInt();
             final String jobName = MultiVideoGridJob.class.getName();
+
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
@@ -135,9 +134,6 @@ public class MultiVideoGridJob extends AbstractJob {
             // For each camera and window, get the most recent frame.
             // Operator: lastVideoFramePerCamera
             // Effective parallelism: hash of camera
-            final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
-            final int imageWidth = getConfig().getImageWidth();
-            final int imageHeight = getConfig().getImageHeight();
             final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
                     // TODO: Use a sliding window.
@@ -166,7 +162,7 @@ public class MultiVideoGridJob extends AbstractJob {
             // Operator: ImageAggregator
             // Effective parallelism: hash of monitor
             final DataStream<ImageAggregatorResult> aggResults = resizedVideoFrames
-                    .keyBy((KeySelector<VideoFrame, Integer>) value -> getMonitorFromCamera(value.camera))
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> getMonitorFromCamera(value.camera, camerasPerMonitor))
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .process(new ProcessWindowFunction<VideoFrame, ImageAggregatorResult, Integer, TimeWindow>() {
                         private ValueState<Integer> frameNumberState;
@@ -177,14 +173,20 @@ public class MultiVideoGridJob extends AbstractJob {
                         }
 
                         @Override
-                        public void process(Integer camera, Context context, Iterable<VideoFrame> elements, Collector<ImageAggregatorResult> out) throws Exception {
+                        public void process(Integer monitor, Context context, Iterable<VideoFrame> elements, Collector<ImageAggregatorResult> out) throws Exception {
                             final ImageAggregatorResult result = new ImageAggregatorResult();
-                            elements.forEach(element -> {
-                                 result.camera = camera;
-                                 result.timestamp = new Timestamp(max(result.timestamp.getTime(), element.timestamp.getTime()));
-                                 result.videoFrames.put(element.camera, element);
-                            });
+                            result.monitor = monitor;
+                            result.ssrc = ssrc + monitor;
                             result.frameNumber = Optional.ofNullable(frameNumberState.value()).orElse(0) + 1;
+                            result.imageWidth = imageWidth;
+                            result.imageHeight = imageHeight;
+                            result.numColumns = numColumns;
+                            result.numRows = numRows;
+                            elements.forEach(element -> {
+                                 result.timestamp = new Timestamp(max(result.timestamp.getTime(), element.timestamp.getTime()));
+                                 final int position = getPositionInMonitorFromCamera(element.camera, camerasPerMonitor);
+                                 result.videoFrames.put(position, element);
+                            });
                             frameNumberState.update(result.frameNumber);
                             out.collect(result);
                         }
@@ -192,15 +194,14 @@ public class MultiVideoGridJob extends AbstractJob {
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
 
-            final int ssrc = new Random().nextInt();
 
             // Build output images and encode as JPEG.
             // Effective parallelism: default parallelism
             final DataStream<VideoFrame> videoFrames = aggResults
                     .rebalance() // ensure that successive frames are round robin distributed to different subtasks
-                    .map(aggResult -> new VideoFrame(aggResult.asVideoFrame(imageWidth, imageHeight, ssrc)))
-                    .uid("asVideoFrame")
-                    .name("asVideoFrame");
+                    .map(aggResult -> new VideoFrame(aggResult.encodeVideoFrame()))
+                    .uid("encodeVideoFrame")
+                    .name("encodeVideoFrame");
 
             // Ensure ordering.
             // Effective parallelism: hash of monitor
@@ -210,7 +211,6 @@ public class MultiVideoGridJob extends AbstractJob {
                     .maxBy("timestamp")
                     .uid("outVideoFrames")
                     .name("outVideoFrames");
-
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
             // Split output video frames into chunks of 8 MiB or less.
@@ -241,68 +241,67 @@ public class MultiVideoGridJob extends AbstractJob {
         }
     }
 
-    // TODO: Make this configurable.
-    static int camerasPerMonitor = 2;
-
-    static int getMonitorFromCamera(final int camera) {
+    private static int getMonitorFromCamera(final int camera, final int camerasPerMonitor) {
         return camera / camerasPerMonitor;
     }
 
-    static int getPositionInMonitorFromCamera(final int camera) {
+    private static int getPositionInMonitorFromCamera(final int camera, final int camerasPerMonitor) {
         return camera % camerasPerMonitor;
     }
 
-    public static class ImageAggregatorAccum {
-        public int camera;
-        // Map from camera to last VideoFrame.
+    public static class ImageAggregatorResult {
+        // ID for this monitor
+        public int monitor;
+        public int ssrc;
+        // Map from position to VideoFrame.
         public Map<Integer, VideoFrame> videoFrames = new HashMap<>();
         // Maximum timestamp from cameras.
         public Timestamp timestamp = new Timestamp(0);
         public int frameNumber;
+        // Width of each input image
+        public int imageWidth;
+        // Height of each input image
+        public int imageHeight;
+        // Number of columns in grid
+        public int numColumns;
+        // Number of rows in grid
+        public int numRows;
 
-        public ImageAggregatorAccum() {
+        public ImageAggregatorResult() {
         }
 
         @Override
         public String toString() {
-            return "ImageAggregatorAccum{" +
-                    "camera=" + camera +
-                    ",timestamp=" + timestamp +
-                    ",frameNumber=" + frameNumber +
+            return "ImageAggregatorResult{" +
+                    "monitor=" + monitor +
+                    ", ssrc=" + ssrc +
+                    ", videoFrames=" + videoFrames +
+                    ", timestamp=" + timestamp +
+                    ", frameNumber=" + frameNumber +
+                    ", imageWidth=" + imageWidth +
+                    ", imageHeight=" + imageHeight +
+                    ", numColumns=" + numColumns +
+                    ", numRows=" + numRows +
                     '}';
         }
-    }
 
-    public static class ImageAggregatorResult extends ImageAggregatorAccum {
-        public ImageAggregatorResult() {
-        }
-
-        public VideoFrame asVideoFrame(int imageWidth, int imageHeight, int ssrc) {
-            log.info("asVideoFrame: BEGIN: frameNumber={}", frameNumber);
-            final ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, videoFrames.size());
-            videoFrames.forEach((camera, frame) -> builder.addImage(getPositionInMonitorFromCamera(camera), frame.data));
+        public VideoFrame encodeVideoFrame() {
+            log.info("encodeVideoFrame: BEGIN: frameNumber={}", frameNumber);
+            final ImageGridBuilder builder = new ImageGridBuilder(imageWidth, imageHeight, numColumns, numRows);
+            videoFrames.forEach((position, frame) -> builder.addImage(position, frame.data));
             final long t0 = System.currentTimeMillis();
             VideoFrame videoFrame = new VideoFrame();
-            videoFrame.camera = camera;
-            videoFrame.ssrc = ssrc + camera;
+            videoFrame.camera = monitor;
+            videoFrame.ssrc = ssrc;
             videoFrame.timestamp = timestamp;
             videoFrame.frameNumber = frameNumber;
             videoFrame.data = builder.getOutputImageBytes("jpg");
             videoFrame.hash = videoFrame.calculateHash();
             videoFrame.tags = new HashMap<>();
+            videoFrame.tags.put("cameras", videoFrames.values().stream().map(f -> f.camera).collect(Collectors.toList()).toString());
             videoFrame.tags.put("numCameras", Integer.toString(videoFrames.size()));
-            videoFrame.tags.put("cameras", videoFrames.keySet().toString());
-
-//            long sleepTime = new Random().nextInt(1000);
-//            // long sleepTime = (frameNumber % 2 == 0)
-//            try {
-//                Thread.sleep(sleepTime);
-//            } catch (InterruptedException e) {
-//                throw new RuntimeException(e);
-//            }
-
-            log.info("asVideoFrame: END: frameNumber={}, TIME={}", frameNumber, System.currentTimeMillis() - t0);
-            log.trace("asVideoFrame: videoFrame={}", videoFrame);
+            log.info("encodeVideoFrame: END: frameNumber={}, TIME={}", frameNumber, System.currentTimeMillis() - t0);
+            log.trace("encodeVideoFrame: videoFrame={}", videoFrame);
             return videoFrame;
         }
     }

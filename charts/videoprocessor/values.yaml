@@ -30,9 +30,13 @@ MultiVideoGridJob:
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 6.0
+  framesPerSec: 10.0
+  # Width and height of monitor (output) images
+  imageWidth: 1270
   imageHeight: 720
-  imageWidth: 1280
+  # Columns and rows
+  numColumns: 4
+  numRows: 2
   input:
     minNumSegments: 1
     stream: examples/multi-video-grid-input
@@ -40,15 +44,14 @@ MultiVideoGridJob:
     minNumSegments: 1
     stream: examples/multi-video-grid-output
   maxOutOfOrdernessMs: 10
-  parallelism: 16
+  parallelism: 10
   readerParallelism: 1
-  rebalance: "true"
   startAtTail: "true"
   taskManager:
-    cpu: 5000m
+    cpu: 10000m
     memory: 8G
-    replicas: 4
-    taskSlots: 4
+    replicas: 1
+    taskSlots: 10
 
 VideoDataGeneratorJob:
   enabled: false
