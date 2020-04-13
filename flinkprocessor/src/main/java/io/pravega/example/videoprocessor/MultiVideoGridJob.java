@@ -25,6 +25,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -78,6 +79,7 @@ public class MultiVideoGridJob extends AbstractJob {
             final int camerasPerMonitor = getConfig().getParams().getInt("camerasPerMonitor", numColumns * numRows);
             final int imageWidth = getConfig().getImageWidth() / numColumns;
             final int imageHeight = getConfig().getImageHeight() / numRows;
+            final long slidingWindowSizeMs = getConfig().getParams().getLong("slidingWindowSizeMs", 10000);
             final int ssrc = new Random().nextInt();
             final String jobName = MultiVideoGridJob.class.getName();
 
@@ -105,7 +107,7 @@ public class MultiVideoGridJob extends AbstractJob {
                     .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
                     .name("input-source");
-            inChunkedVideoFrames.printToErr();
+            inChunkedVideoFrames.printToErr().uid("input-source-print").name("input-source-print");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
             // Operator: assignTimestampsAndWatermarks
@@ -121,7 +123,6 @@ public class MultiVideoGridJob extends AbstractJob {
                         })
                     .uid("assignTimestampsAndWatermarks")
                     .name("assignTimestampsAndWatermarks");
-//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Unchunk (disabled).
             // Operator: ChunkedVideoFrameReassembler
@@ -132,11 +133,11 @@ public class MultiVideoGridJob extends AbstractJob {
                     .name("ChunkedVideoFrameReassembler");
 
             // For each camera and window, get the most recent frame.
+            // This will emit at a maximum rate of the framesPerSec parameter.
             // Operator: lastVideoFramePerCamera
             // Effective parallelism: hash of camera
             final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-                    // TODO: Use a sliding window.
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .maxBy("timestamp")
                     .uid("lastVideoFramePerCamera")
@@ -164,6 +165,8 @@ public class MultiVideoGridJob extends AbstractJob {
             final DataStream<ImageAggregatorResult> aggResults = resizedVideoFrames
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> getMonitorFromCamera(value.camera, camerasPerMonitor))
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    // TODO: SlidingEventTimeWindows below does not correctly. It stops emitting records after several seconds.
+//                    .window(SlidingEventTimeWindows.of(Time.milliseconds(slidingWindowSizeMs), Time.milliseconds(periodMs)))
                     .process(new ProcessWindowFunction<VideoFrame, ImageAggregatorResult, Integer, TimeWindow>() {
                         private ValueState<Integer> frameNumberState;
 
@@ -193,7 +196,6 @@ public class MultiVideoGridJob extends AbstractJob {
                     })
                     .uid("ImageAggregator")
                     .name("ImageAggregator");
-
 
             // Build output images and encode as JPEG.
             // Effective parallelism: default parallelism
