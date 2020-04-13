@@ -60,6 +60,10 @@ spec:
       value: {{ .Values.MultiVideoGridJob.imageHeight | quote }}
     - name: imageWidth
       value: {{ .Values.MultiVideoGridJob.imageWidth | quote }}
+    - name: numColumns
+      value: {{ .Values.MultiVideoGridJob.numColumns | quote }}
+    - name: numRows
+      value: {{ .Values.MultiVideoGridJob.numRows | quote }}
     - name: input-minNumSegments
       value: {{ .Values.MultiVideoGridJob.input.minNumSegments | quote }}
     - name: input-stream
@@ -72,8 +76,6 @@ spec:
       value: {{ .Values.MultiVideoGridJob.output.stream | quote }}
     - name: readerParallelism
       value: {{ .Values.MultiVideoGridJob.readerParallelism | quote }}
-    - name: rebalance
-      value: {{ .Values.FlinkObjectDetectorJob.rebalance | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: startAtTail
