@@ -1,3 +1,4 @@
+// This class was made to test out facial detection. This will be removed in final version.
 package io.pravega.example.camerarecorder;
 
 import io.pravega.example.tensorflow.BoundingBox;

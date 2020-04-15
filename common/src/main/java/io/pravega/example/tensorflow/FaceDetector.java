@@ -29,7 +29,7 @@ import static org.bytedeco.opencv.global.opencv_imgproc.*;
 import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 /**
- * ObjectDetector class to detect objects using pre-trained models with TensorFlow Java API.
+ * ObjectDetector class to detect faces using pre-trained models with TensorFlow Java API.
  */
 public class FaceDetector implements Serializable {
     private static FaceDetector single_instance;
@@ -53,7 +53,7 @@ public class FaceDetector implements Serializable {
      * @param videoFrame the video frame which is being processed
      * @return output video frame with faces detected
      */
-    public VideoFrame detectFaces(VideoFrame videoFrame) throws IOException {
+    public VideoFrame detectFaces(VideoFrame videoFrame) {
         Mat imageMat = imdecode(new Mat(videoFrame.data), IMREAD_UNCHANGED);
         CvArr inputImage = new IplImage(imageMat);
 

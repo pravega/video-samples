@@ -1,9 +1,29 @@
 mavenCoordinate:
-  group: io.pravega.example.video
+  group: io.pravega.examples.video
   artifact: flinkprocessor
   version: 0.1.0
 
 FlinkObjectDetectorJob:
+  enabled: false
+  parallelism: 1
+  enableOperatorChaining: "true"
+  input:
+    stream: object-detector-input-video
+    minNumSegments: 1
+  output:
+    stream: object-detector-output-video
+    minNumSegments: 1
+  startAtTail: "false"
+  maxOutOfOrdernessMs: 1000
+  taskManager:
+    replicas: 1
+    memory: 2G
+    cpu: 500m
+    heap: 600m
+    taskSlots: 2
+
+
+FlinkFaceRecognizerJob:
   enabled: true
   parallelism: 1
   enableOperatorChaining: "true"
@@ -23,7 +43,7 @@ FlinkObjectDetectorJob:
     taskSlots: 2
 
 VideoDataGeneratorJob:
-  enabled: true
+  enabled: false
   parallelism: 1
   enableOperatorChaining: "true"
   output:

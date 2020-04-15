@@ -1,0 +1,71 @@
+{{- if .Values.FlinkFaceRecognizerJob.enabled }}
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkCluster
+metadata:
+  name: flink-face-recognizer
+  labels:
+    name: flink-face-recognizer
+spec:
+  imageRef:
+    name: cuda10.0flink1.9.1
+  zookeeperUrl: zookeeper-client:2181
+  storage:
+    volumeSource:
+      persistentVolumeClaim:
+        claimName: data-project
+  localStorage:
+    replicas: 2
+    volumeClaimTemplate:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 10G
+
+  jobManager:
+    replicas: 1
+    memory: 1024M
+    heap: 200m
+    cpu: 450m
+
+  taskManager:
+    replicas: {{ .Values.FlinkFaceRecognizerJob.taskManager.replicas }}
+    memory: {{ .Values.FlinkFaceRecognizerJob.taskManager.memory }}
+    cpu: {{ .Values.FlinkFaceRecognizerJob.taskManager.cpu }}
+    heap: {{ .Values.FlinkFaceRecognizerJob.taskManager.heap }}
+    numberOfTaskSlots: {{ .Values.FlinkFaceRecognizerJob.taskManager.taskSlots }}
+---
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  name: flink-face-recognizer
+  labels:
+    app: videoprocessor
+    component: FlinkFaceRecognizerJob
+    release: {{ $.Release.Name }}
+spec:
+  flinkVersion: 1.9.1
+  clusterSelector:
+    name: flink-face-recognizer
+  mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  mainClass: io.pravega.example.videoprocessor.FlinkFaceRecognizerJob
+  parallelism: {{ .Values.FlinkFaceRecognizerJob.parallelism }}
+  state: started
+  parameters:
+    - name: enableOperatorChaining
+      value: {{ .Values.FlinkFaceRecognizerJob.enableOperatorChaining | quote }}
+    - name: scope
+      value: {{ $.Release.Namespace | quote }}
+    - name: input-stream
+      value: {{ .Values.FlinkFaceRecognizerJob.input.stream | quote }}
+    - name: input-minNumSegments
+      value: {{ .Values.FlinkFaceRecognizerJob.input.minNumSegments | quote }}
+    - name: output-stream
+      value: {{ .Values.FlinkFaceRecognizerJob.output.stream | quote }}
+    - name: output-minNumSegments
+      value: {{ .Values.FlinkFaceRecognizerJob.output.minNumSegments | quote }}
+    - name: startAtTail
+      value: {{ .Values.FlinkFaceRecognizerJob.startAtTail | quote }}
+    - name: maxOutOfOrdernessMs
+      value: {{ .Values.FlinkFaceRecognizerJob.maxOutOfOrdernessMs | quote }}
+  {{- end }}

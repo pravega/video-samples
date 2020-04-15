@@ -41,6 +41,7 @@ public class ObjectDetectorTests {
     }
 
     @Test
+    @Ignore
     public void Test2() throws Exception {
         InputStream origImage = getClass().getResourceAsStream("/thejas.jpg");       // The model
         InputStream otherImage = getClass().getResourceAsStream("/theja1.jpg");       // The model

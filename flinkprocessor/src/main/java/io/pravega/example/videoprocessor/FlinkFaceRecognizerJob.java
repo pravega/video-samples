@@ -109,7 +109,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                             })
                     .uid("assignTimestampsAndWatermarks")
                     .name("assignTimestampsAndWatermarks");
-            // inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
 
             // Reassemble whole video frames from chunks.
             boolean failOnError = false;
@@ -119,16 +118,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
-
-//            //  identify objects with YOLOv3
-//            DataStream<VideoFrame> faceDetectedFrames = videoFrames
-//                    .map(frame -> {
-//                        frame = FaceDetector.getInstance().detectFaces(frame);
-//                        frame.hash = frame.calculateHash();
-//
-//                        return frame;
-//                    });
-
 
             DataStream<VideoFrame> faceRecognizedFrames = videoFrames
                     .map(frame -> {

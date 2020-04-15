@@ -1,12 +1,13 @@
 package io.pravega.example.videoprocessor;
 
 import io.pravega.example.common.ChunkedVideoFrame;
-import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
+import io.pravega.example.common.VideoFrame;
+import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 
 import java.io.IOException;
@@ -154,32 +155,18 @@ public class VideoFrameWindow extends Window {
 
         @Override
         public TypeSerializerSnapshot<VideoFrameWindow> snapshotConfiguration() {
-            return new TypeSerializerSnapshot<VideoFrameWindow>() {
-                @Override
-                public int getCurrentVersion() {
-                    return 0;
-                }
+            return new VideoFrameWindow.Serializer.VideoFrameSerializerSnapshot();
+        }
 
-                @Override
-                public void writeSnapshot(DataOutputView out) throws IOException {
+        /**
+         * Serializer configuration snapshot for compatibility and format evolution.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final class VideoFrameSerializerSnapshot extends SimpleTypeSerializerSnapshot<VideoFrameWindow> {
 
-                }
-
-                @Override
-                public void readSnapshot(int readVersion, DataInputView in, ClassLoader userCodeClassLoader) throws IOException {
-
-                }
-
-                @Override
-                public TypeSerializer<VideoFrameWindow> restoreSerializer() {
-                    return null;
-                }
-
-                @Override
-                public TypeSerializerSchemaCompatibility<VideoFrameWindow> resolveSchemaCompatibility(TypeSerializer<VideoFrameWindow> newSerializer) {
-                    return null;
-                }
-            };
+            public VideoFrameSerializerSnapshot() {
+                super(VideoFrameWindow.Serializer::new);
+            }
         }
     }
 }
