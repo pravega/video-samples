@@ -14,4 +14,4 @@ lib/*
 !lib/README.txt
 out/
 __pycache__
-/home/vidyat/Desktop/video-samples/common/src/main/resources/facenet.pb
+/home/vidyat/Desktop/video-samples/common/src/main/resources/tiny-yolo-voc.pb
