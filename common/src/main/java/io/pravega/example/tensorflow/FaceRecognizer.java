@@ -87,35 +87,40 @@ public class FaceRecognizer implements Serializable {
      * Identifies recognized faces on the video frame
      * @param frame video frame used to detect and recognize faces on
      */
-    public void recognizeFaces(VideoFrame frame) throws IOException {
+    public void recognizeFaces(VideoFrame frame) throws Exception {
         // Identifies the location of faces on video frame
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
-        recognizedBoxes = this.detectFaces(frame.data);
+        try{
+            log.info(String.valueOf(frame.data.length));
+            recognizedBoxes = this.detectFaces(frame.data);
 
-        Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
+            Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
-        for(int i=0; i< recognizedBoxes.size(); i++) {
-            BoundingBox currentFace = recognizedBoxes.get(i);
-            byte[] croppedFace = cropFace(currentFace, imageMat);
+            for(int i=0; i< recognizedBoxes.size(); i++) {
+                BoundingBox currentFace = recognizedBoxes.get(i);
+                byte[] croppedFace = cropFace(currentFace, imageMat);
 
 
-//            if (croppedFace.length > 0) {
-                // Extract the embeddings for the current face
-                frame.embeddings.add(embeddFace(croppedFace));
+    //            if (croppedFace.length > 0) {
+                    // Extract the embeddings for the current face
+                    frame.embeddings.add(embeddFace(croppedFace));
 
-                // Compare with face embeddings in the database to identify the face and label
-                String match = matchEmbedding(frame.embeddings.get(i));
-//            if(match != "") {
-                Recognition recognition = new Recognition(1, match, (float) 1,
-                        new BoxPosition((float) (currentFace.getX()),
-                                (float) (currentFace.getY()),
-                                (float) (currentFace.getWidth()),
-                                (float) (currentFace.getHeight())));
-                frame.data = ImageUtil.getInstance().labelFace(frame.data, recognition);
-//            }
-//            } else {
-//                continue;
-//            }
+                    // Compare with face embeddings in the database to identify the face and label
+                    String match = matchEmbedding(frame.embeddings.get(i));
+    //            if(match != "") {
+                    Recognition recognition = new Recognition(1, match, (float) 1,
+                            new BoxPosition((float) (currentFace.getX()),
+                                    (float) (currentFace.getY()),
+                                    (float) (currentFace.getWidth()),
+                                    (float) (currentFace.getHeight())));
+                    frame.data = ImageUtil.getInstance().labelFace(frame.data, recognition);
+    //            }
+    //            } else {
+    //                continue;
+    //            }
+            }
+        } catch (Exception e) {
+            throw new Exception(e);
         }
     }
 
