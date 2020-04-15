@@ -18,10 +18,15 @@ import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.FloatBuffer;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,7 +96,7 @@ public class FaceRecognizer implements Serializable {
         // Identifies the location of faces on video frame
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
         try{
-            log.info(String.valueOf(frame.data.length));
+            log.info("length of frame is:" + String.valueOf(frame.data.length));
             recognizedBoxes = this.detectFaces(frame.data);
 
             Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
@@ -225,7 +230,7 @@ public class FaceRecognizer implements Serializable {
         return Math.sqrt(sumDiffSq);
     }
 
-    public List<BoundingBox> detectFaces(byte[] imageBytes) throws IOException {
+    public List<BoundingBox> detectFaces(byte[] imageBytes) throws IOException, URISyntaxException {
         Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
         CvArr inputImage = new IplImage(imageMat);
 
@@ -234,9 +239,15 @@ public class FaceRecognizer implements Serializable {
         cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
         cvEqualizeHist(grayImage, grayImage);
 
-        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml"; // face detection model configuration
+
+        URL classifier = getClass().getResource("/haarcascade_frontalface_alt.xml");       // face detection model
+        File file = Paths.get(classifier.toURI()).toFile();
+        String classifierPath = file.getAbsolutePath();
+//        String classifierPath = "./common/src/main/resources/haarcascade_frontalface_alt.xml"; // face detection model configuration
         CascadeClassifier faceCascade = new CascadeClassifier();
-        faceCascade.load(classifierPath);
+        boolean modelLoaded = faceCascade.load(classifierPath);
+        log.info("facial detection model load: " + modelLoaded);
+
 
         RectVector faces = new RectVector();
         int absoluteFaceSize = 0;
