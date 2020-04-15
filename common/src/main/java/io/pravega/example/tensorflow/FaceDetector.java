@@ -97,7 +97,7 @@ public class FaceDetector implements Serializable {
 
             BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
 
-            videoFrame.recognizedBoxes.add(currentBox);
+//            videoFrame.recognizedBoxes.add(currentBox);
         }
 
 //        graphics.dispose();

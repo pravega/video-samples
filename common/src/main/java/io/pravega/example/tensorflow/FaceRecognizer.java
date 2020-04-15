@@ -47,6 +47,7 @@ public class FaceRecognizer implements Serializable {
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
 
+    private List<BoundingBox> recognizedBoxes;
 
     public static FaceRecognizer getInstance() {
         // TODO: fix race condition
@@ -56,6 +57,7 @@ public class FaceRecognizer implements Serializable {
 
         return single_instance;
     }
+
 
 
     public FaceRecognizer() {
@@ -87,12 +89,13 @@ public class FaceRecognizer implements Serializable {
      */
     public void recognizeFaces(VideoFrame frame) throws IOException {
         // Identifies the location of faces on video frame
-        frame.recognizedBoxes = this.detectFaces(frame.data);
+//        frame.recognizedBoxes = this.detectFaces(frame.data);
+        recognizedBoxes = this.detectFaces(frame.data);
 
         Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
-        for(int i=0; i< frame.recognizedBoxes.size(); i++) {
-            BoundingBox currentFace = frame.recognizedBoxes.get(i);
+        for(int i=0; i< recognizedBoxes.size(); i++) {
+            BoundingBox currentFace = recognizedBoxes.get(i);
             byte[] croppedFace = cropFace(currentFace, imageMat);
 
 
@@ -182,14 +185,14 @@ public class FaceRecognizer implements Serializable {
 
     public String matchEmbedding(float[] otherEmbedding) {
         try{
-            VideoFrame origFrame = new VideoFrame();
+//            VideoFrame origFrame = new VideoFrame();
             InputStream origImage = getClass().getResourceAsStream("/TJ_now.jpg");
-            origFrame.data = IOUtils.toByteArray(origImage);
-            FaceDetector.getInstance().detectFaces(origFrame);
-            Mat imageMat = imdecode(new Mat(origFrame.data), IMREAD_UNCHANGED);
-            origFrame.data = cropFace(origFrame.recognizedBoxes.get(0), imageMat);
+            byte[] origFrameData = IOUtils.toByteArray(origImage);
+            this.detectFaces(origFrameData);
+            Mat imageMat = imdecode(new Mat(origFrameData), IMREAD_UNCHANGED);
+            origFrameData = cropFace(recognizedBoxes.get(0), imageMat);
 
-            float[] origEmbedding = embeddFace(origFrame.data);
+            float[] origEmbedding = embeddFace(origFrameData);
 
             double diff = compareEmbeddings(origEmbedding, otherEmbedding);
 
