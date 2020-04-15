@@ -16,7 +16,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +34,13 @@ public class Test {
     }
 
     public static void main(String args[]) throws IOException, URISyntaxException {
+
+        URL classifier = Test.class.getResource("/haarcascade_frontalface_alt.xml");       // face detection model
+        File file = Paths.get(classifier.toURI()).toFile();
+        String classifierPath = file.getAbsolutePath();
+
+        System.out.println("classifierPath is : " + classifierPath);
+
         InputStream imageStream = Test.class.getResourceAsStream("/TJ_now.jpg");
         byte[] imageBytes = IOUtils.toByteArray(imageStream);
         Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
@@ -47,7 +56,7 @@ public class Test {
 
 //        InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
 //        String classifierPath = Paths.get(Test.class.getResource("/haarcascade_frontalface_alt.xml").toURI()).toFile().getPath();
-        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
+        classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
         CascadeClassifier faceCascade = new CascadeClassifier();
         faceCascade.load(classifierPath);
 

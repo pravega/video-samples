@@ -11,24 +11,29 @@
 package io.pravega.example.tensorflow;
 
 
+import io.pravega.common.Exceptions;
 import io.pravega.example.common.VideoFrame;
 import org.apache.commons.io.IOUtils;
+import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
+import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.FloatBuffer;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_core.cvarrToMat;
@@ -95,7 +100,7 @@ public class FaceRecognizer implements Serializable {
     public void recognizeFaces(VideoFrame frame) throws Exception {
         // Identifies the location of faces on video frame
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
-        try{
+//        try{
             log.info("length of frame is:" + String.valueOf(frame.data.length));
             recognizedBoxes = this.detectFaces(frame.data);
 
@@ -124,9 +129,9 @@ public class FaceRecognizer implements Serializable {
     //                continue;
     //            }
             }
-        } catch (Exception e) {
-            throw new Exception(e);
-        }
+//        } catch (Exception e) {
+//            throw new Exception(e);
+//        }
     }
 
     /**
@@ -196,7 +201,7 @@ public class FaceRecognizer implements Serializable {
     public String matchEmbedding(float[] otherEmbedding) {
         try{
 //            VideoFrame origFrame = new VideoFrame();
-            InputStream origImage = getClass().getResourceAsStream("/TJ_now.jpg");
+            InputStream origImage = FaceRecognizer.class.getResourceAsStream("/TJ_now.jpg");
             byte[] origFrameData = IOUtils.toByteArray(origImage);
             this.detectFaces(origFrameData);
             Mat imageMat = imdecode(new Mat(origFrameData), IMREAD_UNCHANGED);
@@ -240,10 +245,37 @@ public class FaceRecognizer implements Serializable {
         cvEqualizeHist(grayImage, grayImage);
 
 
-        URL classifier = getClass().getResource("/haarcascade_frontalface_alt.xml");       // face detection model
-        File file = Paths.get(classifier.toURI()).toFile();
+//        URL classifier = FaceRecognizer.class.getResource("/haarcascade_frontalface_alt.xml");       // face detection model
+        File file = null;
+        String resource = "/haarcascade_frontalface_alt.xml";
+        URL classifier = getClass().getResource(resource);
+
+        if (classifier.getProtocol().equals("jar")) {
+//            try {
+                InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
+                file = File.createTempFile("tempfile", ".tmp");
+                OutputStream out = new FileOutputStream(file);
+                int read;
+                byte[] bytes = new byte[1024];
+
+                while ((read = input.read(bytes)) != -1) {
+                    out.write(bytes, 0, read);
+                }
+                out.close();
+                file.deleteOnExit();
+        } else {
+            //this will probably work in your IDE, but not from a JAR
+            file = new File(classifier.getFile());
+        }
+
+        if (file != null && !file.exists()) {
+            throw new RuntimeException("Error: File " + file + " not found!");
+        }
+
         String classifierPath = file.getAbsolutePath();
-//        String classifierPath = "./common/src/main/resources/haarcascade_frontalface_alt.xml"; // face detection model configuration
+//        log.info("path is: " + file.getAbsolutePath());
+
+
         CascadeClassifier faceCascade = new CascadeClassifier();
         boolean modelLoaded = faceCascade.load(classifierPath);
         log.info("facial detection model load: " + modelLoaded);
