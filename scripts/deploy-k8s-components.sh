@@ -1,11 +1,10 @@
 #! /bin/bash
 set -ex
-
 ROOT_DIR=$(dirname $0)/..
-NAMESPACE=${NAMESPACE:-examples}
-
+source ${ROOT_DIR}/scripts/env-local.sh
+JOBNAME=${JOBNAME:-videoprocessor}
 helm upgrade --install --timeout 600s --wait --debug \
-videoprocessor \
---namespace ${NAMESPACE} \
-${ROOT_DIR}/charts/videoprocessor \
-$@
+  ${JOBNAME} \
+  --namespace ${NAMESPACE} \
+  ${ROOT_DIR}/charts/${JOBNAME} \
+  $@

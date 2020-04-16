@@ -15,3 +15,4 @@ lib/*
 out/
 __pycache__
 jupyterhub/secret.yaml
+*-local.sh
