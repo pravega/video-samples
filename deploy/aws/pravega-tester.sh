@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-#export PRAVEGA_CONTROLLER_URI=tls://nautilus-pravega-controller.nautilus-pravega.svc.cluster.local:443
-export PRAVEGA_CONTROLLER_URI=tls://pravega-controller.videodemo1.nautilus-lab-sulfur.com:443
-export PRAVEGA_SCOPE=examples
+source ./env-local.sh
 export IMAGE=claudiofahey/pravega-tester:0.7.0
 
 kubectl delete -n ${PRAVEGA_SCOPE} deployment/pravega-tester

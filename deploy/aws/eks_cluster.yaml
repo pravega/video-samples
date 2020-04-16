@@ -1,7 +1,7 @@
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 metadata:
-  name: videodemo
+  name: videodemo2
   region: us-east-1
 nodeGroups:
   - name: standard-workers

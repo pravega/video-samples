@@ -1,0 +1,4 @@
+nautilus-dist-master/
+*.log
+*-values.yaml
+*-local.sh

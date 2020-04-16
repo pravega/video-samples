@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 set -ex
-scripts/validate-values.py videodemo1-values.yaml,scripts/pre-install/values.yaml
+source ./env-local.sh
+nautilus-dist-master/decks-install config set registry ${REGISTRY}
+nautilus-dist-master/scripts/validate-values.py ${CLUSTER_NAME}-values.yaml,nautilus-dist-master/scripts/pre-install/values.yaml
