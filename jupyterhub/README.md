@@ -43,7 +43,7 @@ export NAMESPACE=examples
 
 #### Login to Jupyter Hub
 
-1. Open your browser to the proxy service address you set above (http).   
+1. Open your browser to the proxy service address you set above (http).
    Alternatively, you may determine the external IP address with the following command.
 ```
 kubectl get svc/proxy-public -n examples

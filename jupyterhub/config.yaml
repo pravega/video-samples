@@ -31,6 +31,8 @@ singleuser:
       default: true
       kubespawner_override:
         image: jupyter/tensorflow-notebook:dc9744740e12
+        extra_resource_guarantees:
+          ephemeral-storage: "2Gi"
 
     - display_name: "Jupyter All Spark Notebook 2020-03-17"
       default: false
@@ -43,6 +45,7 @@ singleuser:
         image: jupyter/all-spark-notebook:f646d2b2a3af
 
   storage:
+    capacity: "10Gi"
     extraVolumes:
       - name: examples-pravega
         secret:
@@ -59,5 +62,6 @@ singleuser:
 proxy:
   service:
     annotations:
-      external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.frightful-four.eaglemonk.intranet.nautilus-platform-dev.com"
+      #external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.frightful-four.eaglemonk.intranet.nautilus-platform-dev.com"
       #external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.microbe.eaglemonk.intranet.nautilus-platform-dev.com"
+      external-dns.alpha.kubernetes.io/hostname: "jupyterhub.examples.videodemo2.nautilus-lab-sulfur.com"
