@@ -14,7 +14,7 @@ FlinkObjectDetectorJob:
   output:
     minNumSegments: 1
     stream: object-detector-output-video
-  parallelism: 1
+  parallelism: 2
   readerParallelism: 1
   rebalance: "true"
   startAtTail: "true"
@@ -22,7 +22,7 @@ FlinkObjectDetectorJob:
     cpu: 2000m
     heap: 2000m
     memory: 8G
-    replicas: 1
+    replicas: 2
     taskSlots: 1
 
 MultiVideoGridJob:
