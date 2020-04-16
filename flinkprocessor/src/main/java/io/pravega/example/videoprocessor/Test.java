@@ -11,9 +11,6 @@ import java.io.InputStream;
 public class Test {
     public static void main(String args[]) throws Exception {
         try{
-            String[] images = {"/TJ_now.jpg", "/TJ_now.jpg", "/IMG_1583.jpg", "IMG_1732.jpg", "IMG_2003.jpg"
-                    , "/ben_afflek_input_1.jpg", "ben_afflek_input_2.jpg"};
-
             InputStream origImage = Test.class.getResourceAsStream("/2020-04-06-181009.jpg");       // The model
             InputStream otherImage = Test.class.getResourceAsStream("/TJ_now.jpg");       // The model
 

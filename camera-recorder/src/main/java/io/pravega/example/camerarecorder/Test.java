@@ -34,14 +34,7 @@ public class Test {
     }
 
     public static void main(String args[]) throws IOException, URISyntaxException {
-
-        URL classifier = Test.class.getResource("/haarcascade_frontalface_alt.xml");       // face detection model
-        File file = Paths.get(classifier.toURI()).toFile();
-        String classifierPath = file.getAbsolutePath();
-
-        System.out.println("classifierPath is : " + classifierPath);
-
-        InputStream imageStream = Test.class.getResourceAsStream("/TJ_now.jpg");
+        InputStream imageStream = Test.class.getResourceAsStream("/ben_afflek_input_2.jpg");
         byte[] imageBytes = IOUtils.toByteArray(imageStream);
         Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
         IplImage inputImage = new IplImage(imageMat);
@@ -56,7 +49,7 @@ public class Test {
 
 //        InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
 //        String classifierPath = Paths.get(Test.class.getResource("/haarcascade_frontalface_alt.xml").toURI()).toFile().getPath();
-        classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
+        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
         CascadeClassifier faceCascade = new CascadeClassifier();
         faceCascade.load(classifierPath);
 
@@ -111,9 +104,9 @@ public class Test {
         byte[] outData;
         outData = baos.toByteArray();
 
-//        Mat croppedimage = new Mat(imageMat, faces.get(0));
-//        byte[] outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
-//        imencode(".jpg", croppedimage, outData);
+        Mat croppedimage = new Mat(imageMat, faces.get(0));
+        outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
+        imencode(".jpg", croppedimage, outData);
 
         for(BoundingBox currentFace: recognizedBoxes) {
 

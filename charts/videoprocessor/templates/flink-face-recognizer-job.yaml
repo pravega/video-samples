@@ -24,7 +24,7 @@ spec:
 
   jobManager:
     replicas: 1
-    memory: 1024M
+    memory: 500M
     heap: 200m
     cpu: 450m
 

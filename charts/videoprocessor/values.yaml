@@ -39,7 +39,7 @@ FlinkFaceRecognizerJob:
     replicas: 1
     memory: 2G
     cpu: 500m
-    heap: 600m
+    heap: 700m
     taskSlots: 2
 
 VideoDataGeneratorJob:

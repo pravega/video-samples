@@ -71,7 +71,7 @@ public class FaceRecognizer implements Serializable {
 
 
     public FaceRecognizer() {
-        InputStream graphFile = getClass().getResourceAsStream("/facenet.pb");       // Pre-trained model
+        InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
 
         byte[] GRAPH_DEF = IOUtil.readAllBytesOrExit(graphFile);
         Graph graph = new Graph();
@@ -151,6 +151,8 @@ public class FaceRecognizer implements Serializable {
      */
     public float[] executeGraph(byte[] jpegBytes) {
         // Preprocess image (decode JPEG and resize)
+
+        log.info("jpegBytes.length is " + jpegBytes.length);
         try (final Tensor<?> jpegTensor = Tensor.create(jpegBytes)) {
             final List<Tensor<?>> imagePreprocessorOutputs = session
                     .runner()
@@ -198,14 +200,18 @@ public class FaceRecognizer implements Serializable {
         return outData;
     }
 
-    public String matchEmbedding(float[] otherEmbedding) {
-        try{
+    public String matchEmbedding(float[] otherEmbedding) throws IOException, URISyntaxException {
+//        try{
 //            VideoFrame origFrame = new VideoFrame();
             InputStream origImage = FaceRecognizer.class.getResourceAsStream("/TJ_now.jpg");
             byte[] origFrameData = IOUtils.toByteArray(origImage);
-            this.detectFaces(origFrameData);
+            List<BoundingBox> referBox = this.detectFaces(origFrameData);
             Mat imageMat = imdecode(new Mat(origFrameData), IMREAD_UNCHANGED);
-            origFrameData = cropFace(recognizedBoxes.get(0), imageMat);
+            log.info("image frame length is " + origFrameData.length);
+            origFrameData = cropFace(referBox.get(0), imageMat);
+
+            log.info("cropped frame length is " + origFrameData.length);
+//            log.info("origFrame length is " + origFrameData.length);
 
             float[] origEmbedding = embeddFace(origFrameData);
 
@@ -220,9 +226,9 @@ public class FaceRecognizer implements Serializable {
             }
 
             return match;
-        } catch(Exception e) {
-            throw new RuntimeException(e);
-        }
+//        } catch(Exception e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     public double compareEmbeddings(float[] origEmbedding, float[] otherEmbedding) {
