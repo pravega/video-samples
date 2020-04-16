@@ -4,7 +4,7 @@ mavenCoordinate:
   version: 0.1.0
 
 FlinkObjectDetectorJob:
-  enabled: false
+  enabled: true
   checkpointIntervalMs: 10000
   enableOperatorChaining: "true"
   input:
@@ -14,7 +14,7 @@ FlinkObjectDetectorJob:
   output:
     minNumSegments: 1
     stream: object-detector-output-video
-  parallelism: 3
+  parallelism: 1
   readerParallelism: 1
   rebalance: "true"
   startAtTail: "true"
@@ -22,11 +22,11 @@ FlinkObjectDetectorJob:
     cpu: 2000m
     heap: 2000m
     memory: 8G
-    replicas: 3
+    replicas: 1
     taskSlots: 1
 
 MultiVideoGridJob:
-  enabled: true
+  enabled: false
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"

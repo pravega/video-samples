@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-eksctl scale nodegroup --cluster videodemo2 --name standard-workers --nodes 3
+eksctl scale nodegroup --cluster videodemo2 --name standard-workers --nodes 5
