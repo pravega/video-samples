@@ -26,21 +26,9 @@ public class YOLOClassifier {
     private final static float THRESHOLD = 0.5f;
     private final static int MAX_RESULTS = 24;
     private final static int NUMBER_OF_BOUNDING_BOXES = 5;
-    private static YOLOClassifier classifier;
-
-    private YOLOClassifier() {}
-
-    public static YOLOClassifier getInstance() {
-        if (classifier == null) {
-            classifier = new YOLOClassifier();
-        }
-
-        return  classifier;
-    }
 
     /**
      * Gets the number of classes based on the tensor shape
-     * TODO: make this a static method
      *
      * @param result - the tensorflow output
      * @return the number of classes

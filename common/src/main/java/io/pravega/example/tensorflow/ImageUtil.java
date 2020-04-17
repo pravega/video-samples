@@ -28,24 +28,6 @@ import java.util.List;
  */
 public class ImageUtil {
     private final static Logger LOGGER = LoggerFactory.getLogger(ImageUtil.class);
-    private static ImageUtil imageUtil;
-
-
-    private ImageUtil() {
-
-    }
-
-    /**
-     * It returns the singleton instance of this class.
-     * @return ImageUtil instance
-     */
-    public static ImageUtil getInstance() {
-        if (imageUtil == null) {
-            imageUtil = new ImageUtil();
-        }
-
-        return imageUtil;
-    }
 
     /**
      * Label image with classes and predictions given by the ThensorFLow
@@ -54,8 +36,9 @@ public class ImageUtil {
      * @return JPEG image in a byte array
      */
     public byte[] labelImage(final byte[] image, final List<Recognition> recognitions) {
-        byte[] bytes = null;
-        BufferedImage bufferedImage = imageUtil.createImageFromBytes(image);
+        LOGGER.info("labelImage: BEGIN");
+        byte[] bytes;
+        BufferedImage bufferedImage = createImageFromBytes(image);
         float scaleX = (float) bufferedImage.getWidth() / (float) 416;
         float scaleY = (float) bufferedImage.getHeight() / (float) 416;
         Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
@@ -74,18 +57,15 @@ public class ImageUtil {
 
         graphics.dispose();
 
-        try
-        {
+        try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(bufferedImage, "jpg", baos);
             bytes = baos.toByteArray();
-        }
-        catch (IOException e)
-        {
-            throw  new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
-
+        LOGGER.info("labelImage: END");
         return bytes;
     }
 
