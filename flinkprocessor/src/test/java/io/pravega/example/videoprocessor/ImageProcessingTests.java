@@ -70,7 +70,7 @@ public class ImageProcessingTests {
         Map<Integer, byte[]> images = new HashMap<>();
         images.put(0, inBytes);
         images.put(3, inBytes);
-        ImageGridBuilder builder = new ImageGridBuilder(19, 19, 4);
+        ImageGridBuilder builder = new ImageGridBuilder(19, 19, 4, 3);
         builder.addImage(1, inBytes);
         builder.addImages(images);
         byte[] outBytes = builder.getOutputImageBytes("png");
