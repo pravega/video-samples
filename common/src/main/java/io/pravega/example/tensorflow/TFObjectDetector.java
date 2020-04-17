@@ -45,6 +45,7 @@ public class TFObjectDetector implements Serializable, Closeable {
 
     public TFObjectDetector() {
         log.info("TFObjectDetector: initializing TensorFlow");
+        final long t0 = System.currentTimeMillis();
         final ConfigProto config = ConfigProto.newBuilder()
                 .setGpuOptions(GPUOptions.newBuilder()
                         .setAllowGrowth(true)
@@ -76,7 +77,14 @@ public class TFObjectDetector implements Serializable, Closeable {
 
         yoloClassifier = new YOLOClassifier();
         imageUtil = new ImageUtil();
-        log.info("TFObjectDetector: done initializing TensorFlow");
+        log.info("TFObjectDetector: done initializing TensorFlow; duration = {} ms", System.currentTimeMillis() - t0);
+    }
+
+    public void warmup() {
+        log.info("warmup: BEGIN");
+        final long t0 = System.currentTimeMillis();
+        detect(imageUtil.createBlankJpeg(1280, 720));
+        log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
     }
 
     @Override

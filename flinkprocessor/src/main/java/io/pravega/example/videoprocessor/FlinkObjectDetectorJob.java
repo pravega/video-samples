@@ -71,7 +71,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             final String jobName = FlinkObjectDetectorJob.class.getName();
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
-            final int mode = getConfig().getParams().getInt("mode", 0);
+            final int mode = getConfig().getParams().getInt("mode", 2);
             log.info("mode={}", mode);
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
@@ -105,6 +105,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final DataStream<VideoFrame> outVideoFrames;
 
             if (mode == 0) {
+                // BUG: THIS RESULTS IN OUT-OF-ORDER WRITES!
 
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
@@ -124,6 +125,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 outVideoFrames = objectDetectedFrames;
 
             } else if (mode == 1) {
+                // BUG: THIS RESULTS IN OUT-OF-ORDER WRITES!
 
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
@@ -143,7 +145,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
                 outVideoFrames = objectDetectedFrames;
 
-            } else {
+            } else if (mode == 2) {
 
                 // Assign timestamps and watermarks based on timestamp in each chunk.
                 // Operator: assignTimestampsAndWatermarks
@@ -167,29 +169,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                         .map(VideoFrame::new)
                         .uid("ChunkedVideoFrameReassembler")
                         .name("ChunkedVideoFrameReassembler");
-
-//            // Assign sequential index. This will be used as the frame number.
-//            // Operator: assignSequentialIndex
-//            // Effective parallelism: hash of monitor
-//            final DataStream<OrderedVideoFrame> assignSequentialIndex = inVideoFrames
-//                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-//                    .process(new KeyedProcessFunction<Integer, VideoFrame, OrderedVideoFrame>() {
-//                        private ValueState<Long> indexState;
-//
-//                        @Override
-//                        public void open(Configuration parameters) throws Exception {
-//                            indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
-//                        }
-//
-//                        @Override
-//                        public void processElement(VideoFrame value, Context ctx, Collector<OrderedVideoFrame> out) throws Exception {
-//                            final long index = Optional.ofNullable(indexState.value()).orElse(0L);
-//                            out.collect(new OrderedImageAggregatorResult(index, value));
-//                            indexState.update(index + 1);
-//                        }
-//                    })
-//                    .uid("assignSequentialIndex")
-//                    .name("assignSequentialIndex");
 
                 // For each camera and window, get the most recent frame.
                 // This will emit at a maximum rate of the framesPerSec parameter.
@@ -222,32 +201,36 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
 
                 // Validate strictly increasing frame number. Throws an exception if events are out of order.
-//            final DataStream<VideoFrame> orderedOutVideoFrames = outVideoFrames
-//                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-//                    .process(new KeyedProcessFunction<Integer, VideoFrame, VideoFrame>() {
-//                        private ValueState<Long> lastFrameNumberState;
-//
-//                        @Override
-//                        public void open(Configuration parameters) {
-//                            lastFrameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("lastFrameNumber", Long.class));
-//                        }
-//
-//                        @Override
-//                        public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
-//                            final Long lastFrameNumber = lastFrameNumberState.value();
-//                            if (lastFrameNumber != null) {
-//                                if (value.frameNumber <= lastFrameNumber) {
-//                                    log.error(MessageFormat.format(
-//                                            "Unexpected frame number; current={0}, last={1}, camera={2}",
-//                                            value.frameNumber, lastFrameNumber, value.camera));
-//                                }
-//                            }
-//                            out.collect(value);
-//                            lastFrameNumberState.update((long) value.frameNumber);
-//                        }
-//                    })
-//                    .uid("assignSequentialIndex")
-//                    .name("assignSequentialIndex");
+                if (false) {
+                    final DataStream<VideoFrame> verifyOrderedVideoFrames = outVideoFrames
+                            .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                            .process(new KeyedProcessFunction<Integer, VideoFrame, VideoFrame>() {
+                                private ValueState<Long> lastFrameNumberState;
+
+                                @Override
+                                public void open(Configuration parameters) {
+                                    lastFrameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("lastFrameNumber", Long.class));
+                                }
+
+                                @Override
+                                public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
+                                    final Long lastFrameNumber = lastFrameNumberState.value();
+                                    if (lastFrameNumber != null) {
+                                        if (value.frameNumber <= lastFrameNumber) {
+                                            log.error(MessageFormat.format(
+                                                    "Unexpected frame number; current={0}, last={1}, camera={2}",
+                                                    value.frameNumber, lastFrameNumber, value.camera));
+                                        }
+                                    }
+                                    out.collect(value);
+                                    lastFrameNumberState.update((long) value.frameNumber);
+                                }
+                            })
+                            .uid("verifyOrderedVideoFrames")
+                            .name("verifyOrderedVideoFrames");
+                }
+            } else {
+                throw new IllegalArgumentException(MessageFormat.format("Unknown mode {0}", mode));
             }
 
             // Split output video frames into chunks of 8 MiB or less.
@@ -287,9 +270,14 @@ public class FlinkObjectDetectorJob extends AbstractJob {
         final private static Logger log = LoggerFactory.getLogger(TFObjectDetectorMapFunction.class);
         private transient TFObjectDetector tfObjectDetector;
 
+        /**
+         * The first execution takes 6 minutes on a V100.
+         * We warmup in open() so that map() does not timeout.
+         */
         @Override
         public void open(Configuration parameters) {
             tfObjectDetector = new TFObjectDetector();
+            tfObjectDetector.warmup();
         }
 
         @Override
