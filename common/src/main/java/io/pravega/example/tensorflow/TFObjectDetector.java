@@ -40,6 +40,8 @@ public class TFObjectDetector implements Serializable, Closeable {
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final List<String> LABEL_DEF;
+    private final YOLOClassifier yoloClassifier;
+    private final ImageUtil imageUtil;
 
     public TFObjectDetector() {
         log.info("TFObjectDetector: initializing TensorFlow");
@@ -72,6 +74,8 @@ public class TFObjectDetector implements Serializable, Closeable {
                                 graphBuilder.constant("size", new int[]{IMAGE_DIMENSION, IMAGE_DIMENSION})),
                         graphBuilder.constant("scale", SCALE));
 
+        yoloClassifier = new YOLOClassifier();
+        imageUtil = new ImageUtil();
         log.info("TFObjectDetector: done initializing TensorFlow");
     }
 
@@ -90,8 +94,8 @@ public class TFObjectDetector implements Serializable, Closeable {
         log.info("detect: BEGIN");
         final long t0 = System.currentTimeMillis();
         final float[] tensorFlowOutput = executeYOLOGraph(image);
-        final List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(tensorFlowOutput, LABEL_DEF);
-        final byte[] jpegBytes = ImageUtil.getInstance().labelImage(image, recognitions);
+        final List<Recognition> recognitions = yoloClassifier.classifyImage(tensorFlowOutput, LABEL_DEF);
+        final byte[] jpegBytes = imageUtil.labelImage(image, recognitions);
         final long dt = System.currentTimeMillis() - t0;
         final double fps = 1000.0/dt;
         log.info("detect: elapsed time for single frame: {} ms ({} fps)", dt, fps);
@@ -126,7 +130,7 @@ public class TFObjectDetector implements Serializable, Closeable {
                 log.info("executeYOLOGraph: got detectorOutputs");
                 assert detectorOutputs.size() == 1;
                 try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
-                    final float[] outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(resultTensor)];
+                    final float[] outputTensor = new float[yoloClassifier.getOutputSizeByShape(resultTensor)];
                     final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
                     resultTensor.writeTo(floatBuffer);
                     return outputTensor;
