@@ -54,6 +54,8 @@ spec:
   parameters:
     - name: enableOperatorChaining
       value: {{ .Values.FlinkObjectDetectorJob.enableOperatorChaining | quote }}
+    - name: framesPerSec
+      value: {{ .Values.FlinkObjectDetectorJob.framesPerSec | quote }}
     - name: input-stream
       value: {{ .Values.FlinkObjectDetectorJob.input.stream | quote }}
     - name: input-minNumSegments
@@ -65,9 +67,7 @@ spec:
     - name: output-minNumSegments
       value: {{ .Values.FlinkObjectDetectorJob.output.minNumSegments | quote }}
     - name: readerParallelism
-      value: {{ .Values.MultiVideoGridJob.readerParallelism | quote }}
-    - name: rebalance
-      value: {{ .Values.FlinkObjectDetectorJob.rebalance | quote }}
+      value: {{ .Values.FlinkObjectDetectorJob.readerParallelism | quote }}
     - name: scope
       value: {{ $.Release.Namespace | quote }}
     - name: startAtTail
