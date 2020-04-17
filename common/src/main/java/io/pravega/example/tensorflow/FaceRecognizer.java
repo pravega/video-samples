@@ -57,7 +57,7 @@ public class FaceRecognizer implements Serializable {
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
 
-    private List<BoundingBox> recognizedBoxes;
+//    private List<BoundingBox> recognizedBoxes;
 
     public static FaceRecognizer getInstance() {
         // TODO: fix race condition
@@ -102,12 +102,12 @@ public class FaceRecognizer implements Serializable {
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
 //        try{
             log.info("length of frame is:" + String.valueOf(frame.data.length));
-            recognizedBoxes = this.detectFaces(frame.data);
+            frame.recognizedBoxes = this.detectFaces(frame.data);
 
             Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
-            for(int i=0; i< recognizedBoxes.size(); i++) {
-                BoundingBox currentFace = recognizedBoxes.get(i);
+            for(int i=0; i< frame.recognizedBoxes.size(); i++) {
+                BoundingBox currentFace = frame.recognizedBoxes.get(i);
                 byte[] croppedFace = cropFace(currentFace, imageMat);
 
 
@@ -123,6 +123,7 @@ public class FaceRecognizer implements Serializable {
                                     (float) (currentFace.getY()),
                                     (float) (currentFace.getWidth()),
                                     (float) (currentFace.getHeight())));
+                    frame.recognitions.add(recognition);
                     frame.data = ImageUtil.getInstance().labelFace(frame.data, recognition);
     //            }
     //            } else {
@@ -202,18 +203,18 @@ public class FaceRecognizer implements Serializable {
 
     public String matchEmbedding(float[] otherEmbedding) throws IOException, URISyntaxException {
 //        try{
-//            VideoFrame origFrame = new VideoFrame();
+            VideoFrame origFrame = new VideoFrame();
             InputStream origImage = FaceRecognizer.class.getResourceAsStream("/TJ_now.jpg");
-            byte[] origFrameData = IOUtils.toByteArray(origImage);
-            List<BoundingBox> referBox = this.detectFaces(origFrameData);
-            Mat imageMat = imdecode(new Mat(origFrameData), IMREAD_UNCHANGED);
-            log.info("image frame length is " + origFrameData.length);
-            origFrameData = cropFace(referBox.get(0), imageMat);
+            origFrame.data = IOUtils.toByteArray(origImage);
+            origFrame.recognizedBoxes = this.detectFaces(origFrame.data);
+            Mat imageMat = imdecode(new Mat(origFrame.data), IMREAD_UNCHANGED);
+            log.info("image frame length is " + origFrame.data.length);
+            origFrame.data = cropFace(origFrame.recognizedBoxes.get(0), imageMat);
 
-            log.info("cropped frame length is " + origFrameData.length);
+            log.info("cropped frame length is " + origFrame.data.length);
 //            log.info("origFrame length is " + origFrameData.length);
 
-            float[] origEmbedding = embeddFace(origFrameData);
+            float[] origEmbedding = embeddFace(origFrame.data);
 
             double diff = compareEmbeddings(origEmbedding, otherEmbedding);
 
@@ -241,8 +242,8 @@ public class FaceRecognizer implements Serializable {
         return Math.sqrt(sumDiffSq);
     }
 
-    public List<BoundingBox> detectFaces(byte[] imageBytes) throws IOException, URISyntaxException {
-        Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
+    public List<BoundingBox> detectFaces(byte[] frameData) throws IOException, URISyntaxException {
+        Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
         CvArr inputImage = new IplImage(imageMat);
 
         CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
