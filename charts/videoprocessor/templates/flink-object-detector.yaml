@@ -72,4 +72,8 @@ spec:
       value: {{ $.Release.Namespace | quote }}
     - name: startAtTail
       value: {{ .Values.FlinkObjectDetectorJob.startAtTail | quote }}
+    {{- range $key, $value := .Values.FlinkObjectDetectorJob.appParameters }}
+    - name: {{ $key | quote }}
+      value: {{ $value | quote }}
+    {{- end }}
   {{- end }}
