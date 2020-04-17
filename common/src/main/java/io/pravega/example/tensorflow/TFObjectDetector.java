@@ -87,6 +87,7 @@ public class TFObjectDetector implements Serializable, Closeable {
      * @return output image with objects detected
      */
     public DetectionResult detect(byte[] image) {
+        log.info("detect: BEGIN");
         final long t0 = System.currentTimeMillis();
         final float[] tensorFlowOutput = executeYOLOGraph(image);
         final List<Recognition> recognitions = YOLOClassifier.getInstance().classifyImage(tensorFlowOutput, LABEL_DEF);
@@ -94,6 +95,7 @@ public class TFObjectDetector implements Serializable, Closeable {
         final long dt = System.currentTimeMillis() - t0;
         final double fps = 1000.0/dt;
         log.info("detect: elapsed time for single frame: {} ms ({} fps)", dt, fps);
+        log.info("detect: END");
         return new DetectionResult(recognitions, jpegBytes);
     }
 
@@ -105,12 +107,14 @@ public class TFObjectDetector implements Serializable, Closeable {
      */
     private float[] executeYOLOGraph(byte[] jpegBytes) {
         // Preprocess image (decode JPEG and resize)
+        log.info("executeYOLOGraph: BEGIN");
         try (final Tensor<?> jpegTensor = Tensor.create(jpegBytes)) {
             final List<Tensor<?>> imagePreprocessorOutputs = session
                     .runner()
                     .feed(JPEG_BYTES_PLACEHOLDER_NAME, jpegTensor)
                     .fetch(imagePreprocessingOutput.op().name())
                     .run();
+            log.info("executeYOLOGraph: got imagePreprocessorOutputs");
             assert imagePreprocessorOutputs.size() == 1;
             try (final Tensor<Float> preprocessedImageTensor = imagePreprocessorOutputs.get(0).expect(Float.class)) {
                 // YOLO object detection
@@ -119,6 +123,7 @@ public class TFObjectDetector implements Serializable, Closeable {
                         .feed("input", preprocessedImageTensor)
                         .fetch("output")
                         .run();
+                log.info("executeYOLOGraph: got detectorOutputs");
                 assert detectorOutputs.size() == 1;
                 try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
                     final float[] outputTensor = new float[YOLOClassifier.getInstance().getOutputSizeByShape(resultTensor)];
@@ -127,6 +132,8 @@ public class TFObjectDetector implements Serializable, Closeable {
                     return outputTensor;
                 }
             }
+        } finally {
+            log.info("executeYOLOGraph: END");
         }
     }
 

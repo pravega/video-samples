@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.Optional;
 
 
 /**
@@ -70,6 +71,8 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             final String jobName = FlinkObjectDetectorJob.class.getName();
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
+            final int mode = getConfig().getParams().getInt("mode", 0);
+            log.info("mode={}", mode);
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
 
@@ -93,93 +96,163 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
                     .name("input-source");
-            inChunkedVideoFrames.printToErr().uid("input-source-print").name("input-source-print");
+            inChunkedVideoFrames
+                    .printToErr()
+                    .setParallelism(getConfig().getReaderParallelism())
+                    .uid("input-source-print")
+                    .name("input-source-print");
 
-            // Assign timestamps and watermarks based on timestamp in each chunk.
-            // Operator: assignTimestampsAndWatermarks
-            // Effective parallelism: min of # of segments, getReaderParallelism()
-            final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
-                    .assignTimestampsAndWatermarks(
-                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
-                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
-                                @Override
-                                public long extractTimestamp(ChunkedVideoFrame element) {
-                                    return element.timestamp.getTime();
-                                }
-                            })
-                    .uid("assignTimestampsAndWatermarks")
-                    .name("assignTimestampsAndWatermarks");
+            final DataStream<VideoFrame> outVideoFrames;
 
-            // Unchunk (disabled).
-            // Operator: ChunkedVideoFrameReassembler
-            // Effective parallelism: default parallelism (implicit rebalance before operator)
-            final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
-                    .map(VideoFrame::new)
-                    .uid("ChunkedVideoFrameReassembler")
-                    .name("ChunkedVideoFrameReassembler");
+            if (mode == 0) {
 
-            // For each camera and window, get the most recent frame.
-            // This will emit at a maximum rate of the framesPerSec parameter.
-            // Operator: lastVideoFramePerCamera
-            // Effective parallelism: hash of camera
-            final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
-                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-                    .maxBy("timestamp")
-                    .uid("lastVideoFramePerCamera")
-                    .name("lastVideoFramePerCamera");
+                // Unchunk (disabled).
+                // Operator: ChunkedVideoFrameReassembler
+                // Effective parallelism: default parallelism (implicit rebalance before operator) ???
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                        .map(VideoFrame::new)
+                        .uid("ChunkedVideoFrameReassembler")
+                        .name("ChunkedVideoFrameReassembler");
 
-            // Identify objects with YOLOv3.
-            // Effective parallelism: default parallelism
-            final DataStream<VideoFrame> objectDetectedFrames = lastVideoFramePerCamera
-                    .rebalance()
-                    .map(new TFObjectDetectorMapFunction())
-                    .uid("objectDetectedFrames")
-                    .name("objectDetectedFrames");
-            objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
+                // Identify objects with YOLOv3.
+                // Effective parallelism: default parallelism
+                final DataStream<VideoFrame> objectDetectedFrames = inVideoFrames
+                        .map(new TFObjectDetectorMapFunction())
+                        .uid("objectDetectedFrames")
+                        .name("objectDetectedFrames");
+                objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
+                outVideoFrames = objectDetectedFrames;
 
-            // Ensure ordering.
-            // Effective parallelism: hash of camera
-            final DataStream<VideoFrame> outVideoFrames = objectDetectedFrames
-                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-                    .maxBy("timestamp")
-                    .uid("outVideoFrames")
-                    .name("outVideoFrames");
-            outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
+            } else if (mode == 1) {
 
-            // Validate strictly increasing frame number. Throws an exception if events are out of order.
-            outVideoFrames
-                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
-                    .process(new KeyedProcessFunction<Integer, VideoFrame, VideoFrame>() {
-                        private ValueState<Long> lastFrameNumberState;
+                // Unchunk (disabled).
+                // Operator: ChunkedVideoFrameReassembler
+                // Effective parallelism: default parallelism (implicit rebalance before operator) ???
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                        .map(VideoFrame::new)
+                        .uid("ChunkedVideoFrameReassembler")
+                        .name("ChunkedVideoFrameReassembler");
 
-                        @Override
-                        public void open(Configuration parameters) throws Exception {
-                            lastFrameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("lastFrameNumber", Long.class));
-                        }
+                // Identify objects with YOLOv3.
+                // Effective parallelism: default parallelism
+                final DataStream<VideoFrame> objectDetectedFrames = inVideoFrames
+                        .rebalance()
+                        .map(new TFObjectDetectorMapFunction())
+                        .uid("objectDetectedFrames")
+                        .name("objectDetectedFrames");
+                objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
+                outVideoFrames = objectDetectedFrames;
 
-                        @Override
-                        public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
-                            final Long lastFrameNumber = lastFrameNumberState.value();
-                            if (lastFrameNumber != null) {
-                                if (value.frameNumber <= lastFrameNumber) {
-                                    throw new RuntimeException(MessageFormat.format(
-                                            "Unexpected frame number; current={0}, last={1}, camera={2}",
-                                            value.frameNumber, lastFrameNumber, value.camera));
-                                }
-                            }
-                            out.collect(value);
-                            lastFrameNumberState.update((long) value.frameNumber);
-                        }
-                    })
-                    .uid("assignSequentialIndex")
-                    .name("assignSequentialIndex");
+            } else {
 
+                // Assign timestamps and watermarks based on timestamp in each chunk.
+                // Operator: assignTimestampsAndWatermarks
+                // Effective parallelism: min of # of segments, getReaderParallelism()
+                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                        .assignTimestampsAndWatermarks(
+                                new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                        Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
+                                    @Override
+                                    public long extractTimestamp(ChunkedVideoFrame element) {
+                                        return element.timestamp.getTime();
+                                    }
+                                })
+                        .uid("assignTimestampsAndWatermarks")
+                        .name("assignTimestampsAndWatermarks");
+
+                // Unchunk (disabled).
+                // Operator: ChunkedVideoFrameReassembler
+                // Effective parallelism: default parallelism (implicit rebalance before operator) ???
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
+                        .map(VideoFrame::new)
+                        .uid("ChunkedVideoFrameReassembler")
+                        .name("ChunkedVideoFrameReassembler");
+
+//            // Assign sequential index. This will be used as the frame number.
+//            // Operator: assignSequentialIndex
+//            // Effective parallelism: hash of monitor
+//            final DataStream<OrderedVideoFrame> assignSequentialIndex = inVideoFrames
+//                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+//                    .process(new KeyedProcessFunction<Integer, VideoFrame, OrderedVideoFrame>() {
+//                        private ValueState<Long> indexState;
+//
+//                        @Override
+//                        public void open(Configuration parameters) throws Exception {
+//                            indexState = getRuntimeContext().getState(new ValueStateDescriptor<>("index", Long.class));
+//                        }
+//
+//                        @Override
+//                        public void processElement(VideoFrame value, Context ctx, Collector<OrderedVideoFrame> out) throws Exception {
+//                            final long index = Optional.ofNullable(indexState.value()).orElse(0L);
+//                            out.collect(new OrderedImageAggregatorResult(index, value));
+//                            indexState.update(index + 1);
+//                        }
+//                    })
+//                    .uid("assignSequentialIndex")
+//                    .name("assignSequentialIndex");
+
+                // For each camera and window, get the most recent frame.
+                // This will emit at a maximum rate of the framesPerSec parameter.
+                // Operator: lastVideoFramePerCamera
+                // Effective parallelism: hash of camera
+                final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
+                        .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                        .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                        .maxBy("timestamp")
+                        .uid("lastVideoFramePerCamera")
+                        .name("lastVideoFramePerCamera");
+
+                // Identify objects with YOLOv3.
+                // Effective parallelism: default parallelism
+                final DataStream<VideoFrame> objectDetectedFrames = lastVideoFramePerCamera
+                        .rebalance()
+                        .map(new TFObjectDetectorMapFunction())
+                        .uid("objectDetectedFrames")
+                        .name("objectDetectedFrames");
+                objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
+
+                // Ensure ordering.
+                // Effective parallelism: hash of camera
+                outVideoFrames = objectDetectedFrames
+                        .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                        .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                        .maxBy("timestamp")
+                        .uid("outVideoFrames")
+                        .name("outVideoFrames");
+                outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
+
+                // Validate strictly increasing frame number. Throws an exception if events are out of order.
+//            final DataStream<VideoFrame> orderedOutVideoFrames = outVideoFrames
+//                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+//                    .process(new KeyedProcessFunction<Integer, VideoFrame, VideoFrame>() {
+//                        private ValueState<Long> lastFrameNumberState;
+//
+//                        @Override
+//                        public void open(Configuration parameters) {
+//                            lastFrameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("lastFrameNumber", Long.class));
+//                        }
+//
+//                        @Override
+//                        public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
+//                            final Long lastFrameNumber = lastFrameNumberState.value();
+//                            if (lastFrameNumber != null) {
+//                                if (value.frameNumber <= lastFrameNumber) {
+//                                    log.error(MessageFormat.format(
+//                                            "Unexpected frame number; current={0}, last={1}, camera={2}",
+//                                            value.frameNumber, lastFrameNumber, value.camera));
+//                                }
+//                            }
+//                            out.collect(value);
+//                            lastFrameNumberState.update((long) value.frameNumber);
+//                        }
+//                    })
+//                    .uid("assignSequentialIndex")
+//                    .name("assignSequentialIndex");
+            }
 
             // Split output video frames into chunks of 8 MiB or less.
             // Effective parallelism: hash of camera
-            final DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
+            final DataStream<ChunkedVideoFrame> chunkedVideoFrames = outVideoFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
@@ -226,9 +299,11 @@ public class FlinkObjectDetectorJob extends AbstractJob {
 
         @Override
         public VideoFrame map(VideoFrame frame) {
+            log.info("map: BEGIN: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
             final TFObjectDetector.DetectionResult result = tfObjectDetector.detect(frame.data);
             frame.data = result.getJpegBytes();
             frame.recognitions = result.getRecognitions();
+            log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
             return frame;
         }
     }
