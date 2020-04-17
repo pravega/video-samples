@@ -19,17 +19,22 @@ import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 
 
 /**
@@ -142,6 +147,35 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("outVideoFrames")
                     .name("outVideoFrames");
             outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
+
+            // Validate strictly increasing frame number. Throws an exception if events are out of order.
+            outVideoFrames
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .process(new KeyedProcessFunction<Integer, VideoFrame, VideoFrame>() {
+                        private ValueState<Long> lastFrameNumberState;
+
+                        @Override
+                        public void open(Configuration parameters) throws Exception {
+                            lastFrameNumberState = getRuntimeContext().getState(new ValueStateDescriptor<>("lastFrameNumber", Long.class));
+                        }
+
+                        @Override
+                        public void processElement(VideoFrame value, Context ctx, Collector<VideoFrame> out) throws Exception {
+                            final Long lastFrameNumber = lastFrameNumberState.value();
+                            if (lastFrameNumber != null) {
+                                if (value.frameNumber <= lastFrameNumber) {
+                                    throw new RuntimeException(MessageFormat.format(
+                                            "Unexpected frame number; current={0}, last={1}, camera={2}",
+                                            value.frameNumber, lastFrameNumber, value.camera));
+                                }
+                            }
+                            out.collect(value);
+                            lastFrameNumberState.update((long) value.frameNumber);
+                        }
+                    })
+                    .uid("assignSequentialIndex")
+                    .name("assignSequentialIndex");
+
 
             // Split output video frames into chunks of 8 MiB or less.
             // Effective parallelism: hash of camera
