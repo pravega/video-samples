@@ -13,8 +13,11 @@ package io.pravega.example.tensorflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -22,6 +25,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+
+import static java.awt.image.BufferedImage.TYPE_3BYTE_BGR;
 
 /**
  * Util class for image processing.
@@ -67,6 +72,23 @@ public class ImageUtil {
 
         LOGGER.info("labelImage: END");
         return bytes;
+    }
+
+    /**
+     * @return JPEG image in a byte array
+     */
+    public byte[] createBlankJpeg(int width, int height) {
+        try {
+            BufferedImage outImage = new BufferedImage(width, height, TYPE_3BYTE_BGR);
+            ImageWriter writer = ImageIO.getImageWritersByFormatName("jpg").next();
+            ImageWriteParam writeParam = writer.getDefaultWriteParam();
+            ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+            writer.setOutput(new MemoryCacheImageOutputStream(outStream));
+            writer.write(null, new IIOImage(outImage, null, null), writeParam);
+            return outStream.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

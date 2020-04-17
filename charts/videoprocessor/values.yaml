@@ -6,7 +6,7 @@ mavenCoordinate:
 FlinkObjectDetectorJob:
   enabled: true
   appParameters:
-    mode: "1"
+    mode: "2"
   checkpointIntervalMs: 10000
   enableOperatorChaining: "false"
   framesPerSec: 30.0
