@@ -18,6 +18,8 @@ import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
+import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
@@ -79,6 +81,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .setParallelism(getConfig().getReaderParallelism())
                     .uid("input-source")
                     .name("input-source");
+            inChunkedVideoFrames.printToErr().uid("input-source-print").name("input-source-print");
 
             // Unchunk disabled.
             final DataStream<VideoFrame> videoFrames = inChunkedVideoFrames
@@ -95,12 +98,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
 
             // Identify objects with YOLOv3.
             final DataStream<VideoFrame> objectDetectedFrames = rebalancedVideoFrames
-                    .map(frame -> {
-                        final TFObjectDetector.DetectionResult result = TFObjectDetector.getInstance().detect(frame.data);
-                        frame.data = result.getJpegBytes();
-                        frame.recognitions = result.getRecognitions();
-                        return frame;
-                    });
+                    .map(new TFObjectDetectorMapFunction());
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
             final DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
@@ -126,6 +124,34 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             env.execute(jobName);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * A map function that uses TensorFlow.
+     * The TensorFlow Session cannot be serialized so it is declared transient and
+     * initialized in open().
+     */
+    static class TFObjectDetectorMapFunction extends RichMapFunction<VideoFrame, VideoFrame> {
+        final private static Logger log = LoggerFactory.getLogger(TFObjectDetectorMapFunction.class);
+        private transient TFObjectDetector tfObjectDetector;
+
+        @Override
+        public void open(Configuration parameters) {
+            tfObjectDetector = new TFObjectDetector();
+        }
+
+        @Override
+        public void close() {
+            tfObjectDetector.close();
+        }
+
+        @Override
+        public VideoFrame map(VideoFrame frame) {
+            final TFObjectDetector.DetectionResult result = tfObjectDetector.detect(frame.data);
+            frame.data = result.getJpegBytes();
+            frame.recognitions = result.getRecognitions();
+            return frame;
         }
     }
 }
