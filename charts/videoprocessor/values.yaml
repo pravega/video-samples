@@ -7,22 +7,22 @@ FlinkObjectDetectorJob:
   enabled: true
   checkpointIntervalMs: 10000
   enableOperatorChaining: "true"
+  framesPerSec: 30.0
   input:
     minNumSegments: 1
     stream: object-detector-input-video
-  maxOutOfOrdernessMs: 1000
+  maxOutOfOrdernessMs: 10
   output:
     minNumSegments: 1
     stream: object-detector-output-video
-  parallelism: 10
+  parallelism: 8
   readerParallelism: 1
-  rebalance: "true"
   startAtTail: "true"
   taskManager:
     cpu: 1000m
-    heap: 2000m
+    heap: 4000m
     memory: 8G
-    replicas: 5
+    replicas: 4
     taskSlots: 2
 
 MultiVideoGridJob:

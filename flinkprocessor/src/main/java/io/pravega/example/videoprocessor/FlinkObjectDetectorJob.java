@@ -128,8 +128,10 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             // Effective parallelism: default parallelism
             final DataStream<VideoFrame> objectDetectedFrames = lastVideoFramePerCamera
                     .rebalance()
-                    .map(new TFObjectDetectorMapFunction());
-            objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
+                    .map(new TFObjectDetectorMapFunction())
+                    .uid("objectDetectedFrames")
+                    .name("objectDetectedFrames");
+            objectDetectedFrames.printToErr().uid("objectDetectedFrames-print").name("objectDetectedFrames-print");
 
             // Ensure ordering.
             // Effective parallelism: hash of camera
