@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,13 @@ import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +62,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
 
     public void run() {
         try {
+            final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             final String jobName = FlinkObjectDetectorJob.class.getName();
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
@@ -70,12 +75,14 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 startStreamCut = StreamCut.UNBOUNDED;
             }
 
+            // Read chunked video frames from Pravega.
+            // Operator: input-source
+            // Effective parallelism: min of # of segments, getReaderParallelism()
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-
             final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .setParallelism(getConfig().getReaderParallelism())
@@ -83,30 +90,66 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .name("input-source");
             inChunkedVideoFrames.printToErr().uid("input-source-print").name("input-source-print");
 
-            // Unchunk disabled.
-            final DataStream<VideoFrame> videoFrames = inChunkedVideoFrames
+            // Assign timestamps and watermarks based on timestamp in each chunk.
+            // Operator: assignTimestampsAndWatermarks
+            // Effective parallelism: min of # of segments, getReaderParallelism()
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                    .assignTimestampsAndWatermarks(
+                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
+                                @Override
+                                public long extractTimestamp(ChunkedVideoFrame element) {
+                                    return element.timestamp.getTime();
+                                }
+                            })
+                    .uid("assignTimestampsAndWatermarks")
+                    .name("assignTimestampsAndWatermarks");
+
+            // Unchunk (disabled).
+            // Operator: ChunkedVideoFrameReassembler
+            // Effective parallelism: default parallelism (implicit rebalance before operator)
+            final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramesWithTimestamps
                     .map(VideoFrame::new)
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
-            final DataStream<VideoFrame> rebalancedVideoFrames;
-            if (getConfig().isEnableRebalance()) {
-                rebalancedVideoFrames = videoFrames.rebalance();
-            } else {
-                rebalancedVideoFrames = videoFrames;
-            }
+            // For each camera and window, get the most recent frame.
+            // This will emit at a maximum rate of the framesPerSec parameter.
+            // Operator: lastVideoFramePerCamera
+            // Effective parallelism: hash of camera
+            final DataStream<VideoFrame> lastVideoFramePerCamera = inVideoFrames
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .maxBy("timestamp")
+                    .uid("lastVideoFramePerCamera")
+                    .name("lastVideoFramePerCamera");
 
             // Identify objects with YOLOv3.
-            final DataStream<VideoFrame> objectDetectedFrames = rebalancedVideoFrames
+            // Effective parallelism: default parallelism
+            final DataStream<VideoFrame> objectDetectedFrames = lastVideoFramePerCamera
+                    .rebalance()
                     .map(new TFObjectDetectorMapFunction());
             objectDetectedFrames.printToErr().uid("video-object-detector-print").name("video-object-detector-print");
 
+            // Ensure ordering.
+            // Effective parallelism: hash of camera
+            final DataStream<VideoFrame> outVideoFrames = objectDetectedFrames
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .maxBy("timestamp")
+                    .uid("outVideoFrames")
+                    .name("outVideoFrames");
+            outVideoFrames.printToErr().uid("outVideoFrames-print").name("outVideoFrames-print");
+
+            // Split output video frames into chunks of 8 MiB or less.
+            // Effective parallelism: hash of camera
             final DataStream<ChunkedVideoFrame> chunkedVideoFrames = objectDetectedFrames
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
 
-            // Create the Pravega sink to write a stream of video frames.
+            // Write chunks to Pravega encoded as JSON.
+            // Effective parallelism: hash of camera
             final FlinkPravegaWriter<ChunkedVideoFrame> writer = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getOutputStreamConfig().getStream())
@@ -114,7 +157,6 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .withEventRouter(frame -> String.format("%d", frame.camera))
                     .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
                     .build();
-
             chunkedVideoFrames
                     .addSink(writer)
                     .uid("output-sink")
