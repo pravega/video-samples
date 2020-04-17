@@ -12,10 +12,15 @@ package io.pravega.example.tensorflow;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tensorflow.*;
+import org.tensorflow.DataType;
+import org.tensorflow.Graph;
+import org.tensorflow.Output;
+import org.tensorflow.Session;
+import org.tensorflow.Tensor;
 import org.tensorflow.framework.ConfigProto;
 import org.tensorflow.framework.GPUOptions;
 
+import java.io.Closeable;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.FloatBuffer;
@@ -24,7 +29,7 @@ import java.util.List;
 /**
  * ObjectDetector class to detect objects using pre-trained models with TensorFlow Java API.
  */
-public class TFObjectDetector implements Serializable {
+public class TFObjectDetector implements Serializable, Closeable {
     private static final Logger log = LoggerFactory.getLogger(TFObjectDetector.class);
 
     // Params used for image processing
@@ -32,24 +37,12 @@ public class TFObjectDetector implements Serializable {
     private static final float SCALE = 255f;
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
 
-    private static TFObjectDetector single_instance;
-
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final List<String> LABEL_DEF;
 
-    public static TFObjectDetector getInstance() {
-        log.info("getInstance");
-        // TODO: fix race condition
-        if (single_instance == null) {
-            single_instance = new TFObjectDetector();
-        }
-        return single_instance;
-    }
-
     public TFObjectDetector() {
         log.info("TFObjectDetector: initializing TensorFlow");
-
         final ConfigProto config = ConfigProto.newBuilder()
                 .setGpuOptions(GPUOptions.newBuilder()
                         .setAllowGrowth(true)
@@ -80,6 +73,11 @@ public class TFObjectDetector implements Serializable {
                         graphBuilder.constant("scale", SCALE));
 
         log.info("TFObjectDetector: done initializing TensorFlow");
+    }
+
+    @Override
+    public void close() {
+        session.close();
     }
 
     /**
