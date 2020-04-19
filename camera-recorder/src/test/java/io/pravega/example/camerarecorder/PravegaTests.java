@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,18 +12,26 @@ package io.pravega.example.camerarecorder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.ClientConfig;
-import io.pravega.client.ClientFactory;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
-import io.pravega.client.stream.*;
+import io.pravega.client.stream.EventRead;
+import io.pravega.client.stream.EventStreamReader;
+import io.pravega.client.stream.ReaderConfig;
+import io.pravega.client.stream.ReaderGroupConfig;
+import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.StreamCut;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
-import io.pravega.client.stream.impl.UTF8StringSerializer;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacv.*;
+import org.bytedeco.javacv.CanvasFrame;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameGrabber;
+import org.bytedeco.javacv.OpenCVFrameConverter;
+import org.bytedeco.javacv.OpenCVFrameGrabber;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_videoio.VideoCapture;
@@ -38,10 +46,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 public class PravegaTests {
     private static Logger log = LoggerFactory.getLogger(PravegaTests.class);
@@ -61,20 +66,6 @@ public class PravegaTests {
         try (StreamManager streamManager = StreamManager.create(clientConfig)) {
             streamManager.createStream(scope, streamName, StreamConfiguration.builder().build());
         }
-    }
-
-    @Test
-    @Ignore
-    public void Test1() throws Exception {
-        createStream();
-        try (ClientFactory clientFactory = ClientFactory.withScope(scope, clientConfig);
-             EventStreamWriter<String> pravegaWriter = clientFactory.createEventWriter(
-                     streamName,
-                     new UTF8StringSerializer(),
-                     EventWriterConfig.builder().build())) {
-            pravegaWriter.writeEvent("0", "{\"camera\":0}").get();
-        }
-        log.info("Done.");
     }
 
     @Test
@@ -147,82 +138,6 @@ public class PravegaTests {
 
             Thread.sleep(500);
             frameNumber++;
-        }
-    }
-
-    @Test
-    @Ignore
-    public void TestCameraToPravega5() throws Exception {
-        createStream();
-        final int WEBCAM_DEVICE_INDEX = 0;
-        final int captureWidth = 320;
-        final int captureHeight = 240;
-
-//        log.info("getDeviceDescriptions={}", Arrays.toString(VideoInputFrameGrabber.getDeviceDescriptions()));
-        log.info("creating grabber");
-//        final FrameGrabber grabber = new VideoInputFrameGrabber(WEBCAM_DEVICE_INDEX);
-        final FrameGrabber grabber = new OpenCVFrameGrabber(WEBCAM_DEVICE_INDEX);
-        grabber.setImageWidth(captureWidth);
-        grabber.setImageHeight(captureHeight);
-        grabber.setFrameRate(15.0);
-        log.info("starting grabber");
-        grabber.start();
-
-        log.info("actual frame rate={}", grabber.getFrameRate());
-
-        OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
-
-        final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / grabber.getGamma());
-        Frame capturedFrame;
-        int frameNumber = 0;
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        int ssrc = new Random().nextInt();
-        try (ClientFactory clientFactory = ClientFactory.withScope(scope, clientConfig);
-             EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
-                     streamName,
-                     new ByteBufferSerializer(),
-                     EventWriterConfig.builder().build())) {
-
-            while ((capturedFrame = grabber.grab()) != null)
-            {
-                long timestamp = System.currentTimeMillis();
-                log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
-
-                Mat mat = converterToMat.convert(capturedFrame);
-                BytePointer pngBytePointer = new BytePointer();
-                opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
-                log.info("pngBytePointer={}", pngBytePointer);
-                byte[] pngByteArray = pngBytePointer.getStringBytes();
-//                Files.write((new File(String.format("c:\\temp\\capture4-%05d.png", frameNumber))).toPath(), pngByteArray);
-
-                VideoFrame videoFrame = new VideoFrame();
-                videoFrame.camera = 8;
-                videoFrame.ssrc = ssrc;
-                videoFrame.timestamp = new Timestamp(timestamp);
-                videoFrame.frameNumber = frameNumber;
-                videoFrame.data = pngByteArray;
-                videoFrame.hash = videoFrame.calculateHash();
-                ChunkedVideoFrame chunkedVideoFrame = new ChunkedVideoFrame(videoFrame);
-
-                ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(chunkedVideoFrame));
-
-                CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
-
-                if (cFrame.isVisible())
-                {
-                    // Show our frame in the preview
-                    cFrame.showImage(capturedFrame);
-                }
-
-                Thread.sleep(3000);
-
-                future.get();
-
-                frameNumber++;
-            }
-
         }
     }
 
