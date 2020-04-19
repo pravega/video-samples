@@ -8,27 +8,27 @@ FlinkObjectDetectorJob:
   appParameters:
     mode: "2"
   checkpointIntervalMs: 10000
-  enableOperatorChaining: "false"
+  enableOperatorChaining: "true"
   framesPerSec: 30.0
   input:
     minNumSegments: 1
-    stream: object-detector-input-video
+    stream: adas-raw-video
   maxOutOfOrdernessMs: 10
   output:
     minNumSegments: 1
     stream: object-detector-output-video
-  parallelism: 12
+  parallelism: 2
   readerParallelism: 1
   startAtTail: "true"
   taskManager:
     cpu: 1000m
     heap: 6000m
     memory: 12G
-    replicas: 6
+    replicas: 1
     taskSlots: 2
 
 MultiVideoGridJob:
-  enabled: false
+  enabled: true
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
@@ -41,19 +41,19 @@ MultiVideoGridJob:
   numRows: 3
   input:
     minNumSegments: 1
-    stream: examples/multi-video-grid-input
+    stream: safety-and-security-video
   output:
     minNumSegments: 1
-    stream: examples/multi-video-grid-output
+    stream: multi-video-grid-output
   maxOutOfOrdernessMs: 10
-  parallelism: 20
+  parallelism: 8
   readerParallelism: 1
   startAtTail: "true"
   taskManager:
-    cpu: 10000m
+    cpu: 1000m
     memory: 8G
-    replicas: 2
-    taskSlots: 10
+    replicas: 4
+    taskSlots: 2
 
 VideoDataGeneratorJob:
   enabled: false
