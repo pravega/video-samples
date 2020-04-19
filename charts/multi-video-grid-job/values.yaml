@@ -1,0 +1,33 @@
+appParameters:
+  checkpointIntervalMs: 300000
+  chunkSizeBytes: "6292480"
+  enableOperatorChaining: "true"
+  framesPerSec: 2.0
+  # Width and height of monitor (output) images
+  imageWidth: 1280
+  imageHeight: 720
+  # Columns and rows
+  numColumns: 2
+  numRows: 2
+  input-minNumSegments: 1
+  input-stream: safety-and-security-video
+  maxOutOfOrdernessMs: 10
+  output-minNumSegments: 1
+  output-stream: multi-video-grid-output
+  readerParallelism: 1
+  startAtTail: "true"
+flinkVersion: 1.9.1
+imageRef:
+  name: 1.9.1-2.12
+mainClass: io.pravega.example.videoprocessor.MultiVideoGridJob
+mavenCoordinate:
+  artifact: flinkprocessor
+  group: io.pravega.example.video
+  version: 0.1.0
+parallelism: 8
+taskManager:
+  cpu: 1000m
+  heap: 4000m
+  memory: 8G
+  replicas: 4
+  taskSlots: 2

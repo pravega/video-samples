@@ -1,0 +1,25 @@
+appParameters:
+  chunkSizeBytes: "6292480"
+  enableOperatorChaining: "true"
+  framesPerSec: 1.0
+  imageWidth: 1280
+  imageHeight: 720
+  numCameras: 1
+  output-minNumSegments: 1
+  output-stream: generated-video
+  useCachedFrame: "false"
+flinkVersion: 1.9.1
+imageRef:
+  name: 1.9.1-2.12
+mainClass: io.pravega.example.videoprocessor.VideoDataGeneratorJob
+mavenCoordinate:
+  artifact: flinkprocessor
+  group: io.pravega.example.video
+  version: 0.1.0
+parallelism: 1
+taskManager:
+  replicas: 1
+  heap: 500m
+  memory: 1G
+  cpu: 250m
+  taskSlots: 1

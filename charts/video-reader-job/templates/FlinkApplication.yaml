@@ -1,0 +1,21 @@
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: FlinkApplication
+metadata:
+  labels:
+    release: {{ $.Release.Name }}
+  name: {{ $.Release.Name }}
+spec:
+  clusterSelector:
+    name: {{ $.Release.Name }}
+  flinkVersion: {{ $.Values.flinkVersion }}
+  mainClass: {{ .Values.mainClass }}
+  mavenCoordinate: {{ .Values.mavenCoordinate.group }}:{{ .Values.mavenCoordinate.artifact }}:{{ .Values.mavenCoordinate.version }}
+  parallelism: {{ .Values.parallelism }}
+  parameters:
+    - name: scope
+      value: {{ $.Release.Namespace | quote }}
+    {{- range $key, $value := .Values.appParameters }}
+    - name: {{ $key | quote }}
+      value: {{ $value | quote }}
+    {{- end }}
+  state: started
