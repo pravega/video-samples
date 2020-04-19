@@ -79,7 +79,7 @@ publishing {
                 username "$System.env.MAVEN_USERNAME"
                 password "$System.env.MAVEN_PASSWORD"
             }
-            url projectRepoUrl
+            url "$System.env.MAVEN_URL"
         }
     }
 
