@@ -5,7 +5,8 @@ metadata:
   region: us-east-1
 nodeGroups:
   - name: standard-workers
+    availabilityZones: ["us-east-1b"]
     instanceType: p3.2xlarge
-    desiredCapacity: 3
+    desiredCapacity: 5
     ssh:
       publicKeyName: "faheyc@ubuntu"
