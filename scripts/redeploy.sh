@@ -13,4 +13,5 @@ for chart in ${CHARTS} ; do
 done
 
 ${ROOT_DIR}/scripts/deploy.sh
-watch "kubectl get FlinkApplication -n ${NAMESPACE} ; kubectl get pods -n ${NAMESPACE}"
+watch "kubectl get FlinkApplication -n ${NAMESPACE} ; \
+kubectl get pod -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName -n ${NAMESPACE}"
