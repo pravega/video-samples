@@ -2,7 +2,7 @@ appParameters:
   checkpointIntervalMs: 300000
   chunkSizeBytes: "6292480"
   enableOperatorChaining: "true"
-  framesPerSec: 2.0
+  framesPerSec: 4.0
   # Width and height of monitor (output) images
   imageWidth: 1280
   imageHeight: 720
@@ -24,10 +24,10 @@ mavenCoordinate:
   artifact: flinkprocessor
   group: io.pravega.example.video
   version: 0.1.0
-parallelism: 8
+parallelism: 16
 taskManager:
-  cpu: 1000m
+  cpu: 2000m
   heap: 4000m
   memory: 8G
-  replicas: 4
+  replicas: 8
   taskSlots: 2
