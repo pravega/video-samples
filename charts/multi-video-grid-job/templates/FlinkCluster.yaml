@@ -18,13 +18,14 @@ spec:
       resources:
         requests:
           storage: 5Gi
-      storageClassName: standard
+      storageClassName: nfs   # use nfs to avoid affinity issues - TODO: change back to standard
   storage:
     volumeSource:
       persistentVolumeClaim:
         claimName: data-project
   taskManager:
     cpu: {{ .Values.taskManager.cpu }}
+    heap: {{ .Values.taskManager.heap }}
     memory: {{ .Values.taskManager.memory }}
     numberOfTaskSlots: {{ .Values.taskManager.taskSlots }}
     replicas: {{ .Values.taskManager.replicas }}
