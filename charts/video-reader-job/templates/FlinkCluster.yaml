@@ -25,6 +25,7 @@ spec:
         claimName: data-project
   taskManager:
     cpu: {{ .Values.taskManager.cpu }}
+    heap: {{ .Values.taskManager.heap }}
     memory: {{ .Values.taskManager.memory }}
     numberOfTaskSlots: {{ .Values.taskManager.taskSlots }}
     replicas: {{ .Values.taskManager.replicas }}
