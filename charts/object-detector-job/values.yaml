@@ -18,10 +18,10 @@ mavenCoordinate:
   artifact: flinkprocessor
   group: io.pravega.example.video
   version: 0.1.0
-parallelism: 2
+parallelism: 12
 taskManager:
-  cpu: 1000m
+  cpu: 6000m
   heap: 6000m
   memory: 12G
   replicas: 1
-  taskSlots: 2
+  taskSlots: 12
