@@ -46,7 +46,6 @@ class KittiCarSimulator():
         event_interval_sec = (self.video_df.timestamp.shift(-1) - self.video_df.timestamp).mean()
         next_period_t0 = self.video_df.timestamp.iloc[-1] + event_interval_sec
         self.period_sec = next_period_t0 - self.recorded_t0
-        print(f'event_interval_sec={event_interval_sec}, period_sec={self.period_sec}')
         self.processes = []
         self.wall_clock_t0 = None
 
