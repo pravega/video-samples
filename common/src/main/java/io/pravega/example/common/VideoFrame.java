@@ -41,7 +41,7 @@ public class VideoFrame {
     public byte[] hash;
     // Arbitrary user-defined key/value pairs.
     public Map<String,String> tags;
-
+    public KittiSensorReading kittiSensorReadings;
     public List<Recognition> recognitions = new ArrayList<>();
 
     public VideoFrame() {
@@ -55,6 +55,7 @@ public class VideoFrame {
         this.data = frame.data;
         this.hash = frame.hash;
         this.tags = frame.tags;
+        this.kittiSensorReadings = frame.kittiSensorReadings;
         this.recognitions = frame.recognitions;
     }
 
@@ -84,6 +85,7 @@ public class VideoFrame {
                 ", frameNumber=" + frameNumber +
                 ", tags=" + tagsStr +
                 ", hash=" + Arrays.toString(hash) +
+                ", kittiSensorReadings=" + kittiSensorReadings +
                 ", recognitions=" + recognitions.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
