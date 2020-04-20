@@ -25,8 +25,18 @@ public class KittiSensorReading {
     public int camera;
     // Event time of this sensor reading. We use Timestamp to have nanosecond precision for high-speed cameras.
     public Timestamp timestamp;
+    // latitude of the oxts-unit (deg)
+    public double lat;
+    // longitude of the oxts-unit (deg)
+    public double lon;
+    // forward velocity, i.e. parallel to earth-surface (m/s)
+    public double vf;
+    // leftward velocity, i.e. parallel to earth-surface (m/s)
+    public double vl;
     // forward acceleration (m/s^2)
     public double af;
+    // leftward acceleration (m/s^2)
+    public double al;
 
     @Override
     public String toString() {
@@ -34,7 +44,12 @@ public class KittiSensorReading {
                 "car_id=" + car_id +
                 ", camera=" + camera +
                 ", timestamp=" + timestamp +
+                ", lat=" + lat +
+                ", lon=" + lon +
+                ", vf=" + vf +
+                ", vl=" + vl +
                 ", af=" + af +
+                ", al=" + al +
                 '}';
     }
 }
