@@ -12,3 +12,8 @@ from .pravega_video import (
 from .transcoding import (
     Transcoder,
 )
+
+from .kitti import (
+    KittiFleetSimulator,
+    KittiCarSimulator,
+)
