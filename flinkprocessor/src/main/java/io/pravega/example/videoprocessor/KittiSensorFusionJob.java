@@ -12,9 +12,10 @@ package io.pravega.example.videoprocessor;
 
 import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
+import io.pravega.connectors.flink.FlinkPravegaWriter;
+import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.KittiSensorReading;
-import io.pravega.example.common.SensorReading;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
@@ -27,6 +28,8 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
 
 /**
  * This job demonstrates how to join different data types from different Pravega streams.
@@ -57,12 +60,13 @@ public class KittiSensorFusionJob extends AbstractJob {
 
     public void run() {
         try {
-            final long periodMs = 200;
+            final long periodMs = (long) (1000.0 / getConfig().getFramesPerSec());
             final String jobName = KittiSensorFusionJob.class.getName();
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
 
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getSensorStreamConfig());
+            createStream(getConfig().getOutputStreamConfig());
 
             //
             // Create video datastream.
@@ -75,18 +79,18 @@ public class KittiSensorFusionJob extends AbstractJob {
                 startStreamCut = StreamCut.UNBOUNDED;
             }
 
-            FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
+            final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
-            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
                     .assignTimestampsAndWatermarks(
                             new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
                                     Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
@@ -100,7 +104,6 @@ public class KittiSensorFusionJob extends AbstractJob {
 
             // Unchunk (disabled).
             // Operator: ChunkedVideoFrameReassembler
-            // Effective parallelism: default parallelism (implicit rebalance before operator) ???
             final DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
                     .map(VideoFrame::new)
                     .uid("ChunkedVideoFrameReassembler")
@@ -117,19 +120,19 @@ public class KittiSensorFusionJob extends AbstractJob {
                 startStreamCutSensor = StreamCut.UNBOUNDED;
             }
 
-            FlinkPravegaReader<KittiSensorReading> flinkPravegaReaderSensor = FlinkPravegaReader.<KittiSensorReading>builder()
+            final FlinkPravegaReader<KittiSensorReading> flinkPravegaReaderSensor = FlinkPravegaReader.<KittiSensorReading>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getSensorStreamConfig().getStream(), startStreamCutSensor, StreamCut.UNBOUNDED)
                     .withDeserializationSchema(new JsonDeserializationSchema<>(KittiSensorReading.class))
                     .build();
-            DataStream<KittiSensorReading> inSensorReadings = env
+            final DataStream<KittiSensorReading> inSensorReadings = env
                     .addSource(flinkPravegaReaderSensor)
                     .uid("input-sensor")
                     .name("input-sensor");
             inSensorReadings.printToErr().uid("inSensorReadings-print").name("inSensorReadings-print");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
-            DataStream<KittiSensorReading> inSensorReadingsWithTimestamps = inSensorReadings
+            final DataStream<KittiSensorReading> inSensorReadingsWithTimestamps = inSensorReadings
                     .assignTimestampsAndWatermarks(
                             new BoundedOutOfOrdernessTimestampExtractor<KittiSensorReading>(
                                     Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
@@ -142,21 +145,55 @@ public class KittiSensorFusionJob extends AbstractJob {
                     .name("assignTimestampsAndWatermarksSensor");
             inSensorReadingsWithTimestamps.printToErr().uid("inSensorReadingsWithTimestamps-print").name("inSensorReadingsWithTimestamps-print");
 
+            // For each camera and window, get the most recent frame.
+            final DataStream<VideoFrame> lastVideoFramePerCamera = videoFrames
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .maxBy("timestamp")
+                    .uid("lastVideoFramePerCamera")
+                    .name("lastVideoFramePerCamera");
+
+            // For each camera and window, get the most recent sensor reading.
+            final DataStream<KittiSensorReading> lastSensorReadingsPerCamera = inSensorReadingsWithTimestamps
+                    .keyBy((KeySelector<KittiSensorReading, Integer>) value -> value.camera)
+                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
+                    .maxBy("timestamp")
+                    .uid("lastSensorReadingsPerCamera")
+                    .name("lastSensorReadingsPerCamera");
+
             //
             // Join video and non-video sensor data.
             //
 
-            videoFrames
-                    .join(inSensorReadingsWithTimestamps)
+            final DataStream<VideoFrame> outVideoFrames = lastVideoFramePerCamera
+                    .join(lastSensorReadingsPerCamera)
                     .where((KeySelector<VideoFrame, Integer>) value -> value.camera)
                     .equalTo((KeySelector<KittiSensorReading, Integer>) value -> value.camera)
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-                    .apply(new JoinFunction<VideoFrame, KittiSensorReading, String>() {
-                        @Override
-                        public String join(VideoFrame first, KittiSensorReading second) throws Exception {
-                            return "{" + first.toString() + "," + second.toString() + "}";
-                        }
-                    }).printToErr();
+                    .apply((JoinFunction<VideoFrame, KittiSensorReading, VideoFrame>) (first, second) -> {
+                        first.kittiSensorReadings = second;
+                        return first;
+                    });
+            outVideoFrames.printToErr();
+
+            // Split output video frames into chunks of 8 MiB or less.
+            final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
+                    .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
+                    .uid("VideoFrameChunker")
+                    .name("VideoFrameChunker");
+
+            // Write chunks to Pravega encoded as JSON.
+            final FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getOutputStreamConfig().getStream())
+                    .withSerializationSchema(new ChunkedVideoFrameSerializationSchema())
+                    .withEventRouter(frame -> String.format("%d", frame.camera))
+                    .withWriterMode(PravegaWriterMode.ATLEAST_ONCE)
+                    .build();
+            outChunkedVideoFrames
+                    .addSink(flinkPravegaWriter)
+                    .uid("output-sink")
+                    .name("output-sink");
 
             log.info("Executing {} job", jobName);
             env.execute(jobName);
