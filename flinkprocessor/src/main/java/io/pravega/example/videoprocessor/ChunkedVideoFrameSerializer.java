@@ -12,7 +12,7 @@ package io.pravega.example.videoprocessor;
 
 import io.pravega.client.stream.Serializer;
 import io.pravega.example.common.ChunkedVideoFrame;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
