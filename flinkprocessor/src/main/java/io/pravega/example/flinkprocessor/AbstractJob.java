@@ -14,6 +14,7 @@ import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.StreamCut;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.runtime.state.filesystem.FsStateBackend;
@@ -63,6 +64,22 @@ public abstract class AbstractJob implements Runnable {
     public StreamInfo getStreamInfo(Stream stream) {
         try (StreamManager streamManager = StreamManager.create(getConfig().getPravegaConfig().getClientConfig())) {
             return streamManager.getStreamInfo(stream.getScope(), stream.getStreamName());
+        }
+    }
+
+    public StreamCut resolveStartStreamCut(AppConfiguration.StreamConfig streamConfig) {
+        if (streamConfig.isStartAtTail()) {
+            return getStreamInfo(streamConfig.getStream()).getTailStreamCut();
+        } else {
+            return streamConfig.getStartStreamCut();
+        }
+    }
+
+    public StreamCut resolveEndStreamCut(AppConfiguration.StreamConfig streamConfig) {
+        if (streamConfig.isEndAtTail()) {
+            return getStreamInfo(streamConfig.getStream()).getTailStreamCut();
+        } else {
+            return streamConfig.getEndStreamCut();
         }
     }
 

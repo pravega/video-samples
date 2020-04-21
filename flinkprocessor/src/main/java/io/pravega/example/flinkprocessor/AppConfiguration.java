@@ -12,6 +12,7 @@ package io.pravega.example.flinkprocessor;
 
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.PravegaConfig;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.slf4j.Logger;
@@ -37,6 +38,9 @@ public class AppConfiguration {
     private final boolean enableCheckpoint;
     private final boolean enableOperatorChaining;
     private final boolean enableRebalance;
+    /**
+     * @Deprecated Use StreamConfig.startAtTail instead.
+     */
     private final boolean startAtTail;
     private final long maxOutOfOrdernessMs;
 
@@ -130,12 +134,20 @@ public class AppConfiguration {
         private final int targetRate;
         private final int scaleFactor;
         private final int minNumSegments;
+        private final StreamCut startStreamCut;
+        private final StreamCut endStreamCut;
+        private final boolean startAtTail;
+        private final boolean endAtTail;
 
         public StreamConfig(PravegaConfig pravegaConfig, String argPrefix, ParameterTool params) {
             stream = pravegaConfig.resolve(params.get(argPrefix + "stream", "video-demo-stream"));
             targetRate = params.getInt(argPrefix + "targetRate", 100000);  // data rate in KB/sec
             scaleFactor = params.getInt(argPrefix + "scaleFactor", 2);
             minNumSegments = params.getInt(argPrefix + "minNumSegments", 2);
+            startStreamCut = StreamCut.from(params.get(argPrefix + "startStreamCut", StreamCut.UNBOUNDED.asText()));
+            endStreamCut = StreamCut.from(params.get(argPrefix + "endStreamCut", StreamCut.UNBOUNDED.asText()));
+            startAtTail = params.getBoolean("startAtTail", false);
+            endAtTail = params.getBoolean("endAtTail", false);
         }
 
         @Override
@@ -145,6 +157,10 @@ public class AppConfiguration {
                     ", targetRate=" + targetRate +
                     ", scaleFactor=" + scaleFactor +
                     ", minNumSegments=" + minNumSegments +
+                    ", startStreamCut=" + startStreamCut +
+                    ", endStreamCut=" + endStreamCut +
+                    ", startAtTail=" + startAtTail +
+                    ", endAtTail=" + endAtTail +
                     '}';
         }
 
@@ -154,6 +170,22 @@ public class AppConfiguration {
 
         public ScalingPolicy getScalingPolicy() {
             return ScalingPolicy.byDataRate(targetRate, scaleFactor, minNumSegments);
+        }
+
+        public StreamCut getStartStreamCut() {
+            return startStreamCut;
+        }
+
+        public StreamCut getEndStreamCut() {
+            return endStreamCut;
+        }
+
+        public boolean isStartAtTail() {
+            return startAtTail;
+        }
+
+        public boolean isEndAtTail() {
+            return endAtTail;
         }
     }
 }

@@ -25,6 +25,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     private final int imageHeight;
     private final int imageWidth;
     private final int chunkSizeBytes;
+    private final boolean reassembleChunks;
     private final boolean dropChunks;
     private final double framesPerSec;
     private final boolean writeToPravega;
@@ -37,6 +38,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         imageHeight = getParams().getInt("imageHeight", 100);
         imageWidth = getParams().getInt("imageWidth", 100);
         chunkSizeBytes = getParams().getInt("chunkSizeBytes", 8*1024*1024*3/4 + 1024);
+        reassembleChunks = getParams().getBoolean("reassembleChunks", false);
         dropChunks = getParams().getBoolean("dropChunks", false);
         framesPerSec = getParams().getDouble("framesPerSec", 1.0);
         writeToPravega = getParams().getBoolean("writeToPravega", true);
@@ -52,6 +54,7 @@ public class VideoAppConfiguration extends AppConfiguration {
                 ", imageHeight=" + imageHeight +
                 ", imageWidth=" + imageWidth +
                 ", chunkSizeBytes=" + chunkSizeBytes +
+                ", reassembleChunks=" + reassembleChunks +
                 ", dropChunks=" + dropChunks +
                 ", framesPerSec=" + framesPerSec +
                 ", writeToPravega=" + writeToPravega +
@@ -74,6 +77,10 @@ public class VideoAppConfiguration extends AppConfiguration {
 
     public int getChunkSizeBytes() {
         return chunkSizeBytes;
+    }
+
+    public boolean isReassembleChunks() {
+        return reassembleChunks;
     }
 
     public boolean isDropChunks() {
