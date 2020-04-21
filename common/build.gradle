@@ -19,11 +19,10 @@ dependencies {
     compile group: 'io.netty', name: 'netty-all', version: "${nettyVersion}"
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
-    testCompile group: 'junit', name: 'junit', version: '4.12'
     compile "io.pravega:pravega-connectors-flink-${flinkShortVersion}_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
     compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
-    compile "com.fasterxml.jackson.core:jackson-databind:2.9.1"
+    compile "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
 
     compile group: 'org.tensorflow', name: 'tensorflow', version: tensorflowVersion
     compile group: 'org.tensorflow', name: 'libtensorflow', version: tensorflowVersion
@@ -32,4 +31,6 @@ dependencies {
     if (enableGPU.toBoolean()) {
         compile group: 'org.tensorflow', name: 'libtensorflow_jni_gpu', version: tensorflowVersion
     }
+
+    testCompile group: 'junit', name: 'junit', version: junitVersion
 }

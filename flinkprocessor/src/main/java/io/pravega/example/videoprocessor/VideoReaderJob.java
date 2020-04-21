@@ -62,8 +62,8 @@ public class VideoReaderJob extends AbstractJob {
             createStream(getConfig().getInputStreamConfig());
             final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
             final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
-            log.info("startStreamCut={}", startStreamCut.asText());
-            log.info("endStreamCut={}", endStreamCut.asText());
+            log.info("startStreamCut={}", startStreamCut);
+            log.info("endStreamCut={}", endStreamCut);
 
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
@@ -74,7 +74,7 @@ public class VideoReaderJob extends AbstractJob {
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-//            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
+            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
             // Reassemble whole video frames from chunks.
             final DataStream<VideoFrame> videoFrames;

@@ -10,22 +10,14 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.connectors.flink.serialization.PravegaSerializationSchema;
 import io.pravega.example.common.ChunkedVideoFrame;
-import org.apache.flink.api.common.serialization.SerializationSchema;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Serializes ChunkedVideoFrame to JSON.
  */
-public class ChunkedVideoFrameSerializationSchema implements SerializationSchema<ChunkedVideoFrame> {
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    @Override
-    public byte[] serialize(ChunkedVideoFrame element) {
-        try {
-            return mapper.writeValueAsBytes(element);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to serialize", e);
-        }
+public class ChunkedVideoFrameSerializationSchema extends PravegaSerializationSchema<ChunkedVideoFrame> {
+    public ChunkedVideoFrameSerializationSchema() {
+        super(new ChunkedVideoFrameSerializer());
     }
 }

@@ -67,14 +67,25 @@ public abstract class AbstractJob implements Runnable {
         }
     }
 
+    /**
+     * Convert UNBOUNDED start StreamCut to a concrete StreamCut, pointing to the current head or tail of the stream
+     * (depending on isStartAtTail).
+     */
     public StreamCut resolveStartStreamCut(AppConfiguration.StreamConfig streamConfig) {
         if (streamConfig.isStartAtTail()) {
             return getStreamInfo(streamConfig.getStream()).getTailStreamCut();
+        } else if (streamConfig.getStartStreamCut() == StreamCut.UNBOUNDED) {
+            return getStreamInfo(streamConfig.getStream()).getHeadStreamCut();
         } else {
             return streamConfig.getStartStreamCut();
         }
     }
 
+    /**
+     * For bounded reads (indicated by isEndAtTail), convert UNBOUNDED end StreamCut to a concrete StreamCut,
+     * pointing to the current tail of the stream.
+     * For unbounded reads, returns UNBOUNDED.
+     */
     public StreamCut resolveEndStreamCut(AppConfiguration.StreamConfig streamConfig) {
         if (streamConfig.isEndAtTail()) {
             return getStreamInfo(streamConfig.getStream()).getTailStreamCut();

@@ -15,6 +15,7 @@ import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.ExtendedEventPointer;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
@@ -98,6 +99,16 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("input-source-print")
                     .name("input-source-print");
 
+            // Calculate source event pointer.
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFramedWithSource = inChunkedVideoFrames.
+                    map(videoFrame -> {
+                            videoFrame.sourceEventPointer = new ExtendedEventPointer(videoFrame.eventReadMetadata, startStreamCut);
+                            return videoFrame;
+                    })
+                    .uid("inChunkedVideoFramedWithSource")
+                    .name("inChunkedVideoFramedWithSource");
+            inChunkedVideoFramedWithSource.printToErr().uid("inChunkedVideoFramedWithSource-print").name("inChunkedVideoFramedWithSource-print");
+
             final DataStream<VideoFrame> outVideoFrames;
 
             if (mode == 0) {
@@ -106,7 +117,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
                 // Effective parallelism: default parallelism (implicit rebalance before operator) ???
-                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramedWithSource
                         .map(VideoFrame::new)
                         .uid("ChunkedVideoFrameReassembler")
                         .name("ChunkedVideoFrameReassembler");
@@ -126,7 +137,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
                 // Effective parallelism: default parallelism (implicit rebalance before operator) ???
-                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramedWithSource
                         .map(VideoFrame::new)
                         .uid("ChunkedVideoFrameReassembler")
                         .name("ChunkedVideoFrameReassembler");
@@ -146,7 +157,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Assign timestamps and watermarks based on timestamp in each chunk.
                 // Operator: assignTimestampsAndWatermarks
                 // Effective parallelism: min of # of segments, getReaderParallelism()
-                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFramedWithSource
                         .assignTimestampsAndWatermarks(
                                 new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
                                         Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
