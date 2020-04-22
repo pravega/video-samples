@@ -119,6 +119,14 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .uid("ChunkedVideoFrameReassembler")
                     .name("ChunkedVideoFrameReassembler");
 
+//            DataStream<VideoFrame> QRScanFrames = videoFrames
+//                    .map(frame -> {
+//                        FaceRecognizer.getInstance().recognizeFaces(frame);
+//                        frame.hash = frame.calculateHash();
+//
+//                        return frame;
+//                    });
+
             DataStream<VideoFrame> faceRecognizedFrames = videoFrames
                     .map(frame -> {
                         FaceRecognizer.getInstance().recognizeFaces(frame);

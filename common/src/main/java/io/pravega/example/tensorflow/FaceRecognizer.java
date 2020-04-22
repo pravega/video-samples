@@ -203,48 +203,21 @@ public class FaceRecognizer implements Serializable {
     }
 
     public String matchEmbedding(float[] otherEmbedding) throws IOException, URISyntaxException {
-//        try{
-            String match = "Unknown";
+        String match = "Unknown";
 
-            ObjectMapper mapper = new ObjectMapper();
-            InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
-            Person[] people = mapper.readValue(databaseStream, Person[].class);
+        ObjectMapper mapper = new ObjectMapper();
+        InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
+        Person[] people = mapper.readValue(databaseStream, Person[].class);
 
-            for (Person currPerson: people) {
-                double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
-                log.info("distance is " + diff);
-                if(diff < 1.05) {
-                    match = currPerson.name;
-                }
+        for (Person currPerson: people) {
+            double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
+            log.info("distance is " + diff);
+            if(diff < 1.05) {
+                match = currPerson.name;
             }
+        }
 
-//            VideoFrame origFrame = new VideoFrame();
-//            InputStream origImage = FaceRecognizer.class.getResourceAsStream("/TJ_now.jpg");
-//            origFrame.data = IOUtils.toByteArray(origImage);
-//            origFrame.recognizedBoxes = this.detectFaces(origFrame.data);
-//            Mat imageMat = imdecode(new Mat(origFrame.data), IMREAD_UNCHANGED);
-//            log.info("image frame length is " + origFrame.data.length);
-//            origFrame.data = cropFace(origFrame.recognizedBoxes.get(0), imageMat);
-//
-//            log.info("cropped frame length is " + origFrame.data.length);
-////            log.info("origFrame length is " + origFrameData.length);
-//
-//            float[] origEmbedding = embeddFace(origFrame.data);
-//
-//            double diff = compareEmbeddings(origEmbedding, otherEmbedding);
-//
-//            log.info("distance is " + diff);
-//
-//            String match = "Unknown";
-//
-//            if(diff < 1.05) {
-//                match = "Thejas";
-//            }
-
-            return match;
-//        } catch(Exception e) {
-//            throw new RuntimeException(e);
-//        }
+        return match;
     }
 
     public double compareEmbeddings(float[] origEmbedding, float[] otherEmbedding) {
