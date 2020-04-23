@@ -1,5 +1,5 @@
 #! /bin/bash
-set -ex
+set -e
 ROOT_DIR=$(dirname $0)/..
 source ${ROOT_DIR}/scripts/env-local.sh
 kubectl apply -f ${ROOT_DIR}/GPUTensorflowImage/ClusterFlinkImage.yaml
