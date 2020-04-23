@@ -85,19 +85,15 @@ public class MultiVideoGridExperimentalJob extends AbstractJob {
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
 
-            final StreamCut startStreamCut;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            } else {
-                startStreamCut = StreamCut.UNBOUNDED;
-            }
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
 
             // Read chunked video frames from Pravega.
             // Operator: input-source
             // Effective parallelism: min of # of segments, getReaderParallelism()
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env

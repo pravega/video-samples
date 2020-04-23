@@ -3,13 +3,13 @@ appParameters:
   enableOperatorChaining: "true"
   framesPerSec: 30.0
   input-minNumSegments: 1
+  input-startAtTail: "true"
   input-stream: adas-raw-video
   maxOutOfOrdernessMs: 10
   output-minNumSegments: 1
   output-stream: object-detector-output-video
   mode: "2"
   readerParallelism: 1
-  startAtTail: "true"
 flinkVersion: 1.9.1
 imageRef:
   name: cuda10.0flink1.9.1

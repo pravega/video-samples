@@ -10,12 +10,12 @@ appParameters:
   numColumns: 2
   numRows: 2
   input-minNumSegments: 1
+  input-startAtTail: "true"
   input-stream: safety-and-security-video
   maxOutOfOrdernessMs: 10
   output-minNumSegments: 1
   output-stream: multi-video-grid-output
   readerParallelism: 1
-  startAtTail: "true"
 flinkVersion: 1.9.1
 imageRef:
   name: 1.9.1-2.12

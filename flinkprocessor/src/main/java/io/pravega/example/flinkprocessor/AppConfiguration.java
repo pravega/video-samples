@@ -38,10 +38,6 @@ public class AppConfiguration {
     private final boolean enableCheckpoint;
     private final boolean enableOperatorChaining;
     private final boolean enableRebalance;
-    /**
-     * @Deprecated Use StreamConfig.startAtTail instead.
-     */
-    private final boolean startAtTail;
     private final long maxOutOfOrdernessMs;
 
     public AppConfiguration(String[] args) {
@@ -60,7 +56,6 @@ public class AppConfiguration {
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
         enableRebalance = getParams().getBoolean("rebalance", true);
-        startAtTail = getParams().getBoolean("startAtTail", true);
         maxOutOfOrdernessMs = getParams().getLong("maxOutOfOrdernessMs", 1000);
     }
 
@@ -76,7 +71,6 @@ public class AppConfiguration {
                 ", enableCheckpoint=" + enableCheckpoint +
                 ", enableOperatorChaining=" + enableOperatorChaining +
                 ", enableRebalance=" + enableRebalance +
-                ", startAtTail=" + startAtTail +
                 ", maxOutOfOrdernessMs=" + maxOutOfOrdernessMs +
                 '}';
     }
@@ -119,10 +113,6 @@ public class AppConfiguration {
 
     public boolean isEnableRebalance() {
         return enableRebalance;
-    }
-
-    public boolean isStartAtTail() {
-        return startAtTail;
     }
 
     public long getMaxOutOfOrdernessMs() {

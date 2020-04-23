@@ -51,13 +51,11 @@ public class MemoryEaterJob extends AbstractJob {
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
-            StreamCut startStreamCut = StreamCut.UNBOUNDED;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            }
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
             FlinkPravegaReader<InputType> flinkPravegaReader = FlinkPravegaReader.<InputType>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new JsonDeserializationSchema<>(InputType.class))
                     .build();
             DataStream<InputType> ds = env.addSource(flinkPravegaReader);
