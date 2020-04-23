@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -10,22 +10,25 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.client.stream.EventRead;
+import io.pravega.connectors.flink.serialization.PravegaDeserializationSchema;
 import io.pravega.example.common.ChunkedVideoFrame;
-import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
+import io.pravega.example.common.EventReadMetadata;
 
 /**
  * Deserializes ChunkedVideoFrame from JSON.
  */
-public class ChunkedVideoFrameDeserializationSchema extends AbstractDeserializationSchema<ChunkedVideoFrame> {
-    private final ObjectMapper mapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+public class ChunkedVideoFrameDeserializationSchema extends PravegaDeserializationSchema<ChunkedVideoFrame> {
+    public ChunkedVideoFrameDeserializationSchema() {
+        super(ChunkedVideoFrame.class, new ChunkedVideoFrameSerializer());
+    }
 
     @Override
-    public ChunkedVideoFrame deserialize(byte[] message) throws IOException {
-        return mapper.readValue(message, ChunkedVideoFrame.class);
+    public ChunkedVideoFrame extractEvent(EventRead<ChunkedVideoFrame> eventRead) {
+        final ChunkedVideoFrame event = eventRead.getEvent();
+        if (event != null) {
+            event.eventReadMetadata = new EventReadMetadata(eventRead);
+        }
+        return event;
     }
 }

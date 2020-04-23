@@ -2,10 +2,16 @@ package io.pravega.example.videoprocessor;
 
 import com.google.common.base.Preconditions;
 
+/**
+ * This is currently unused as time windows appear to work just as well.
+ * See OrderedVideoFrameCoProcessFunction.
+ * See also MultiVideoGridExperimentalJob.java.
+ */
 public class OrderedParallelOperator {
     /**
      * Operator 0 expects to receive streams 0 to 1.
      * Operator 1 expects to receive streams 0 to 2.
+     *
      * @param currentIndex The first index for all streams is 0.
      * @param operator The number of this operator (0 to parallelism-2).
      * @param parallelism The number of streams.

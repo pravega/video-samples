@@ -38,13 +38,11 @@ dependencies {
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-json:${flinkVersion}"
     compile "io.pravega:pravega-client:${pravegaVersion}"
-
+    compile "com.github.vladimir-bukhtoyarov:bucket4j-core:${bucket4jVersion}"
 
     if (includePravegaCredentials.toBoolean()) {
         compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
-    }
-
-    compile "com.github.vladimir-bukhtoyarov:bucket4j-core:${bucket4jVersion}"
+    }    
 
     testCompile "junit:junit:${junitVersion}"
 }

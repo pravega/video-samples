@@ -10,7 +10,8 @@
  */
 package io.pravega.example.common;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 
 import java.sql.Timestamp;
 

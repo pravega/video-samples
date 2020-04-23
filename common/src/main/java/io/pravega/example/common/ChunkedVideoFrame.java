@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -10,14 +10,17 @@
  */
 package io.pravega.example.common;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+
+import java.io.Serializable;
 
 /**
  * Allows a VideoFrame to be split into smaller chunks.
  * VideoFrame.data contains the chunk of data.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ChunkedVideoFrame extends VideoFrame {
+public class ChunkedVideoFrame extends VideoFrame implements Serializable {
     // 0-based chunk index. The first chunk of each frame has chunkIndex 0.
     public short chunkIndex;
     // Number of chunks minus 1.

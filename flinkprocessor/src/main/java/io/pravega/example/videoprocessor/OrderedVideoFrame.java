@@ -2,6 +2,10 @@ package io.pravega.example.videoprocessor;
 
 import io.pravega.example.common.VideoFrame;
 
+/**
+ * This is currently unused as time windows appear to work just as well.
+ * See MultiVideoGridExperimentalJob.java.
+ */
 public class OrderedVideoFrame {
     public long index;
     public VideoFrame value;

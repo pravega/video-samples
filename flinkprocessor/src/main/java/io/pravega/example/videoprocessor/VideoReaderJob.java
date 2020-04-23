@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,64 +60,74 @@ public class VideoReaderJob extends AbstractJob {
             final String jobName = VideoReaderJob.class.getName();
             StreamExecutionEnvironment env = initializeFlinkStreaming();
             createStream(getConfig().getInputStreamConfig());
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
+            log.info("startStreamCut={}", startStreamCut);
+            log.info("endStreamCut={}", endStreamCut);
 
-            StreamCut startStreamCut = StreamCut.UNBOUNDED;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            }
-
-            FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
+            final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
-            DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
                     .uid("input-source")
                     .name("input-source");
-//            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
-
-            // Assign timestamps and watermarks based on timestamp in each chunk.
-            DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
-                    .assignTimestampsAndWatermarks(
-                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
-                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
-                                @Override
-                                public long extractTimestamp(ChunkedVideoFrame element) {
-                                    return element.timestamp.getTime();
-                                }
-                            })
-                    .uid("assignTimestampsAndWatermarks")
-                    .name("assignTimestampsAndWatermarks");
-//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
+            inChunkedVideoFrames.printToErr().uid("inChunkedVideoFrames-print").name("inChunkedVideoFrames-print");
 
             // Reassemble whole video frames from chunks.
-            boolean failOnError = false;
-            DataStream<VideoFrame> videoFrames = inChunkedVideoFramesWithTimestamps
-                    .keyBy("camera")
-                    .window(new ChunkedVideoFrameWindowAssigner())
-                    .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
-                    .uid("ChunkedVideoFrameReassembler")
-                    .name("ChunkedVideoFrameReassembler");
+            final DataStream<VideoFrame> videoFrames;
+            if (getConfig().isReassembleChunks()) {
+                // Assign timestamps and watermarks based on timestamp in each chunk.
+                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                        .assignTimestampsAndWatermarks(
+                                new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                        Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
+                                    @Override
+                                    public long extractTimestamp(ChunkedVideoFrame element) {
+                                        return element.timestamp.getTime();
+                                    }
+                                })
+                        .uid("assignTimestampsAndWatermarks")
+                        .name("assignTimestampsAndWatermarks");
+//            inChunkedVideoFramesWithTimestamps.printToErr().uid("inChunkedVideoFramesWithTimestamps-print").name("inChunkedVideoFramesWithTimestamps-print");
+
+                final boolean failOnError = false;
+                videoFrames = inChunkedVideoFramesWithTimestamps
+                        .keyBy("camera")
+                        .window(new ChunkedVideoFrameWindowAssigner())
+                        .process(new ChunkedVideoFrameReassembler().withFailOnError(failOnError))
+                        .uid("ChunkedVideoFrameReassembler")
+                        .name("ChunkedVideoFrameReassembler");
+            } else {
+                // Assume that input is not chuncked.
+                videoFrames = inChunkedVideoFrames
+                        .map(VideoFrame::new)
+                        .uid("ChunkedVideoFrameReassembler")
+                        .name("ChunkedVideoFrameReassembler");
+            }
             videoFrames.printToErr().uid("videoFrames-print").name("videoFrames-print");
 
             // Write some frames to files for viewing.
-            videoFrames
-                    .filter(frame -> frame.frameNumber < 20)
-                    .uid("write-file-filter")
-                    .map(frame -> {
-                        String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
-                        log.info("Writing frame to {}", fileName);
-                        try (FileOutputStream fos = new FileOutputStream(fileName)) {
-                            fos.write(frame.data);
-                        }
-                        return 0;
-                    })
-                    .uid("write-file-map")
-                    .name("write-file-map");
+            if (false) {
+                videoFrames
+                        .filter(frame -> frame.frameNumber < 20)
+                        .uid("write-file-filter")
+                        .map(frame -> {
+                            String fileName = String.format("/tmp/camera%d-frame%05d.png", frame.camera, frame.frameNumber);
+                            log.info("Writing frame to {}", fileName);
+                            try (FileOutputStream fos = new FileOutputStream(fileName)) {
+                                fos.write(frame.data);
+                            }
+                            return 0;
+                        })
+                        .uid("write-file-map")
+                        .name("write-file-map");
+            }
 
             // Parse image file and obtain metadata.
-            DataStream<String> frameInfo = videoFrames
+            final DataStream<String> frameInfo = videoFrames
                     .map(frame -> {
                         InputStream inStream = new ByteArrayInputStream(frame.data);
                         BufferedImage inImage = ImageIO.read(inStream);

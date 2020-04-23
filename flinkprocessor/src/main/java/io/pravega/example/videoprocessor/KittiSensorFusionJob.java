@@ -72,16 +72,12 @@ public class KittiSensorFusionJob extends AbstractJob {
             // Create video datastream.
             //
 
-            final StreamCut startStreamCut;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            } else {
-                startStreamCut = StreamCut.UNBOUNDED;
-            }
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
 
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
@@ -113,16 +109,12 @@ public class KittiSensorFusionJob extends AbstractJob {
             // Create non-video sensor datastream.
             //
 
-            final StreamCut startStreamCutSensor;
-            if (getConfig().isStartAtTail()) {
-                startStreamCutSensor = getStreamInfo(getConfig().getSensorStreamConfig().getStream()).getTailStreamCut();
-            } else {
-                startStreamCutSensor = StreamCut.UNBOUNDED;
-            }
+            final StreamCut startStreamCutSensor = resolveStartStreamCut(getConfig().getSensorStreamConfig());
+            final StreamCut endStreamCutSensor = resolveEndStreamCut(getConfig().getSensorStreamConfig());
 
             final FlinkPravegaReader<KittiSensorReading> flinkPravegaReaderSensor = FlinkPravegaReader.<KittiSensorReading>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getSensorStreamConfig().getStream(), startStreamCutSensor, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getSensorStreamConfig().getStream(), startStreamCutSensor, endStreamCutSensor)
                     .withDeserializationSchema(new JsonDeserializationSchema<>(KittiSensorReading.class))
                     .build();
             final DataStream<KittiSensorReading> inSensorReadings = env

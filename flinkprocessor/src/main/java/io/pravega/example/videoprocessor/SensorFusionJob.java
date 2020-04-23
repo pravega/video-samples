@@ -70,14 +70,12 @@ public class SensorFusionJob extends AbstractJob {
             // Create video datastream.
             //
 
-            StreamCut startStreamCut = StreamCut.UNBOUNDED;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            }
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
 
             FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
@@ -112,14 +110,12 @@ public class SensorFusionJob extends AbstractJob {
             // Create non-video sensor datastream.
             //
 
-            startStreamCut = StreamCut.UNBOUNDED;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getSensorStreamConfig().getStream()).getTailStreamCut();
-            }
+            final StreamCut startStreamCutSensor = resolveStartStreamCut(getConfig().getSensorStreamConfig());
+            final StreamCut endStreamCutSensor = resolveEndStreamCut(getConfig().getSensorStreamConfig());
 
             FlinkPravegaReader<SensorReading> flinkPravegaReaderSensor = FlinkPravegaReader.<SensorReading>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getSensorStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getSensorStreamConfig().getStream(), startStreamCutSensor, endStreamCutSensor)
                     .withDeserializationSchema(new JsonDeserializationSchema<>(SensorReading.class))
                     .build();
             DataStream<SensorReading> inSensorReadings = env

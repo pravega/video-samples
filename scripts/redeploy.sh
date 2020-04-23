@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 ROOT_DIR=$(dirname $0)/..
 source ${ROOT_DIR}/scripts/env-local.sh
 ${ROOT_DIR}/scripts/uninstall.sh

@@ -15,6 +15,7 @@ import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
 import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.ExtendedEventPointer;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.tensorflow.TFObjectDetector;
@@ -35,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Optional;
 
 
 /**
@@ -75,20 +75,17 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             log.info("mode={}", mode);
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
-
-            final StreamCut startStreamCut;
-            if (getConfig().isStartAtTail()) {
-                startStreamCut = getStreamInfo(getConfig().getInputStreamConfig().getStream()).getTailStreamCut();
-            } else {
-                startStreamCut = StreamCut.UNBOUNDED;
-            }
+            final StreamCut startStreamCut = resolveStartStreamCut(getConfig().getInputStreamConfig());
+            final StreamCut endStreamCut = resolveEndStreamCut(getConfig().getInputStreamConfig());
+            log.info("startStreamCut={}", startStreamCut.asText());
+            log.info("endStreamCut={}", endStreamCut.asText());
 
             // Read chunked video frames from Pravega.
             // Operator: input-source
             // Effective parallelism: min of # of segments, getReaderParallelism()
             final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReader = FlinkPravegaReader.<ChunkedVideoFrame>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, StreamCut.UNBOUNDED)
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
                     .build();
             final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
@@ -102,6 +99,16 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                     .uid("input-source-print")
                     .name("input-source-print");
 
+            // Calculate source event pointer.
+            final DataStream<ChunkedVideoFrame> inChunkedVideoFramedWithSource = inChunkedVideoFrames.
+                    map(videoFrame -> {
+                            videoFrame.sourceEventPointer = new ExtendedEventPointer(videoFrame.eventReadMetadata, startStreamCut);
+                            return videoFrame;
+                    })
+                    .uid("inChunkedVideoFramedWithSource")
+                    .name("inChunkedVideoFramedWithSource");
+            inChunkedVideoFramedWithSource.printToErr().uid("inChunkedVideoFramedWithSource-print").name("inChunkedVideoFramedWithSource-print");
+
             final DataStream<VideoFrame> outVideoFrames;
 
             if (mode == 0) {
@@ -110,7 +117,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
                 // Effective parallelism: default parallelism (implicit rebalance before operator) ???
-                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramedWithSource
                         .map(VideoFrame::new)
                         .uid("ChunkedVideoFrameReassembler")
                         .name("ChunkedVideoFrameReassembler");
@@ -130,7 +137,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
                 // Effective parallelism: default parallelism (implicit rebalance before operator) ???
-                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFrames
+                final DataStream<VideoFrame> inVideoFrames = inChunkedVideoFramedWithSource
                         .map(VideoFrame::new)
                         .uid("ChunkedVideoFrameReassembler")
                         .name("ChunkedVideoFrameReassembler");
@@ -150,7 +157,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
                 // Assign timestamps and watermarks based on timestamp in each chunk.
                 // Operator: assignTimestampsAndWatermarks
                 // Effective parallelism: min of # of segments, getReaderParallelism()
-                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFrames
+                final DataStream<ChunkedVideoFrame> inChunkedVideoFramesWithTimestamps = inChunkedVideoFramedWithSource
                         .assignTimestampsAndWatermarks(
                                 new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
                                         Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {

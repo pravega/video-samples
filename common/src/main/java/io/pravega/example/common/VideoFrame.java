@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -10,8 +10,10 @@
  */
 package io.pravega.example.common;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnore;
 import io.pravega.example.tensorflow.Recognition;
 
+import java.io.Serializable;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,7 +27,7 @@ import java.util.stream.Collectors;
 /**
  * A class for storing a single video frame.
  */
-public class VideoFrame {
+public class VideoFrame implements Serializable {
     // Unique ID for this video stream.
     public int camera;
     // Random source identifier used to avoid corruption if multiple sources use the same camera and timestamp.
@@ -43,6 +45,10 @@ public class VideoFrame {
     public Map<String,String> tags;
     public KittiSensorReading kittiSensorReadings;
     public List<Recognition> recognitions = new ArrayList<>();
+    public ExtendedEventPointer sourceEventPointer;
+
+    @JsonIgnore
+    public EventReadMetadata eventReadMetadata;
 
     public VideoFrame() {
     }
@@ -57,6 +63,8 @@ public class VideoFrame {
         this.tags = frame.tags;
         this.kittiSensorReadings = frame.kittiSensorReadings;
         this.recognitions = frame.recognitions;
+        this.sourceEventPointer = frame.sourceEventPointer;
+        this.eventReadMetadata = frame.eventReadMetadata;
     }
 
     @Override
@@ -87,6 +95,8 @@ public class VideoFrame {
                 ", hash=" + Arrays.toString(hash) +
                 ", kittiSensorReadings=" + kittiSensorReadings +
                 ", recognitions=" + recognitions.toString() +
+                ", sourceEventPointer=" + sourceEventPointer +
+                ", eventReadMetadata=" + eventReadMetadata +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

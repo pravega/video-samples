@@ -13,6 +13,12 @@ import org.slf4j.LoggerFactory;
 import java.text.MessageFormat;
 import java.util.Optional;
 
+/**
+ * This class can be used to merge two streams of OrderedVideoFrame and produce ordered output.
+ * It buffers elements received out-of-order in the Flink state.
+ * This is currently unused as time windows appear to work just as well.
+ * See MultiVideoGridExperimentalJob.java.
+ */
 class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoFrame, OrderedVideoFrame, OrderedVideoFrame> {
     private static Logger log = LoggerFactory.getLogger(OrderedVideoFrameCoProcessFunction.class);
 
@@ -55,7 +61,7 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
                     break;
                 }
                 // Emit the buffered element now.
-                log.info("CLAUDIO Emitting buffered element; nextOutputIndex={}, buffered={}", nextOutputIndex, buffered);
+                log.info("Emitting buffered element; nextOutputIndex={}, buffered={}", nextOutputIndex, buffered);
                 out.collect(buffered);
                 outOfOrderElementsState.remove(nextOutputIndex);
                 nextOutputIndex = OrderedParallelOperator.getNextIndexToEmit(nextOutputIndex, operator, parallelism);
@@ -63,7 +69,7 @@ class OrderedVideoFrameCoProcessFunction extends CoProcessFunction<OrderedVideoF
             nextOutputIndexState.update(nextOutputIndex);
         } else if (nextOutputIndex < value.index) {
             // Add early element to buffer.
-            log.info("CLAUDIO Buffering early element; nextOutputIndex={}, value={}", nextOutputIndex, value);
+            log.info("Buffering early element; nextOutputIndex={}, value={}", nextOutputIndex, value);
             outOfOrderElementsState.put(value.index, value);
         } else {
             throw new IllegalStateException(MessageFormat.format("Unexpected element order; nextOutputIndex={0}, value.index={1}", nextOutputIndex, value.index));

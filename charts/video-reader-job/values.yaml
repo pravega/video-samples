@@ -1,9 +1,9 @@
 appParameters:
   enableOperatorChaining: "false"
   input-minNumSegments: 1
+  input-startAtTail: "true"
   input-stream: multi-video-grid-output
   maxOutOfOrdernessMs: 1000
-  startAtTail: "true"
 flinkVersion: 1.9.1
 imageRef:
   name: 1.9.1-2.12
