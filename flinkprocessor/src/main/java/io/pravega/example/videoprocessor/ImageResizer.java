@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ * Copyright (c) Dell Inc., or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.*;
-import java.util.Random;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 
 /**
@@ -28,8 +31,6 @@ public class ImageResizer {
 
     private final int outputWidth;
     private final int outputHeight;
-
-//    private final Random random = new Random();
 
     public ImageResizer(int outputWidth, int outputHeight) {
         this.outputWidth = outputWidth;
@@ -49,6 +50,10 @@ public class ImageResizer {
         return outStream.toByteArray();
     }
 
+    /**
+     * Resize images. The output is a PNG because this can be encoded faster than JPEG and the output is expected
+     * to go to a subsequent task before it is stored.
+     */
     public void resize(InputStream inStream, OutputStream outStream) {
         try {
             log.info("resize: BEGIN");
@@ -60,7 +65,6 @@ public class ImageResizer {
             g2d.drawImage(scaledImage, 0, 0, null);
             g2d.dispose();
             ImageIO.write(outImage, "png", outStream);
-//            Thread.sleep(random.nextInt(1000));
             log.info("resize: END: TIME={}", System.currentTimeMillis() - t0);
         } catch (IOException e) {
             throw new RuntimeException(e);
