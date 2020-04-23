@@ -591,9 +591,13 @@ class VideoPlayer():
         if self.filtered_index_df is None or len(self.filtered_index_df) <= frame_number:
             self.show_frame(None)
         else:
-            index_rec = self.filtered_index_df.iloc[frame_number]
-            video_frame = self.indexed_stream.get_single_video_frame_by_index(index_rec)
-            self.show_frame(video_frame)
+            try:
+                index_rec = self.filtered_index_df.iloc[frame_number]
+                video_frame = self.indexed_stream.get_single_video_frame_by_index(index_rec)
+                self.show_frame(video_frame)
+            except Exception as e:
+                #logging.error('VideoPlayer.on_frame_number_change: ' + traceback.format_exc())
+                self.show_frame(None)
 
     def show_frame(self, video_frame):
         """Display a video frame."""
