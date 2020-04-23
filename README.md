@@ -174,12 +174,6 @@ docker build .
 Tag the image, push it, and then edit GPUTensorflowImage/ClusterFlinkImage.yaml with the
 correct tag.
 
-#### Add Custom Flink Image to SDP
-
-```
-kubectl apply -f GPUTensorflowImage/ClusterFlinkImage.yaml
-```
-
 #### (GPU) Enable TensorFlow GPU Support
 
 If you have GPUs on the SDP worker nodes, then set the following in gradle.properties.
@@ -235,30 +229,20 @@ Note that image backgrounds are filled with random bytes to make them incompress
 
 ### Running the Examples in SDP (optional)
 
-1. You must make the Maven repo in SDP available to your development workstation.
+1. Create and edit the file scripts/env-local.sh that defines your environment.
 ```
-export NAMESPACE=examples
-kubectl port-forward service/repo 9092:80 --namespace ${NAMESPACE} &
-```
-
-2. Build and publish your application JAR file.
-```
-export MAVEN_USERNAME=desdp
-export MAVEN_PASSWORD=$(kubectl get secret keycloak-desdp -n nautilus-system -o jsonpath='{.data.password}' | base64 -d)
-./gradlew publish
+cp scripts/env-example.sh scripts/env-local.sh
 ```
 
-3. Use Helm to start your Flink cluster and Flink applications.
+2. Build and deploy the Flink jobs.
 ```
-scripts/deploy-k8s-components.sh
+scripts/redeploy.sh
 ```
 
-You can edit the file (charts/videoprocessor/values.yaml)[charts/videoprocessor/values.yaml]
+You can edit the file (charts/multi-video-grid-job/values.yaml)[charts/multi-video-grid-job/values.yaml]
 to change various parameters such as the image dimensions, frames per second, and
 number of cameras.
-If you make changes to the source code or values.yaml, you may redeploy your application by repeating steps 2 to 3.
-When you do this, you will see the current Flink applications save their state in a savepoint,
-terminate, restart with the new JAR file, and resume from the last savepoint.
+If you make changes to the source code or values.yaml, you may redeploy your application by repeating step 2.
 
 Note: You may use the script `scripts/uninstall.sh` to delete your Flink application and cluster.
 This will also delete any savepoints.
