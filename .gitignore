@@ -3,7 +3,6 @@
 .gradle/
 .idea/
 .ipynb_checkpoints/
-*.json
 *.log
 .nfs*
 build/
@@ -15,3 +14,5 @@ lib/*
 out/
 __pycache__
 common/src/main/resources/tiny-yolo-voc.pb
+keycloak.json
+
