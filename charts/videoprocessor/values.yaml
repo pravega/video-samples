@@ -33,14 +33,14 @@ FlinkFaceRecognizerJob:
   output:
     stream: object-detector-output-video
     minNumSegments: 1
-  startAtTail: "false"
+  startAtTail: "true"
   maxOutOfOrdernessMs: 1000
   taskManager:
     replicas: 1
-    memory: 2G
-    cpu: 500m
-    heap: 700m
-    taskSlots: 2
+    memory: 2.1G
+    cpu: 900m
+    heap: 900m
+    taskSlots: 1
 
 VideoDataGeneratorJob:
   enabled: false
