@@ -209,10 +209,12 @@ public class FaceRecognizer implements Serializable {
         InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
         Person[] people = mapper.readValue(databaseStream, Person[].class);
 
+        double minDiff = 1.0;
+
         for (Person currPerson: people) {
             double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
-            log.info("distance is " + diff);
-            if(diff < 1.05) {
+            log.info("distance with "+ currPerson.name + " is " + diff);
+            if(diff < 1.00 && diff < minDiff) {
                 match = currPerson.name;
             }
         }
