@@ -13,6 +13,7 @@ public class MySQLConnection {
         Connection con = getRemoteConnection();
         String query = "CREATE TABLE pet (name VARCHAR(20), owner VARCHAR(20),\n" +
                 "       species VARCHAR(20), sex CHAR(1), birth DATE, death DATE);";
+        assert con != null;
         Statement st = con.createStatement();
         ResultSet rs = st.executeQuery(query);
         ResultSetMetaData rsmd = rs.getMetaData();
@@ -25,7 +26,6 @@ public class MySQLConnection {
             }
             System.out.println();
         }
-        return;
     }
 
     private Connection getRemoteConnection() {

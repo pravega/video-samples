@@ -21,7 +21,7 @@ import java.util.PriorityQueue;
 
 public class YOLOClassifier {
     private final static float OVERLAP_THRESHOLD = 0.5f;
-    private final static double anchors[] = {1.08, 1.19, 3.42, 4.41, 6.63, 11.38, 9.42, 5.11, 16.62, 10.52};
+    private final static double[] anchors = {1.08, 1.19, 3.42, 4.41, 6.63, 11.38, 9.42, 5.11, 16.62, 10.52};
     private final static int NUMBER_OF_BOXES = 13;
     private final static int MAX_RECOGNIZED_CLASSES = 24;
     private final static float THRESHOLD = 0.15f;   // Change to 0.10 to reduce detected objects.
@@ -49,7 +49,7 @@ public class YOLOClassifier {
     public List<Recognition> classifyImage(final float[] tensorFlowOutput, final List<String> labels) {
         int numClass = (int) (tensorFlowOutput.length / (Math.pow(NUMBER_OF_BOXES, 2) * NUMBER_OF_BOUNDING_BOXES) - 5);
         BoundingBox[][][] boundingBoxPerCell = new BoundingBox[NUMBER_OF_BOXES][NUMBER_OF_BOXES][NUMBER_OF_BOUNDING_BOXES];
-        PriorityQueue<Recognition> priorityQueue = new PriorityQueue(MAX_RECOGNIZED_CLASSES, new RecognitionComparator());
+        PriorityQueue<Recognition> priorityQueue = new PriorityQueue<>(MAX_RECOGNIZED_CLASSES, new RecognitionComparator());
 
         int offset = 0;
         for (int cy = 0; cy < NUMBER_OF_BOXES; cy++) {        // SIZE * SIZE cells
@@ -78,9 +78,7 @@ public class YOLOClassifier {
             classes[probIndex] = tensorFlowOutput[probIndex + offset + 5];
         }
 
-        BoundingBox boundingBox = new BoundingBox(x, y, width, height, confidence, classes);
-
-        return boundingBox;
+        return new BoundingBox(x, y, width, height, confidence, classes);
     }
 
 
@@ -100,7 +98,7 @@ public class YOLOClassifier {
     }
 
     private List<Recognition> getRecognition(final PriorityQueue<Recognition> priorityQueue) {
-        List<Recognition> recognitions = new ArrayList();
+        List<Recognition> recognitions = new ArrayList<>();
 
         if (priorityQueue.size() > 0) {
             // Best recognition

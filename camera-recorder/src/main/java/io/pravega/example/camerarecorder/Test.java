@@ -119,7 +119,7 @@ public class Test {
 
             System.out.println("Recognition location X: " + recognition.getLocation().getLeft() + ", Height:" + recognition.getLocation().getTop());
 
-            outData= ImageUtil.getInstance().labelFace(outData, recognition);
+            outData= new ImageUtil().labelFace(outData, recognition);
         }
 
         Mat outputImage = imdecode(new Mat(outData), IMREAD_UNCHANGED);

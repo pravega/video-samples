@@ -45,7 +45,7 @@ import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 /**
  * ObjectDetector class to detect and recognize faces using pre-trained models with TensorFlow Java API.
  */
-public class FaceRecognizer implements Serializable {
+public class FaceRecognizer implements Serializable, Closeable {
     private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
 
     // Params used for image processing
@@ -57,21 +57,14 @@ public class FaceRecognizer implements Serializable {
 
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
+    private final ImageUtil imageUtil;
+
 
 //    private List<BoundingBox> recognizedBoxes;
 
-    public static FaceRecognizer getInstance() {
-        // TODO: fix race condition
-        if (single_instance == null) {
-            single_instance = new FaceRecognizer();
-        }
-
-        return single_instance;
-    }
-
-
-
     public FaceRecognizer() {
+        log.info("TFObjectDetector: initializing TensorFlow");
+        final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
 
         byte[] GRAPH_DEF = IOUtil.readAllBytesOrExit(graphFile);
@@ -92,17 +85,35 @@ public class FaceRecognizer implements Serializable {
                                         graphBuilder.constant("make_batch", 0)),
                                 graphBuilder.constant("size", new int[]{IMAGE_DIMENSION, IMAGE_DIMENSION})),
                         graphBuilder.constant("scale", SCALE));
+        imageUtil = new ImageUtil();
+        log.info("FaceRecognizer: done initializing TensorFlow; duration = {} ms", System.currentTimeMillis() - t0);
+
     }
+
+    public void warmup() throws Exception {
+        log.info("warmup: BEGIN");
+        final long t0 = System.currentTimeMillis();
+        detectFaces(imageUtil.createBlankJpeg(1280, 720));
+        log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
+    }
+
+    @Override
+    public void close() {
+        session.close();
+    }
+
 
     /**
      * Identifies recognized faces on the video frame
-     * @param frame video frame used to detect and recognize faces on
+     *
+     * @param origFrame video frame used to detect and recognize faces on
      */
-    public void recognizeFaces(VideoFrame frame) throws Exception {
+    public VideoFrame recognizeFaces(VideoFrame origFrame) throws Exception {
         // Identifies the location of faces on video frame
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
 //        try{
-            log.info("length of frame is:" + String.valueOf(frame.data.length));
+            VideoFrame frame = origFrame;
+            log.info("length of frame is:" + frame.data.length);
             frame.recognizedBoxes = this.detectFaces(frame.data);
 
             Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
@@ -125,7 +136,8 @@ public class FaceRecognizer implements Serializable {
                                     (float) (currentFace.getWidth()),
                                     (float) (currentFace.getHeight())));
                     frame.recognitions.add(recognition);
-                    frame.data = ImageUtil.getInstance().labelFace(frame.data, recognition);
+                    ImageUtil util = new ImageUtil();
+                    frame.data = util.labelFace(frame.data, recognition);
     //            }
     //            } else {
     //                continue;
@@ -134,6 +146,7 @@ public class FaceRecognizer implements Serializable {
 //        } catch (Exception e) {
 //            throw new Exception(e);
 //        }
+        return frame;
     }
 
     /**
@@ -142,8 +155,7 @@ public class FaceRecognizer implements Serializable {
      * @return embeddings in a float array
      */
     public float[] embeddFace(byte[] face) {
-        final float[] embeddings = executeGraph(face);
-        return embeddings;
+        return executeGraph(face);
     }
 
     /**
@@ -151,7 +163,7 @@ public class FaceRecognizer implements Serializable {
      * @param jpegBytes byte array to run the facenet model on
      * @return embeddings extracted by running the pre-trained model
      */
-    public float[] executeGraph(byte[] jpegBytes) {
+    private float[] executeGraph(byte[] jpegBytes) {
         // Preprocess image (decode JPEG and resize)
 
         log.info("jpegBytes.length is " + jpegBytes.length);
@@ -202,7 +214,7 @@ public class FaceRecognizer implements Serializable {
         return outData;
     }
 
-    public String matchEmbedding(float[] otherEmbedding) throws IOException, URISyntaxException {
+    public String matchEmbedding(float[] otherEmbedding) throws IOException {
         String match = "Unknown";
 
         ObjectMapper mapper = new ObjectMapper();
@@ -232,22 +244,24 @@ public class FaceRecognizer implements Serializable {
         return Math.sqrt(sumDiffSq);
     }
 
-    public List<BoundingBox> detectFaces(byte[] frameData) throws IOException, URISyntaxException {
-        Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
-        CvArr inputImage = new IplImage(imageMat);
+    public List<BoundingBox> detectFaces(byte[] frameData) throws Exception {
+        try {
 
-        CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
+            Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
+            CvArr inputImage = new IplImage(imageMat);
 
-        cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
-        cvEqualizeHist(grayImage, grayImage);
+            CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
+
+            cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
+            cvEqualizeHist(grayImage, grayImage);
 
 
 //        URL classifier = FaceRecognizer.class.getResource("/haarcascade_frontalface_alt.xml");       // face detection model
-        File file = null;
-        String resource = "/haarcascade_frontalface_alt.xml";
-        URL classifier = getClass().getResource(resource);
+            File file;
+            String resource = "/haarcascade_frontalface_alt.xml";
+            URL classifier = getClass().getResource(resource);
 
-        if (classifier.getProtocol().equals("jar")) {
+            if (classifier.getProtocol().equals("jar")) {
 //            try {
                 InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
                 file = File.createTempFile("tempfile", ".tmp");
@@ -260,51 +274,72 @@ public class FaceRecognizer implements Serializable {
                 }
                 out.close();
                 file.deleteOnExit();
-        } else {
-            //this will probably work in your IDE, but not from a JAR
-            file = new File(classifier.getFile());
-        }
+            } else {
+                //this will probably work in your IDE, but not from a JAR
+                file = new File(classifier.getFile());
+            }
 
-        if (file != null && !file.exists()) {
-            throw new RuntimeException("Error: File " + file + " not found!");
-        }
+            if (!file.exists()) {
+                throw new RuntimeException("Error: File " + file + " not found!");
+            }
 
-        String classifierPath = file.getAbsolutePath();
+            String classifierPath = file.getAbsolutePath();
 //        log.info("path is: " + file.getAbsolutePath());
 
 
-        CascadeClassifier faceCascade = new CascadeClassifier();
-        boolean modelLoaded = faceCascade.load(classifierPath);
-        log.info("facial detection model load: " + modelLoaded);
+            CascadeClassifier faceCascade = new CascadeClassifier();
+            boolean modelLoaded = faceCascade.load(classifierPath);
+            log.info("facial detection model load: " + modelLoaded);
 
 
-        RectVector faces = new RectVector();
-        int absoluteFaceSize = 0;
-        int height = grayImage.arrayHeight();
-        if (Math.round(height * 0.2f) > 0) {
-            absoluteFaceSize = Math.round(height * 0.2f);
+            RectVector faces = new RectVector();
+            int absoluteFaceSize = 0;
+            int height = grayImage.arrayHeight();
+            if (Math.round(height * 0.2f) > 0) {
+                absoluteFaceSize = Math.round(height * 0.2f);
+            }
+
+            System.out.println(cvarrToMat(grayImage));
+
+            // perform face detection
+            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
+
+            List<BoundingBox> recognizedBoxes = new ArrayList<>();
+
+            for (int i = 0; i < faces.size(); i++) {
+                double boxX = Math.max(faces.get(i).x() - 10, 0);
+                double boxY = Math.max(faces.get(i).y() - 10, 0);
+                double boxWidth = Math.min(faces.get(i).width() + 20, imageMat.arrayWidth() - boxX);
+                double boxHeight = Math.min(faces.get(i).height() + 20, imageMat.arrayHeight() - boxY);
+                double boxConfidence = -1.0;
+                double[] boxClasses = new double[1];
+
+                BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+
+                recognizedBoxes.add(currentBox);
+            }
+
+            return recognizedBoxes;
+        } catch (Exception e) {
+            throw new Exception(e);
         }
-
-        System.out.println(cvarrToMat(grayImage));
-
-        // perform face detection
-        faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, 0 | CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
-
-        List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
-
-        for (int i = 0; i < faces.size(); i++) {
-            double boxX = Math.max(faces.get(i).x()-10,0);
-            double boxY = Math.max(faces.get(i).y()-10,0);
-            double boxWidth = Math.min(faces.get(i).width()+20,imageMat.arrayWidth() - boxX);
-            double boxHeight = Math.min(faces.get(i).height()+20,imageMat.arrayHeight() - boxY);
-            double boxConfidence = -1.0;
-            double[] boxClasses = new double[1];
-
-            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
-
-            recognizedBoxes.add(currentBox);
-        }
-
-        return recognizedBoxes;
     }
+
+//    static public class DetectionResult {
+//        private final List<Recognition> recognitions;
+//        private final byte[] jpegBytes;
+//
+//        public DetectionResult(List<Recognition> recognitions, byte[] jpegBytes) {
+//            this.recognitions = recognitions;
+//            this.jpegBytes = jpegBytes;
+//        }
+//
+//        public List<Recognition> getRecognitions() {
+//            return recognitions;
+//        }
+//
+//        public byte[] getJpegBytes() {
+//            return jpegBytes;
+//        }
+//    }
 }

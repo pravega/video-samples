@@ -20,7 +20,7 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
 public class Database {
 
-    public List<Person> database = new ArrayList<Person>();
+    public List<Person> database = new ArrayList<>();
 
     public Database() {
     }
@@ -29,7 +29,7 @@ public class Database {
 
         Database db = new Database();
 
-        Map<String, String> imagesOfPeople = new HashMap<String, String>();
+        Map<String, String> imagesOfPeople = new HashMap<>();
 
         imagesOfPeople.put("Thejas Vidyasagar", "/TJ_now.jpg");
         imagesOfPeople.put("Ben Afflek", "/ben_afflek_input_2.jpg");
@@ -49,7 +49,7 @@ public class Database {
             InputStream inputImageStream = Database.class.getResourceAsStream(imageName);
 
             byte[] data = IOUtils.toByteArray(inputImageStream);
-            FaceRecognizer recognizer = FaceRecognizer.getInstance();
+            FaceRecognizer recognizer = new FaceRecognizer();
 
             List<BoundingBox> recognizedBoxes = recognizer.detectFaces(data);
             Mat imageMat = imdecode(new Mat(data), IMREAD_UNCHANGED);
