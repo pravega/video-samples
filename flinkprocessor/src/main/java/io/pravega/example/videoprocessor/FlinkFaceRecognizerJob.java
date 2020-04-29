@@ -153,7 +153,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                 outVideoFrames = objectDetectedFrames;
 
             } else if (mode == 2) {
-
+                log.info("mode=2");
                 // Assign timestamps and watermarks based on timestamp in each chunk.
                 // Operator: assignTimestampsAndWatermarks
                 // Effective parallelism: min of # of segments, getReaderParallelism()
