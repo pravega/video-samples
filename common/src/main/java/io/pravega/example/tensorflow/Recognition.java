@@ -23,6 +23,10 @@ public final class Recognition {
     private final Float confidence;
     private final BoxPosition location;
 
+    public Recognition() {
+        this(-1,"",(float)-1, new BoxPosition(0,0,0,0));
+    }
+
     public Recognition(final Integer id, final String title,
                        final Float confidence, final BoxPosition location) {
         this.id = id;

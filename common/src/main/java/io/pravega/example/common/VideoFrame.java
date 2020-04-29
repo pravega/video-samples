@@ -11,7 +11,9 @@
 package io.pravega.example.common;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnore;
+import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.Recognition;
+import org.bytedeco.opencv.opencv_core.RectVector;
 
 import java.io.Serializable;
 import java.security.DigestException;
@@ -50,6 +52,10 @@ public class VideoFrame implements Serializable {
     @JsonIgnore
     public EventReadMetadata eventReadMetadata;
 
+    public List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
+
+    public List<float[]> embeddings = new ArrayList<float[]>();
+
     public VideoFrame() {
     }
 
@@ -65,6 +71,8 @@ public class VideoFrame implements Serializable {
         this.recognitions = frame.recognitions;
         this.sourceEventPointer = frame.sourceEventPointer;
         this.eventReadMetadata = frame.eventReadMetadata;
+        this.recognizedBoxes = frame.recognizedBoxes;
+        this.embeddings = frame.embeddings;
     }
 
     @Override
@@ -97,6 +105,8 @@ public class VideoFrame implements Serializable {
                 ", recognitions=" + recognitions.toString() +
                 ", sourceEventPointer=" + sourceEventPointer +
                 ", eventReadMetadata=" + eventReadMetadata +
+                ", recognizedBoxes=" + recognizedBoxes.toString() +
+                ", embeddings=" + embeddings.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

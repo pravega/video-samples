@@ -10,6 +10,7 @@
  */
 package io.pravega.example.videoplayer;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
@@ -84,6 +85,8 @@ public class VideoPlayer implements Runnable {
 
             final long timeoutMs = 1000;
             final ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
             log.info("gamma={}", CanvasFrame.getDefaultGamma());
             final CanvasFrame cFrame = new CanvasFrame("Playback from Pravega", 1.0);
             OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
@@ -107,8 +110,10 @@ public class VideoPlayer implements Runnable {
                         final VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
                             videoFrame.validateHash();
+                            log.info("data length is " + videoFrame.data.length);
                             final Mat pngMat = new Mat(new BytePointer(videoFrame.data));
                             final Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
+                            log.info("mat length is " + mat.dims());
                             final Frame frame = converter.convert(mat);
                             cFrame.showImage(frame);
                         }
