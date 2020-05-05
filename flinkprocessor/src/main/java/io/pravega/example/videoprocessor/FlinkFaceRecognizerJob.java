@@ -168,6 +168,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                                 })
                         .uid("assignTimestampsAndWatermarks")
                         .name("assignTimestampsAndWatermarks");
+//                inChunkedVideoFramesWithTimestamps.printToErr();
 
                 // Unchunk (disabled).
                 // Operator: ChunkedVideoFrameReassembler
@@ -187,6 +188,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                         .maxBy("timestamp")
                         .uid("lastVideoFramePerCamera")
                         .name("lastVideoFramePerCamera");
+                lastVideoFramePerCamera.printToErr();
 
                 DataStream<VideoFrame> faceRecognizedFrames = lastVideoFramePerCamera
                         .rebalance()
@@ -294,6 +296,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
         public VideoFrame map(VideoFrame origFrame) throws Exception {
             log.info("map: BEGIN: camera={}, frameNumber={}", origFrame.camera, origFrame.frameNumber);
             final VideoFrame frame = faceRecognizer.recognizeFaces(origFrame);
+            frame.hash = frame.calculateHash();
             log.info("frame is shown here" + frame);
 //            frame.data = result.getJpegBytes();
 //            frame.recognitions = result.getRecognitions();

@@ -298,6 +298,7 @@ public class FlinkObjectDetectorJob extends AbstractJob {
             final TFObjectDetector.DetectionResult result = tfObjectDetector.detect(frame.data);
             frame.data = result.getJpegBytes();
             frame.recognitions = result.getRecognitions();
+            frame.hash = frame.calculateHash();
             log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
             return frame;
         }

@@ -23,6 +23,13 @@ public class ExtendedEventPointer implements Serializable {
     final private String endStreamCutText;
     final private String description;
 
+    public ExtendedEventPointer() {
+        eventPointerBytes = new byte[0];
+        startStreamCutText = "";
+        endStreamCutText = "";
+        description = "";
+    }
+
     /**
      * TODO: The generated StreamCuts are only valid if the current event is in the same segment as initialStreamCut.
      * This assumption breaks if scaling or (possibly) when the segment owner changes due to a failure.

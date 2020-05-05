@@ -133,7 +133,7 @@ public class AppConfiguration {
             stream = pravegaConfig.resolve(params.get(argPrefix + "stream", "video-demo-stream"));
             targetRate = params.getInt(argPrefix + "targetRate", 100000);  // data rate in KB/sec
             scaleFactor = params.getInt(argPrefix + "scaleFactor", 2);
-            minNumSegments = params.getInt(argPrefix + "minNumSegments", 2);
+            minNumSegments = params.getInt(argPrefix + "minNumSegments", 1);
             startStreamCut = StreamCut.from(params.get(argPrefix + "startStreamCut", StreamCut.UNBOUNDED.asText()));
             endStreamCut = StreamCut.from(params.get(argPrefix + "endStreamCut", StreamCut.UNBOUNDED.asText()));
             startAtTail = params.getBoolean("startAtTail", false);
