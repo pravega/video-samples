@@ -1,29 +1,32 @@
 #!/bin/bash
 
-ROOT_DIR='/home/vidyat/Desktop/video-samples/camera-recorder/src/main/java/io/pravega/example/camerarecorder'
+ROOT_DIR='/home/vidyat/Desktop/video-samples'
+$ROOT_DIR/gradlew classes -b $ROOT_DIR/person-database/build.gradle
 
-while [ $# -gt 0 ]; do
-  case "$1" in
+for i in "$@"
+do
+case $i in
     --personId=*)
-      personId="${1#*=}"
-      ;;
+    personId="${i#*=}"
+    shift # past argument=value
+    ;;
     --imagePath=*)
-      imagePath="${1#*=}"
-      ;;
-    *)
-      printf "***************************\n"
-      printf "* Error: Invalid argument.*\n"
-      printf "***************************\n"
-      exit 1
-  esac
-  shift
-  printf 'personId=%s' "$personId"
-  printf 'imagePath=%s' "$imagePath"
-
-  javac $ROOT_DIR/PersonDatabaseConnection.java --personId $personId --imagePath=$imagePath
+    imagePath="${i#*=}"
+    shift # past argument=value
+    ;;
+    --transactionType=*)
+    transactionType="${i#*=}"
+    shift # past argument=value
+    ;;
+esac
 done
 
+echo "personId  = ${personId}"
+echo "imagePath = ${imagePath}"
+echo "transactionType = ${transactionType}"
+if [[ -n $1 ]]; then
+    echo "Last line of file specified as non-opt/last argument:"
+    tail -1 "$1"
+fi
 
-
-
-
+$ROOT_DIR/gradlew run -b $ROOT_DIR/person-database/build.gradle -PjvmArgs="-DpersonId=${personId},-DimagePath=${imagePath},-DtransactionType=${transactionType}"

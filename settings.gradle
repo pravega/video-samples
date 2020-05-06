@@ -12,7 +12,10 @@ rootProject.name = "video-samples"
 
 include "camera-recorder"
 include 'common'
+include 'person-database'
 include "flinkprocessor"
 include 'video-player'
 include 'common'
 include 'html-video-player'
+include 'person-database'
+
