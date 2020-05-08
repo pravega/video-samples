@@ -26,6 +26,7 @@ targetCompatibility = 1.8
 
 dependencies {
     compile project(':common')
+    compile project(':video-player')
     compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
     compile "ch.qos.logback:logback-classic:${logbackVersion}"
     compile "ch.qos.logback:logback-core:${logbackVersion}"
@@ -40,7 +41,7 @@ dependencies {
 
 run {
     if ( project.hasProperty('jvmArgs') ) {
-        jvmArgs = (project.jvmArgs.split(",") as List)
+        jvmArgs = (project.jvmArgs.replace("\n", "").split(",") as List)
     }
 
 }

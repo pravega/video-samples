@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ROOT_DIR='/home/vidyat/Desktop/video-samples'
-$ROOT_DIR/gradlew classes -b $ROOT_DIR/person-database/build.gradle
+#$ROOT_DIR/gradlew classes -b $ROOT_DIR/person-database/build.gradle
 
 for i in "$@"
 do
@@ -29,4 +29,4 @@ if [[ -n $1 ]]; then
     tail -1 "$1"
 fi
 
-$ROOT_DIR/gradlew run -b $ROOT_DIR/person-database/build.gradle -PjvmArgs="-DpersonId=${personId},-DimagePath=${imagePath},-DtransactionType=${transactionType}"
+$ROOT_DIR/gradlew run -b $ROOT_DIR/person-database/build.gradle -PjvmArgs="-DpersonId=${personId},-DimagePath=${imagePath},-DtransactionType=${transactionType},-DPRAVEGA_SCOPE=examples,-DOUTPUT_STREAM_NAME=person-database-transaction,-DPRAVEGA_CONTROLLER_URI=tcp://localhost:9090,-DIS_CREATE_SCOPE=true"
