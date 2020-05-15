@@ -1,15 +1,11 @@
 package io.pravega.example.tensorflow;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.pravega.example.common.Person;
 import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.Mat;
 
-import javax.xml.crypto.Data;
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,7 +29,7 @@ public class Database {
 
         imagesOfPeople.put("Thejas Vidyasagar", "/TJ_now.jpg");
         imagesOfPeople.put("Ben Afflek", "/ben_afflek_input_2.jpg");
-        imagesOfPeople.put("Srikanth Satya", "/srikanth_satya.jpg");
+        imagesOfPeople.put("Srikanth Satya", "/images/person-database/Ashish.Batwara@dell.com/srikanth_satya.jpg");
         imagesOfPeople.put("Ashish Batwara", "/ashish_batwara.jpg");
 
         for(String name: imagesOfPeople.keySet()) {
@@ -56,7 +52,7 @@ public class Database {
             data = recognizer.cropFace(recognizedBoxes.get(0), imageMat);
 
             float[] origEmbedding = recognizer.embeddFace(data);
-            Person person = new Person(1, name, origEmbedding);
+            Person person = new Person(name, origEmbedding);
             database.add(person);
         } catch (Exception e) {
             throw new Exception(e);

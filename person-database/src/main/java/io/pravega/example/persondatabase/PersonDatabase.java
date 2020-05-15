@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
@@ -65,27 +66,32 @@ public class PersonDatabase implements Runnable {
 
             // args: personId, imagePath, transactionType
             String personId = getConfig().getpersonId();
-            File imageFile = new File(getConfig().getimagePath());
             String transactionType = getConfig().gettransactionType();
-            String imageName = imageFile.getName();
+            String imageName = "";
 
-            final SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-            final String utcTimestamp = sdf.format(new Date());
+            Date date= new Date();
+            long time = date.getTime();
+            System.out.println("Time in Milliseconds: " + time);
+            Timestamp timestamp = new Timestamp(time);
             // Decode the image.
             BufferedImage originalImage= null;
             ByteArrayOutputStream baos=new ByteArrayOutputStream();
 
-            try {
-                originalImage = ImageIO.read(imageFile);
-                ImageIO.write(originalImage, "jpg", baos );
-            } catch (IOException e) {
-                e.printStackTrace();
+            byte[] imageData = null;
+            if(transactionType.equals("add")) {
+                try {
+                    File imageFile = new File(getConfig().getimagePath());
+                    imageName = imageFile.getName();
+                    originalImage = ImageIO.read(imageFile);
+                    ImageIO.write(originalImage, "jpg", baos );
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                imageData=baos.toByteArray();
+                log.info("imageName={}", imageName);
             }
-            byte[] imageData=baos.toByteArray();
-            log.info("imageName={}", imageName);
 
-            Transaction transaction = new Transaction(personId, imageName, imageData, transactionType, utcTimestamp);
+            Transaction transaction = new Transaction(personId, imageName, imageData, transactionType, timestamp);
             log.info("transaction={}", transaction);
 
             ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(transaction));

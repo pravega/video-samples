@@ -12,10 +12,9 @@ package io.pravega.example.tensorflow;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.pravega.common.Exceptions;
+import io.pravega.example.common.Embedding;
+import io.pravega.example.common.Person;
 import io.pravega.example.common.VideoFrame;
-import org.apache.commons.io.IOUtils;
-import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
@@ -23,16 +22,10 @@ import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.FloatBuffer;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -108,7 +101,7 @@ public class FaceRecognizer implements Serializable, Closeable {
      *
      * @param origFrame video frame used to detect and recognize faces on
      */
-    public VideoFrame recognizeFaces(VideoFrame origFrame) throws Exception {
+    public VideoFrame recognizeFaces(VideoFrame origFrame, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) throws Exception {
         // Identifies the location of faces on video frame
 //        frame.recognizedBoxes = this.detectFaces(frame.data);
 //        try{
@@ -128,7 +121,7 @@ public class FaceRecognizer implements Serializable, Closeable {
                     frame.embeddings.add(embeddFace(croppedFace));
 
                     // Compare with face embeddings in the database to identify the face and label
-                    String match = matchEmbedding(frame.embeddings.get(i));
+                    String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
     //            if(match != "") {
                     Recognition recognition = new Recognition(1, match, (float) 1,
                             new BoxPosition((float) (currentFace.getX()),
@@ -214,20 +207,32 @@ public class FaceRecognizer implements Serializable, Closeable {
         return outData;
     }
 
-    public String matchEmbedding(float[] otherEmbedding) throws IOException {
+    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>>embeddingsDatabase) throws IOException {
         String match = "Unknown";
-
-        ObjectMapper mapper = new ObjectMapper();
-        InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
-        Person[] people = mapper.readValue(databaseStream, Person[].class);
+//        ObjectMapper mapper = new ObjectMapper();
+//        InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
+//        Person[] people = mapper.readValue(databaseStream, Person[].class);
 
         double minDiff = 1.0;
 
-        for (Person currPerson: people) {
-            double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
-            log.info("distance with "+ currPerson.name + " is " + diff);
-            if(diff < 1.00 && diff < minDiff) {
-                match = currPerson.name;
+//        for (Person currPerson: people) {
+//            double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
+//            log.info("distance with "+ currPerson.id + " is " + diff);
+//            if(diff < 1.00 && diff < minDiff) {
+//                match = currPerson.id;
+//            }
+//        }
+        while(embeddingsDatabase.hasNext()) {
+            Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
+            String personId = embeddingEntry.getKey();
+            Embedding embedding = embeddingEntry.getValue();
+
+            log.info("Current embedding considered is " + embedding.personId);
+
+            double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
+            log.info("distance with "+ personId + " is " + diff);
+            if(diff < .97 && diff < minDiff) {
+                match = personId;
             }
         }
 
