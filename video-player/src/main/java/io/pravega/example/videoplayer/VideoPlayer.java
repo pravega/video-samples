@@ -41,15 +41,15 @@ public class VideoPlayer implements Runnable {
 
     private final AppConfiguration config;
 
+    public VideoPlayer(AppConfiguration appConfiguration) {
+        config = appConfiguration;
+    }
+
     public static void main(String... args) {
         AppConfiguration config = new AppConfiguration(args);
         log.info("config: {}", config);
         Runnable app = new VideoPlayer(config);
         app.run();
-    }
-
-    public VideoPlayer(AppConfiguration appConfiguration) {
-        config = appConfiguration;
     }
 
     public AppConfiguration getConfig() {
@@ -97,7 +97,7 @@ public class VideoPlayer implements Runnable {
                          new ByteBufferSerializer(),
                          ReaderConfig.builder().build())) {
                 final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(getConfig().getInputStreamConfig().getStream(), startStreamCut);
-                for (;;) {
+                for (; ; ) {
                     EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
                     if (event.getEvent() != null) {
                         streamCutBuilder.addEvent(event.getPosition());
@@ -109,7 +109,7 @@ public class VideoPlayer implements Runnable {
                         // TODO: Reassemble multiple chunks - see ChunkedVideoFrameReassembler
                         final VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
-//                            videoFrame.validateHash();
+                            videoFrame.validateHash();
                             log.info("data length is " + videoFrame.data.length);
                             final Mat pngMat = new Mat(new BytePointer(videoFrame.data));
                             final Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);

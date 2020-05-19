@@ -1,13 +1,12 @@
 package io.pravega.example.videoprocessor;
 
-import akka.event.NoLogging;
 import io.pravega.example.common.Embedding;
 import io.pravega.example.common.Transaction;
 import io.pravega.example.common.VideoFrame;
-import io.pravega.example.tensorflow.*;
+import io.pravega.example.tensorflow.BoundingBox;
+import io.pravega.example.tensorflow.FaceRecognizer;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction;
 import org.apache.flink.util.Collector;
@@ -15,7 +14,6 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Timestamp;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +21,11 @@ import java.util.Map;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
+/*
+ *   This class manages the embeddings database in state, and does facial recognition
+ * */
 public class FaceRecognizerProcessor
-    extends KeyedBroadcastProcessFunction<String, VideoFrame, Transaction, VideoFrame> {
+        extends KeyedBroadcastProcessFunction<String, VideoFrame, Transaction, VideoFrame> {
 
     private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
 
@@ -56,6 +57,7 @@ public class FaceRecognizerProcessor
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
 
         VideoFrame outputFrame = recognizer.recognizeFaces(frame, embeddingsIterator);
+        outputFrame.hash = outputFrame.calculateHash();
         out.collect(outputFrame);
     }
 
@@ -65,12 +67,12 @@ public class FaceRecognizerProcessor
 
         log.info("trying to add element");
 
-        if(transaction.transactionType.equals("add")) {
+        if (transaction.transactionType.equals("add")) {
             List<BoundingBox> recognizedBoxes = recognizer.detectFaces(transaction.imageData);
 
             Mat imageMat = imdecode(new Mat(transaction.imageData), IMREAD_UNCHANGED);
 
-            for(int i=0; i< recognizedBoxes.size(); i++) {
+            for (int i = 0; i < recognizedBoxes.size(); i++) {
                 BoundingBox currentFace = recognizedBoxes.get(i);
                 byte[] croppedFace = recognizer.cropFace(currentFace, imageMat);
                 float[] embeddingValues = recognizer.embeddFace(croppedFace);
@@ -81,7 +83,7 @@ public class FaceRecognizerProcessor
                 // add the new embedding to database
                 bcState.put(transaction.personId, embedding);
             }
-        } else if(transaction.transactionType.equals("delete")) {
+        } else if (transaction.transactionType.equals("delete")) {
             // remove the embeddings related to the person in database
             bcState.remove(transaction.personId);
         }

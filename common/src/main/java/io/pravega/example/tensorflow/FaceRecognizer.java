@@ -11,9 +11,7 @@
 package io.pravega.example.tensorflow;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.example.common.Embedding;
-import io.pravega.example.common.Person;
 import io.pravega.example.common.VideoFrame;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
@@ -30,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
-import static org.bytedeco.opencv.global.opencv_core.cvarrToMat;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
@@ -39,21 +36,17 @@ import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
  * ObjectDetector class to detect and recognize faces using pre-trained models with TensorFlow Java API.
  */
 public class FaceRecognizer implements Serializable, Closeable {
-    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
-
     // Params used for image processing
     private static final int IMAGE_DIMENSION = 160;
     private static final float SCALE = 255f;
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
+    private static final double THRESHOLD = 0.97;
 
     private static FaceRecognizer single_instance;
-
+    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;
-
-
-//    private List<BoundingBox> recognizedBoxes;
 
     public FaceRecognizer() {
         log.info("TFObjectDetector: initializing TensorFlow");
@@ -95,55 +88,44 @@ public class FaceRecognizer implements Serializable, Closeable {
         session.close();
     }
 
-
     /**
-     * Identifies recognized faces on the video frame
-     *
-     * @param origFrame video frame used to detect and recognize faces on
+     * @param origFrame          The video frame with data of faces
+     * @param embeddingsDatabase The facial embeddings to compare with the faces in video frame
+     * @return This returns a video frame with boxes and labels identifying the faces recognized
+     * @throws Exception
      */
     public VideoFrame recognizeFaces(VideoFrame origFrame, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) throws Exception {
         // Identifies the location of faces on video frame
-//        frame.recognizedBoxes = this.detectFaces(frame.data);
-//        try{
-            VideoFrame frame = origFrame;
-            log.info("length of frame is:" + frame.data.length);
-            frame.recognizedBoxes = this.detectFaces(frame.data);
+        VideoFrame frame = origFrame;
+        log.info("length of frame is:" + frame.data.length);
+        frame.recognizedBoxes = this.detectFaces(frame.data);
 
-            Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
+        Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
-            for(int i=0; i< frame.recognizedBoxes.size(); i++) {
-                BoundingBox currentFace = frame.recognizedBoxes.get(i);
-                byte[] croppedFace = cropFace(currentFace, imageMat);
+        for (int i = 0; i < frame.recognizedBoxes.size(); i++) {
+            BoundingBox currentFace = frame.recognizedBoxes.get(i);
+            byte[] croppedFace = cropFace(currentFace, imageMat);
 
+            // Extract the embeddings for the current face
+            frame.embeddings.add(embeddFace(croppedFace));
 
-    //            if (croppedFace.length > 0) {
-                    // Extract the embeddings for the current face
-                    frame.embeddings.add(embeddFace(croppedFace));
-
-                    // Compare with face embeddings in the database to identify the face and label
-                    String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
-    //            if(match != "") {
-                    Recognition recognition = new Recognition(1, match, (float) 1,
-                            new BoxPosition((float) (currentFace.getX()),
-                                    (float) (currentFace.getY()),
-                                    (float) (currentFace.getWidth()),
-                                    (float) (currentFace.getHeight())));
-                    frame.recognitions.add(recognition);
-                    ImageUtil util = new ImageUtil();
-                    frame.data = util.labelFace(frame.data, recognition);
-    //            }
-    //            } else {
-    //                continue;
-    //            }
-            }
-//        } catch (Exception e) {
-//            throw new Exception(e);
-//        }
+            // Compare with face embeddings in the database to identify the face and label
+            String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
+            Recognition recognition = new Recognition(1, match, (float) 1,
+                    new BoxPosition((float) (currentFace.getX()),
+                            (float) (currentFace.getY()),
+                            (float) (currentFace.getWidth()),
+                            (float) (currentFace.getHeight())));
+            frame.recognitions.add(recognition);
+            ImageUtil util = new ImageUtil();
+            frame.data = util.labelFace(frame.data, recognition);
+        }
         return frame;
     }
 
     /**
      * Extract the embeddings for the current face
+     *
      * @param face used to extract the embeddings
      * @return embeddings in a float array
      */
@@ -153,13 +135,12 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * Runs pre-trained facenet model to extract the embeddings from the image
+     *
      * @param jpegBytes byte array to run the facenet model on
      * @return embeddings extracted by running the pre-trained model
      */
     private float[] executeGraph(byte[] jpegBytes) {
         // Preprocess image (decode JPEG and resize)
-
-        log.info("jpegBytes.length is " + jpegBytes.length);
         try (final Tensor<?> jpegTensor = Tensor.create(jpegBytes)) {
             final List<Tensor<?>> imagePreprocessorOutputs = session
                     .runner()
@@ -169,16 +150,15 @@ public class FaceRecognizer implements Serializable, Closeable {
             assert imagePreprocessorOutputs.size() == 1;
 
             try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class);
-                final Tensor<Boolean> preprocessedPhaseTrainTensor = Tensor.create(false).expect(Boolean.class)) {
+                 final Tensor<Boolean> preprocessedPhaseTrainTensor = Tensor.create(false).expect(Boolean.class)) {
                 final List<Tensor<?>> detectorOutputs = session
                         .runner()
                         .feed("input", preprocessedInputTensor)
                         .feed("phase_train", preprocessedPhaseTrainTensor)
                         .fetch("embeddings")
                         .run();
-//                assert detectorOutputs.size() == 1;
                 try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
-                    final float[] outputTensor = new float[(int)resultTensor.shape()[1]];
+                    final float[] outputTensor = new float[(int) resultTensor.shape()[1]];
                     final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
                     resultTensor.writeTo(floatBuffer);
                     return outputTensor;
@@ -187,42 +167,40 @@ public class FaceRecognizer implements Serializable, Closeable {
         }
     }
 
-
+    /**
+     * @param cropBox  The location in the image to crop
+     * @param faceData The data of the image
+     * @return data of the image isolated to the cropped area
+     */
     public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
         Rect cropArea = new Rect((int) cropBox.getX(), (int) cropBox.getY(), (int) cropBox.getWidth(), (int) cropBox.getHeight());
-//        Rect cropArea = new Rect((int) 0, (int) 0, (int) cropBox.getWidth(), (int) cropBox.getHeight());
         byte[] outData = new byte[0];
         if (0 <= cropBox.getX()
                 && 0 <= cropBox.getWidth()
                 && cropBox.getX() + cropBox.getWidth() <= faceData.cols()
                 && 0 <= cropBox.getY()
                 && 0 <= cropBox.getHeight()
-                && cropBox.getY() + cropBox.getHeight() <= faceData.rows()){
+                && cropBox.getY() + cropBox.getHeight() <= faceData.rows()) {
+
             // box within the image plane
             Mat croppedImage = new Mat(faceData, cropArea);
-            outData = new byte[(int)(croppedImage.total()*croppedImage.elemSize())];
+            outData = new byte[(int) (croppedImage.total() * croppedImage.elemSize())];
             imencode(".jpg", croppedImage, outData);
         }
 
         return outData;
     }
 
-    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>>embeddingsDatabase) throws IOException {
+    /**
+     * @param otherEmbedding     The current facial embedding found in the image
+     * @param embeddingsDatabase The database of facial embeddings to compare to
+     * @return The name of the person the embedding matches with in the embeddings database
+     */
+    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) {
         String match = "Unknown";
-//        ObjectMapper mapper = new ObjectMapper();
-//        InputStream databaseStream = FaceRecognizer.class.getResourceAsStream("/database.json");
-//        Person[] people = mapper.readValue(databaseStream, Person[].class);
-
         double minDiff = 1.0;
 
-//        for (Person currPerson: people) {
-//            double diff = compareEmbeddings(currPerson.embedding, otherEmbedding);
-//            log.info("distance with "+ currPerson.id + " is " + diff);
-//            if(diff < 1.00 && diff < minDiff) {
-//                match = currPerson.id;
-//            }
-//        }
-        while(embeddingsDatabase.hasNext()) {
+        while (embeddingsDatabase.hasNext()) {
             Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
             String personId = embeddingEntry.getKey();
             Embedding embedding = embeddingEntry.getValue();
@@ -230,8 +208,10 @@ public class FaceRecognizer implements Serializable, Closeable {
             log.info("Current embedding considered is " + embedding.personId);
 
             double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
-            log.info("distance with "+ personId + " is " + diff);
-            if(diff < .97 && diff < minDiff) {
+            log.info("distance with " + personId + " is " + diff);
+
+            // Matches if within threshold
+            if (diff < THRESHOLD && diff < minDiff) {
                 match = personId;
             }
         }
@@ -239,19 +219,28 @@ public class FaceRecognizer implements Serializable, Closeable {
         return match;
     }
 
+    /**
+     * @param origEmbedding  The data for a facial embedding
+     * @param otherEmbedding The data for another facial embedding
+     * @return The difference between the facial embeddings
+     */
     public double compareEmbeddings(float[] origEmbedding, float[] otherEmbedding) {
         double sumDiffSq = 0;
 
-        for(int i=0; i< origEmbedding.length; i++) {
+        for (int i = 0; i < origEmbedding.length; i++) {
             sumDiffSq += Math.pow(origEmbedding[i] - otherEmbedding[i], 2);
         }
 
         return Math.sqrt(sumDiffSq);
     }
 
+    /**
+     * @param frameData data that represents the image with faces
+     * @return location of the detected faces
+     * @throws Exception
+     */
     public List<BoundingBox> detectFaces(byte[] frameData) throws Exception {
         try {
-
             Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
             CvArr inputImage = new IplImage(imageMat);
 
@@ -260,14 +249,12 @@ public class FaceRecognizer implements Serializable, Closeable {
             cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
             cvEqualizeHist(grayImage, grayImage);
 
-
-//        URL classifier = FaceRecognizer.class.getResource("/haarcascade_frontalface_alt.xml");       // face detection model
             File file;
             String resource = "/haarcascade_frontalface_alt.xml";
             URL classifier = getClass().getResource(resource);
 
+            // Accesses the jar file to get resources
             if (classifier.getProtocol().equals("jar")) {
-//            try {
                 InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
                 file = File.createTempFile("tempfile", ".tmp");
                 OutputStream out = new FileOutputStream(file);
@@ -289,13 +276,9 @@ public class FaceRecognizer implements Serializable, Closeable {
             }
 
             String classifierPath = file.getAbsolutePath();
-//        log.info("path is: " + file.getAbsolutePath());
-
-
             CascadeClassifier faceCascade = new CascadeClassifier();
             boolean modelLoaded = faceCascade.load(classifierPath);
             log.info("facial detection model load: " + modelLoaded);
-
 
             RectVector faces = new RectVector();
             int absoluteFaceSize = 0;
@@ -306,7 +289,7 @@ public class FaceRecognizer implements Serializable, Closeable {
 
             System.out.println(cvarrToMat(grayImage));
 
-            // perform face detection
+            // Identify location of the faces
             faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
 
             List<BoundingBox> recognizedBoxes = new ArrayList<>();
@@ -329,22 +312,4 @@ public class FaceRecognizer implements Serializable, Closeable {
             throw new Exception(e);
         }
     }
-
-//    static public class DetectionResult {
-//        private final List<Recognition> recognitions;
-//        private final byte[] jpegBytes;
-//
-//        public DetectionResult(List<Recognition> recognitions, byte[] jpegBytes) {
-//            this.recognitions = recognitions;
-//            this.jpegBytes = jpegBytes;
-//        }
-//
-//        public List<Recognition> getRecognitions() {
-//            return recognitions;
-//        }
-//
-//        public byte[] getJpegBytes() {
-//            return jpegBytes;
-//        }
-//    }
 }

@@ -1,12 +1,12 @@
 package io.pravega.example.persondatabase;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
+import io.pravega.example.common.PravegaAppConfiguration;
 import io.pravega.example.common.PravegaUtil;
 import io.pravega.example.common.Transaction;
 import org.slf4j.Logger;
@@ -19,15 +19,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.TimeZone;
 import java.util.concurrent.CompletableFuture;
+
+/*
+    This class adds data to the embeddings database using input
+ */
 
 public class PersonDatabase implements Runnable {
     private static Logger log = LoggerFactory.getLogger(PersonDatabase.class);
     private final AppConfiguration config;
-    static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     public PersonDatabase(AppConfiguration config) {
         this.config = config;
@@ -40,11 +41,13 @@ public class PersonDatabase implements Runnable {
         app.run();
     }
 
-    public AppConfiguration getConfig() { return config; }
+    public AppConfiguration getConfig() {
+        return config;
+    }
 
 
     public void run() {
-        if (getConfig().isCreateScope()) {
+        if (PravegaAppConfiguration.isCreateScope()) {
             try (StreamManager streamManager = StreamManager.create(getConfig().getClientConfig())) {
                 streamManager.createScope(getConfig().getDefaultScope());
             }
@@ -52,7 +55,6 @@ public class PersonDatabase implements Runnable {
 
         // Create Pravega stream.
         PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
-
 
         try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
                 getConfig().getOutputStreamConfig().getStream().getScope(),
@@ -64,30 +66,30 @@ public class PersonDatabase implements Runnable {
 
             ObjectMapper mapper = new ObjectMapper();
 
-            // args: personId, imagePath, transactionType
+            // args
             String personId = getConfig().getpersonId();
             String transactionType = getConfig().gettransactionType();
             String imageName = "";
 
-            Date date= new Date();
+            Date date = new Date();
             long time = date.getTime();
-            System.out.println("Time in Milliseconds: " + time);
             Timestamp timestamp = new Timestamp(time);
+
             // Decode the image.
-            BufferedImage originalImage= null;
-            ByteArrayOutputStream baos=new ByteArrayOutputStream();
+            BufferedImage originalImage = null;
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
             byte[] imageData = null;
-            if(transactionType.equals("add")) {
+            if (transactionType.equals("add")) {
                 try {
                     File imageFile = new File(getConfig().getimagePath());
                     imageName = imageFile.getName();
                     originalImage = ImageIO.read(imageFile);
-                    ImageIO.write(originalImage, "jpg", baos );
+                    ImageIO.write(originalImage, "jpg", baos);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                imageData=baos.toByteArray();
+                imageData = baos.toByteArray();
                 log.info("imageName={}", imageName);
             }
 
@@ -96,14 +98,10 @@ public class PersonDatabase implements Runnable {
 
             ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(transaction));
 
+            // Write to pravega
             CompletableFuture<Void> future = pravegaWriter.writeEvent(personId, jsonBytes);
 
             future.get();
-
-//            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//
-//            transaction = mapper.readValue(jsonBytes.array(), Transaction.class);
-//            log.info("transactionBuffer={}", transaction);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

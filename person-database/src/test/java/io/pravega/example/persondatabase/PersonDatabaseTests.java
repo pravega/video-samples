@@ -1,6 +1,5 @@
 package io.pravega.example.persondatabase;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
@@ -9,17 +8,9 @@ import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
-import io.pravega.example.common.ChunkedVideoFrame;
 import io.pravega.example.common.PravegaAppConfiguration.StreamConfig;
 import io.pravega.example.common.Transaction;
-import io.pravega.example.common.VideoFrame;
 import io.pravega.example.videoplayer.StreamCutBuilder;
-import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacv.CanvasFrame;
-import org.bytedeco.javacv.Frame;
-import org.bytedeco.javacv.OpenCVFrameConverter;
-import org.bytedeco.opencv.global.opencv_imgcodecs;
-import org.bytedeco.opencv.opencv_core.Mat;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -37,70 +28,66 @@ public class PersonDatabaseTests {
     private static Logger log = LoggerFactory.getLogger(PersonDatabaseTests.class);
 
     @Test
-//    @Ignore
+    @Ignore
     // Read data from database stream.
     public void Test1() throws Exception {
-//        try {
-            String scope = "examples";
+        String scope = "examples";
 
-            String streamName = "person-database-transaction";
-            URI controllerURI = new URI("tcp://localhost:9090");
-            boolean startAtTail = false;
-            ClientConfig clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
-            StreamConfig inputStreamConfig = new StreamConfig("examples", "INPUT_");
+        String streamName = "person-database-transaction";
+        URI controllerURI = new URI("tcp://localhost:9090");
+        boolean startAtTail = false;
+        ClientConfig clientConfig = ClientConfig.builder().controllerURI(controllerURI).build();
+        StreamConfig inputStreamConfig = new StreamConfig("examples", "INPUT_");
 
 
-            StreamInfo streamInfo;
-            try (StreamManager streamManager = StreamManager.create(clientConfig)) {
-                streamInfo = streamManager.getStreamInfo(scope, streamName);
-            }
+        StreamInfo streamInfo;
+        try (StreamManager streamManager = StreamManager.create(clientConfig)) {
+            streamInfo = streamManager.getStreamInfo(scope, streamName);
+        }
 
-            StreamCut startStreamCut = inputStreamConfig.getStartStreamCut();
-            if (startStreamCut == StreamCut.UNBOUNDED && startAtTail) {
-                startStreamCut = streamInfo.getTailStreamCut();
-            }
-            final String readerGroup = UUID.randomUUID().toString().replace("-", "");
-            final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
-                    .stream(
-                            Stream.of(scope, streamName),
-                            startStreamCut,
-                            inputStreamConfig.getEndStreamCut())
-                    .build();
-            try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
-                readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
-            }
+        StreamCut startStreamCut = inputStreamConfig.getStartStreamCut();
+        if (startStreamCut == StreamCut.UNBOUNDED && startAtTail) {
+            startStreamCut = streamInfo.getTailStreamCut();
+        }
+        final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+        final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+                .stream(
+                        Stream.of(scope, streamName),
+                        startStreamCut,
+                        inputStreamConfig.getEndStreamCut())
+                .build();
+        try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, clientConfig)) {
+            readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+        }
 
-            final long timeoutMs = 1000;
-            final ObjectMapper mapper = new ObjectMapper();
-//            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        final long timeoutMs = 1000;
+        final ObjectMapper mapper = new ObjectMapper();
 
-            try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
-                 EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
-                         readerGroup,
-                         new ByteBufferSerializer(),
-                         ReaderConfig.builder().build())) {
-                final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(Stream.of(scope, streamName), startStreamCut);
-                for (;;) {
-                    EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
-                    if (event.getEvent() != null) {
-                        streamCutBuilder.addEvent(event.getPosition());
-                        final StreamCut streamCutForNextEvent = streamCutBuilder.getStreamCut();
-                        final Transaction transaction = mapper.readValue(event.getEvent().array(), Transaction.class);
-                        log.info("Transaction={}", transaction);
-                        log.info("streamCutForNextEvent={}", streamCutForNextEvent);
-                        log.info("streamCutForNextEvent={}", streamCutForNextEvent.asText());
-                        if(transaction.getImageData() != null) {
-                            BufferedImage img = ImageIO.read(new ByteArrayInputStream(transaction.getImageData()));
-                            File outputfile = new File("../images/temp/" + transaction.getImageName());
-                            log.info(outputfile.getAbsolutePath());
-                            outputfile.createNewFile();
-                            ImageIO.write(img, "jpg", outputfile);
-                        }
+        // Create a pravega reader and access the data
+        try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(scope, clientConfig);
+             EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
+                     readerGroup,
+                     new ByteBufferSerializer(),
+                     ReaderConfig.builder().build())) {
+            final StreamCutBuilder streamCutBuilder = new StreamCutBuilder(Stream.of(scope, streamName), startStreamCut);
+            for (; ; ) {
+                EventRead<ByteBuffer> event = reader.readNextEvent(timeoutMs);
+                if (event.getEvent() != null) {
+                    streamCutBuilder.addEvent(event.getPosition());
+                    final StreamCut streamCutForNextEvent = streamCutBuilder.getStreamCut();
+                    final Transaction transaction = mapper.readValue(event.getEvent().array(), Transaction.class);
+                    log.info("Transaction={}", transaction);
+                    log.info("streamCutForNextEvent={}", streamCutForNextEvent);
+                    log.info("streamCutForNextEvent={}", streamCutForNextEvent.asText());
+                    if (transaction.getImageData() != null) {
+                        BufferedImage img = ImageIO.read(new ByteArrayInputStream(transaction.getImageData()));
+                        File outputfile = new File("../images/temp/" + transaction.getImageName());
+                        log.info(outputfile.getAbsolutePath());
+                        outputfile.createNewFile();
+                        ImageIO.write(img, "jpg", outputfile);
                     }
                 }
             }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
+        }
     }
 }

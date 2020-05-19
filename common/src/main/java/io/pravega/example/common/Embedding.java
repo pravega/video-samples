@@ -2,6 +2,10 @@ package io.pravega.example.common;
 
 import java.sql.Timestamp;
 
+/*
+ *   This class represents a single facial embedding of a person using the algorithm.
+ * */
+
 public class Embedding {
     public String personId;
     public float[] embeddingValue;
@@ -27,7 +31,9 @@ public class Embedding {
         return this.imageName;
     }
 
-    public Timestamp getTimestamp() { return this.timestamp; }
+    public Timestamp getTimestamp() {
+        return this.timestamp;
+    }
 
     public String toString() {
         return "personId={" + this.personId + "}" +

@@ -1,9 +1,15 @@
 package io.pravega.example.common;
 
+/*
+ *   This holds relevant information about the people in the Embeddings database.
+ * */
+
 public class Person {
     public String id;
 //    public String name;
+
     public float[] embedding;
+
     public Person() {
         this("Unknown", new float[1]);
     }

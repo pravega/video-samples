@@ -7,6 +7,10 @@ import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Arrays;
 
+/*
+ *   This class represents the schema for interacting with the Embeddings database
+ * */
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Transaction implements Serializable {
     public String personId;
@@ -56,6 +60,8 @@ public class Transaction implements Serializable {
     public String toString() {
         String dataStr = "null";
         int dataLength = 0;
+
+        // crop the data
         if (this.imageData != null) {
             dataLength = this.imageData.length;
             int sizeToPrint = dataLength;

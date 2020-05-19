@@ -13,16 +13,11 @@ case $i in
     imagePath="${i#*=}"
     shift # past argument=value
     ;;
-#    --transactionType=*)
-#    transactionType="${i#*=}"
-#    shift # past argument=value
-#    ;;
 esac
 done
 
 echo "personId  = ${personId}"
 echo "imagePath = ${imagePath}"
-#echo "transactionType = ${transactionType}"
 if [[ -n $1 ]]; then
     echo "Last line of file specified as non-opt/last argument:"
     tail -1 "$1"
@@ -32,4 +27,3 @@ export PERSON_DATABASE_OPTS="-DpersonId=${personId} -DimagePath=${imagePath} -Dt
  -DOUTPUT_STREAM_NAME=person-database-transaction -DPRAVEGA_CONTROLLER_URI=tcp://localhost:9090 -DIS_CREATE_SCOPE=true"
 
 /tmp/person-database-0.1.0/bin/person-database
-

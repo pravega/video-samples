@@ -20,13 +20,9 @@ import io.pravega.example.common.Transaction;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
-import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.FaceRecognizer;
 import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.tuple.Tuple;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.datastream.BroadcastStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
@@ -34,14 +30,8 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
-
-import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
 // set --parallelism=1
 
@@ -51,6 +41,11 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 public class FlinkFaceRecognizerJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.class);
     private static FaceRecognizer recognizer;
+
+    public FlinkFaceRecognizerJob(VideoAppConfiguration config) {
+        super(config);
+        recognizer = new FaceRecognizer();
+    }
 
     /**
      * The entry point for Flink applications.
@@ -62,11 +57,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
         log.info("config: {}", config);
         FlinkFaceRecognizerJob job = new FlinkFaceRecognizerJob(config);
         job.run();
-    }
-
-    public FlinkFaceRecognizerJob(VideoAppConfiguration config) {
-        super(config);
-        recognizer = new FaceRecognizer();
     }
 
     @Override
@@ -125,38 +115,16 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             // Create non-video person database transaction datastream.
             //
 
-            final StreamCut startStreamCutSensor = resolveStartStreamCut(getConfig().getPersonDatabaseStreamConfig());
-            final StreamCut endStreamCutSensor = resolveEndStreamCut(getConfig().getPersonDatabaseStreamConfig());
-
-            final FlinkPravegaReader<Transaction> flinkPravegaReaderSensor = FlinkPravegaReader.<Transaction>builder()
+            final FlinkPravegaReader<Transaction> flinkPravegaReaderTransactions = FlinkPravegaReader.<Transaction>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
-                    .forStream(getConfig().getPersonDatabaseStreamConfig().getStream(), startStreamCutSensor, endStreamCutSensor)
+                    .forStream(getConfig().getPersonDatabaseStreamConfig().getStream())
                     .withDeserializationSchema(new JsonDeserializationSchema<>(Transaction.class))
                     .build();
             final DataStream<Transaction> personDatabaseTransactions = env
-                    .addSource(flinkPravegaReaderSensor)
+                    .addSource(flinkPravegaReaderTransactions)
                     .uid("transaction")
                     .name("transaction");
             personDatabaseTransactions.printToErr().uid("personDatabaseTransactions-print").name("personDatabaseTransactions-print");
-
-
-//            DataStream<Embedding> embeddings = personDatabaseTransactions
-//                    .map(transaction -> {
-//                        Embedding embedding = null;
-//                        if(transaction.transactionType.equals("add")) {
-//                            List<BoundingBox> recognizedBoxes = recognizer.detectFaces(transaction.imageData);
-//
-//                            Mat imageMat = imdecode(new Mat(transaction.imageData), IMREAD_UNCHANGED);
-//
-////                        for(int i=0; i< recognizedBoxes.size(); i++) {
-//                            BoundingBox currentFace = recognizedBoxes.get(0);
-//                            byte[] croppedFace = recognizer.cropFace(currentFace, imageMat);
-//                            float[] embeddingValues = recognizer.embeddFace(croppedFace);
-//                            embedding = new Embedding(transaction.personId, embeddingValues, transaction.imageName, transaction.timestamp);
-//                        }
-//                        return embedding;
-//                    });
-//            embeddings.printToErr().uid("personDatabaseTransactionsWithTimestamps-print").name("personDatabaseTransactionsWithTimestamps-print");
 
             // Assign timestamps and watermarks based on timestamp in each chunk.
             final DataStream<Transaction> transactionsWithTimestamps = personDatabaseTransactions
@@ -183,14 +151,14 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             final KeyedStream<VideoFrame, Integer> videoFramePerCamera = lastVideoFramePerCamera
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
-//            final KeyedStream<Embedding, String> embeddingPerPerson = embeddingsWithTimestamps
-//                    .keyBy((KeySelector<Embedding, String>) value -> value.personId);
-
+            // Schema of the embeddings database in state
             MapStateDescriptor<String, Embedding> bcStateDescriptor =
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
+            // Partition the embeddings database within this stream.
             BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcStateDescriptor);
 
+            // Run facial recognition on incoming video frames
             DataStream<VideoFrame> facesRecognized = videoFramePerCamera
                     .connect(bcedTransactions)
                     .process(new FaceRecognizerProcessor());
@@ -200,38 +168,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
-
-//            // For each camera and window, get the most recent sensor reading.
-//            final DataStream<Transaction> lastSensorReadingsPerCamera = personDatabaseTransactionsWithTimestamps
-//                    .keyBy((KeySelector<Transaction, Long>) value -> value.timestamp.getTime())
-//                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-//                    .maxBy("timestamp")
-//                    .uid("lastSensorReadingsPerCamera")
-//                    .name("lastSensorReadingsPerCamera");
-
-
-//
-//            //
-//            // Join video and non-video sensor data.
-//            //
-//
-//            final DataStream<VideoFrame> outVideoFrames = lastVideoFramePerCamera
-//                    .join(lastSensorReadingsPerCamera)
-//                    .where((KeySelector<VideoFrame, Integer>) value -> value.camera)
-//                    .equalTo((KeySelector<Transaction, Integer>) value -> value.camera)
-//                    .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
-//                    .apply((JoinFunction<VideoFrame, KittiSensorReading, VideoFrame>) (first, second) -> {
-//                        first.kittiSensorReadings = second;
-//                        return first;
-//                    })
-//                    .process();
-//            outVideoFrames.printToErr();
-//
-//            // Split output video frames into chunks of 8 MiB or less.
-//            final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = outVideoFrames
-//                    .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
-//                    .uid("VideoFrameChunker")
-//                    .name("VideoFrameChunker");
 
             // Write chunks to Pravega encoded as JSON.
             final FlinkPravegaWriter<ChunkedVideoFrame> flinkPravegaWriter = FlinkPravegaWriter.<ChunkedVideoFrame>builder()
