@@ -42,14 +42,13 @@ public class FaceRecognizer implements Serializable, Closeable {
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
     private static final double THRESHOLD = 0.97;
 
-    private static FaceRecognizer single_instance;
     private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;
 
     public FaceRecognizer() {
-        log.info("TFObjectDetector: initializing TensorFlow");
+        log.info("FaceRecognizer: initializing TensorFlow");
         final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
 
@@ -126,7 +125,7 @@ public class FaceRecognizer implements Serializable, Closeable {
     /**
      * Extract the embeddings for the current face
      *
-     * @param face used to extract the embeddings
+     * @param face image in JPEG format used to extract the embeddings
      * @return embeddings in a float array
      */
     public float[] embeddFace(byte[] face) {
@@ -286,8 +285,6 @@ public class FaceRecognizer implements Serializable, Closeable {
             if (Math.round(height * 0.2f) > 0) {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
-
-            System.out.println(cvarrToMat(grayImage));
 
             // Identify location of the faces
             faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());

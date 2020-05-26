@@ -18,3 +18,5 @@ keycloak.json
 
 jupyterhub/secret.yaml
 *-local.sh
+camera-recorder/src/main/java/io/pravega/example/camerarecorder/Test.java
+/home/vidyat/Desktop/video-samples/common/src/main/java/io/pravega/example/tensorflow/QRCode.java

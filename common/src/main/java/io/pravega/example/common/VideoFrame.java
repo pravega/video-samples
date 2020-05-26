@@ -20,11 +20,9 @@ import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * A class for storing a single video frame.
@@ -48,6 +46,7 @@ public class VideoFrame implements Serializable {
     public KittiSensorReading kittiSensorReadings;
     public List<Recognition> recognitions = new ArrayList<>();
     public ExtendedEventPointer sourceEventPointer;
+    public Iterable lastBadges = new ArrayList();
 
     @JsonIgnore
     public EventReadMetadata eventReadMetadata;
@@ -73,6 +72,7 @@ public class VideoFrame implements Serializable {
         this.eventReadMetadata = frame.eventReadMetadata;
         this.recognizedBoxes = frame.recognizedBoxes;
         this.embeddings = frame.embeddings;
+        this.lastBadges = frame.lastBadges;
     }
 
     @Override
@@ -107,6 +107,9 @@ public class VideoFrame implements Serializable {
                 ", eventReadMetadata=" + eventReadMetadata +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
                 ", embeddings=" + embeddings.toString() +
+                ", lastBadges=" + StreamSupport
+                .stream(lastBadges.spliterator(), false)
+                .collect(Collectors.toList()) +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

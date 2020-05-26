@@ -32,6 +32,7 @@ public class VideoAppConfiguration extends AppConfiguration {
     private final boolean useCachedFrame;
     private final StreamConfig personDatabaseStreamConfig;
     private final StreamConfig sensorStreamConfig;
+    private final StreamConfig badgeStreamConfig;
 
     public VideoAppConfiguration(String[] args) {
         super(args);
@@ -46,6 +47,7 @@ public class VideoAppConfiguration extends AppConfiguration {
         useCachedFrame = getParams().getBoolean("useCachedFrame", false);
         personDatabaseStreamConfig = new StreamConfig(getPravegaConfig(), "person-database-", getParams());
         sensorStreamConfig = new StreamConfig(getPravegaConfig(),"sensor-",  getParams());
+        badgeStreamConfig = new StreamConfig(getPravegaConfig(), "badge-", getParams());
     }
 
     @Override
@@ -106,4 +108,8 @@ public class VideoAppConfiguration extends AppConfiguration {
     }
 
     public StreamConfig getSensorStreamConfig() { return sensorStreamConfig; }
+
+    public StreamConfig getBadgeStreamConfig() {
+        return badgeStreamConfig;
+    }
 }

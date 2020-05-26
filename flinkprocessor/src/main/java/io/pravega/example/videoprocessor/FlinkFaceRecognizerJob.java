@@ -10,6 +10,7 @@
  */
 package io.pravega.example.videoprocessor;
 
+import com.google.zxing.NotFoundException;
 import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
@@ -21,17 +22,40 @@ import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
 import io.pravega.example.tensorflow.FaceRecognizer;
+import io.pravega.example.tensorflow.QRCode;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.BroadcastStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Int;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+
+import static java.lang.Math.max;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imencode;
 
 // set --parallelism=1
 
@@ -41,10 +65,12 @@ import org.slf4j.LoggerFactory;
 public class FlinkFaceRecognizerJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.class);
     private static FaceRecognizer recognizer;
+    private static QRCode badgeProcessor;
 
     public FlinkFaceRecognizerJob(VideoAppConfiguration config) {
         super(config);
         recognizer = new FaceRecognizer();
+        badgeProcessor = new QRCode();
     }
 
     /**
@@ -73,6 +99,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             createStream(getConfig().getInputStreamConfig());
             createStream(getConfig().getPersonDatabaseStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
+            createStream(getConfig().getBadgeStreamConfig());
 
             //
             // Create video datastream.
@@ -112,6 +139,44 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("ChunkedVideoFrameReassembler");
 
             //
+            // Create non-video person database badge datastream.
+            //
+
+            final StreamCut startStreamCutBadge = resolveStartStreamCut(getConfig().getBadgeStreamConfig());
+            final StreamCut endStreamCutBadge = resolveEndStreamCut(getConfig().getBadgeStreamConfig());
+
+            final FlinkPravegaReader<ChunkedVideoFrame> flinkPravegaReaderBadge = FlinkPravegaReader.<ChunkedVideoFrame>builder()
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCutBadge, endStreamCutBadge)
+                    .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
+                    .build();
+            final DataStream<ChunkedVideoFrame> chunkedVideoFrameBadges = env
+                    .addSource(flinkPravegaReaderBadge)
+                    .uid("badges")
+                    .name("badges");
+
+            // Assign timestamps and watermarks based on timestamp in each chunk.
+            final DataStream<ChunkedVideoFrame> chunkedVideoFrameBadgesWithTimestamps = chunkedVideoFrameBadges
+                    .assignTimestampsAndWatermarks(
+                            new BoundedOutOfOrdernessTimestampExtractor<ChunkedVideoFrame>(
+                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
+                                @Override
+                                public long extractTimestamp(ChunkedVideoFrame element) {
+                                    return element.timestamp.getTime();
+                                }
+                            })
+                    .uid("assignTimestampsAndWatermarksBadges")
+                    .name("assignTimestampsAndWatermarksBadges");
+
+            // Unchunk (disabled).
+            // Operator: ChunkedVideoFrameReassembler
+            final DataStream<VideoFrame> videoFrameBadges = chunkedVideoFrameBadgesWithTimestamps
+                    .map(VideoFrame::new)
+                    .uid("ChunkedVideoFrameReassemblerBadges")
+                    .name("ChunkedVideoFrameReassemblerBadges");
+
+
+            //
             // Create non-video person database transaction datastream.
             //
 
@@ -136,8 +201,8 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                                     return element.timestamp.getTime();
                                 }
                             })
-                    .uid("assignTimestampsAndWatermarksSensor")
-                    .name("assignTimestampsAndWatermarksSensor");
+                    .uid("assignTimestampsAndWatermarksTransaction")
+                    .name("assignTimestampsAndWatermarksTransaction");
             transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
 
             // For each camera and window, get the most recent frame.
@@ -148,15 +213,66 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .uid("lastVideoFramePerCamera")
                     .name("lastVideoFramePerCamera");
 
+            // For each camera and window, get the most recent badges processed within 5 sec.
+            final DataStream<Iterable> lastBadges = videoFrameBadges
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
+                    .window(SlidingEventTimeWindows.of(Time.seconds(5), Time.seconds(1)))
+                    .process(new ProcessWindowFunction<VideoFrame, Iterable, Integer, TimeWindow>() {
+                        @Override
+                        public void process(Integer integer, Context context, Iterable<VideoFrame> elements, Collector<Iterable> out) throws Exception {
+                            List<Tuple3<String, Timestamp, Integer>> result = new ArrayList<Tuple3<String, Timestamp, Integer>>();
+
+                            elements.forEach(element -> {
+                                String qrVal = null;
+                                try {
+                                    qrVal = badgeProcessor.readQRCode(element.data);
+                                    result.add(new Tuple3<>(qrVal, element.timestamp, element.camera));
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                } catch (NotFoundException e) {
+                                    // skip if not found
+                                }
+
+                                log.info("reached");
+                                log.info("qr info is: " + qrVal);
+                            });
+
+                            out.collect(result);
+                        }
+                    })
+                    .uid("lastBadgesPerCamera")
+                    .name("lastBadgesPerCamera");
+            lastBadges.printToErr().uid("lastBadges-print").name("lastBadges-print");
+
+            // window: sliding window: 100 ms
+            // process window function: convert iterator of qr codes to list of qr codes: <Timestamp, Camera, List<QR code>>
+            // 5 sec window
+            // alerts: unknown person, recognized but no badge, qr code but doesnt exist in embeddings database
+
+            final DataStream<VideoFrame>  videoFrameBadges = lastVideoFramePerCamera
+                    .map(frame -> {
+                        frame.lastBadges = lastBadges;
+                            })
+                    .uid("videoFrameBadges")
+                    .name("videoFrameBadges");
+
+
             final KeyedStream<VideoFrame, Integer> videoFramePerCamera = lastVideoFramePerCamera
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
             // Schema of the embeddings database in state
-            MapStateDescriptor<String, Embedding> bcStateDescriptor =
+            MapStateDescriptor<String, Embedding> bcEmbeddingsStateDescriptor =
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
+
+//            // Schema of the last badges processed in state
+//            MapStateDescriptor<String, Embedding> bcBadgesStateDescriptor =
+//                    new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
+
+
+
             // Partition the embeddings database within this stream.
-            BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcStateDescriptor);
+            BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcEmbeddingsStateDescriptor);
 
             // Run facial recognition on incoming video frames
             DataStream<VideoFrame> facesRecognized = videoFramePerCamera
@@ -187,5 +303,20 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+}
+
+final class MapBadgesToVideoFrame implements MapFunction<VideoFrame, VideoFrame>, Serializable {
+
+    private Iterable lastBadges;
+
+    public MapBadgesToVideoFrame(Iterable lastBadges) {
+        this.lastBadges = lastBadges;
+    }
+
+    @Override
+    public VideoFrame map(VideoFrame frame) throws Exception {
+        frame.lastBadges = this.lastBadges;
+        return frame;
     }
 }

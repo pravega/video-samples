@@ -85,7 +85,6 @@ public class ImageUtil {
         Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
         graphics.setColor(Color.green);
 
-//        for (Recognition recognition: recognitions) {
         BoxPosition box = recognition.getLocation();
         //set font
         Font myFont = new Font("Courier New", 1, 14);
@@ -97,7 +96,6 @@ public class ImageUtil {
         // draw bounding box
         System.out.println("Recognition location X: " + box.getLeftInt() + ", Height:" + box.getTopInt());
         graphics.drawRect(box.getLeftInt(),box.getTopInt(), box.getWidthInt(), box.getHeightInt());
-//        }
 
         graphics.dispose();
 

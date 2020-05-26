@@ -1,134 +1,104 @@
-// This class was made to test out facial detection. This will be removed in final version.
+/*
+ * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ */
 package io.pravega.example.camerarecorder;
 
-import io.pravega.example.tensorflow.BoundingBox;
-import io.pravega.example.tensorflow.BoxPosition;
-import io.pravega.example.tensorflow.ImageUtil;
-import io.pravega.example.tensorflow.Recognition;
-import org.apache.commons.io.IOUtils;
-import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.opencv.opencv_core.*;
-import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
-import org.bytedeco.opencv.opencv_objdetect.CvHaarClassifierCascade;
+import io.pravega.client.admin.StreamManager;
+import io.pravega.example.common.PravegaUtil;
+import io.pravega.example.tensorflow.QRCode;
+import org.bytedeco.javacv.CanvasFrame;
+import org.bytedeco.opencv.global.opencv_videoio;
+import org.bytedeco.opencv.opencv_core.Mat;
+import org.bytedeco.opencv.opencv_videoio.VideoCapture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.google.zxing.*;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.*;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.rmi.ConnectIOException;
 
-import static org.bytedeco.opencv.global.opencv_core.*;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
-import static org.bytedeco.opencv.global.opencv_imgproc.*;
-import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imencode;
 
-public class Test {
-    public Test() {
-        InputStream inputImage = getClass().getResourceAsStream("/TJ_now.jpg");
-        InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
+/**
+ * Reads video images from a web cam and writes them to a Pravega stream.
+ */
+public class Test implements Runnable {
+    private static Logger log = LoggerFactory.getLogger(Test.class);
+
+    private final QRCode qrcode;
+    private final AppConfiguration config;
+
+    public Test(AppConfiguration appConfiguration) {
+        config = appConfiguration;
+        qrcode = new QRCode();
     }
 
-    public static void main(String args[]) throws IOException, URISyntaxException {
-        InputStream imageStream = Test.class.getResourceAsStream("/ben_afflek_input_2.jpg");
-        byte[] imageBytes = IOUtils.toByteArray(imageStream);
-        Mat imageMat = imdecode(new Mat(imageBytes), IMREAD_UNCHANGED);
-        IplImage inputImage = new IplImage(imageMat);
+    public static void main(String... args) {
+        AppConfiguration config = new AppConfiguration(args);
+        log.info("config: {}", config);
+        Runnable app = new Test(config);
+        app.run();
+    }
 
-        System.out.println(inputImage);
+    public AppConfiguration getConfig() {
+        return config;
+    }
 
-//        CvArr grayImage = new IplImage();
-        CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
+    public void run() {
+            // Initialize camera.
+            final int captureWidth = getConfig().getImageWidth();
+            final int captureHeight = getConfig().getImageHeight();
+            log.info("creating grabber");
+            final VideoCapture cap = new VideoCapture(getConfig().getCameraDeviceNumber());
 
-        cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
-        cvEqualizeHist(grayImage, grayImage);
+            if (!cap.open(getConfig().getCameraDeviceNumber())) {
+                try {
+                    throw new ConnectIOException("Cannot open the camera");
+                } catch (ConnectIOException e) {
+                    e.printStackTrace();
+                }
+            }
 
-//        InputStream classifier = getClass().getResourceAsStream("/haarcascade_frontalface_alt.xml");
-//        String classifierPath = Paths.get(Test.class.getResource("/haarcascade_frontalface_alt.xml").toURI()).toFile().getPath();
-        String classifierPath = "./camera-recorder/src/main/resources/haarcascade_frontalface_alt.xml";
-        CascadeClassifier faceCascade = new CascadeClassifier();
-        faceCascade.load(classifierPath);
+            log.info("starting video capture");
+            cap.set(opencv_videoio.CAP_PROP_FPS, getConfig().getFramesPerSec());
+            cap.set(opencv_videoio.CAP_PROP_FRAME_WIDTH, captureWidth);
+            cap.set(opencv_videoio.CAP_PROP_FRAME_HEIGHT, captureHeight);
 
-        RectVector faces = new RectVector();
-        int absoluteFaceSize = 0;
-        int height = grayImage.arrayHeight();
-        if (Math.round(height * 0.2f) > 0) {
-            absoluteFaceSize = Math.round(height * 0.2f);
-        }
+            final double actualFramesPerSec = cap.get(opencv_videoio.CAP_PROP_FPS);
+            log.info("actual frame rate={}", actualFramesPerSec);
+            final boolean dropFrames = actualFramesPerSec > getConfig().getFramesPerSec();
+            long lastTimestamp = 0;
 
-        faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, 0 | CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
+            // Initialize capture preview window.
+            final CanvasFrame cFrame = new CanvasFrame("Capture Preview", CanvasFrame.getDefaultGamma() / 2.2);
 
-        System.out.println(imageStream);
-        System.out.println();
-
-//        BufferedImage bufferedImage = ImageIO.read(imageStream);
-        ByteArrayInputStream bais = new ByteArrayInputStream(imageBytes);
-        BufferedImage bufferedImage = ImageIO.read(bais);
-
-        Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
-        graphics.setColor(Color.green);
-
-
-
-        List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
-
-        for (int i = 0; i < faces.size(); i++) {
-//            double boxX = Math.max(faces.get(i).x() - 10, 0);
-//            double boxY = Math.max(faces.get(i).y() - 10, 0);
-            double boxX = faces.get(i).x() - 20;
-            double boxY = faces.get(i).y() - 20;
-            double boxWidth = faces.get(i).width() + 40;
-            double boxHeight = faces.get(i).height() + 40;
-            double boxConfidence = -1.0;
-            double[] boxClasses = new double[1];
-
-//            System.out.println("Rect Width: " + faces.get(i).width() + 20 + ", Height:" + faces.get(i).height() + 20);
+            // Create Pravega stream.
+//            PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
 
 
-//            graphics.drawRect((int) boxX, (int) boxY, (int) boxWidth, (int) boxHeight);
+            Mat mat = new Mat();
+            while (cap.read(mat)) {
+                byte[] imageBytes = new byte[(int) (mat.total() * mat.elemSize())];
+                imencode(".jpg", mat, imageBytes);
 
-            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
-            System.out.println("Rect x:" + currentBox.getX() + ", Y: " + currentBox.getY());
-            System.out.println("Bounding Box X:" + currentBox.getX() + ", Y: " + currentBox.getY());
+                String qrVal = null;
+                try {
+                    qrVal = qrcode.readQRCode(imageBytes);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (NotFoundException e) {
+                    // skip if not found
+                }
 
-            recognizedBoxes.add(currentBox);
-        }
-
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(bufferedImage, "jpg", baos);
-        byte[] outData;
-        outData = baos.toByteArray();
-
-        Mat croppedimage = new Mat(imageMat, faces.get(0));
-        outData = new byte[(int)(croppedimage.total()*croppedimage.elemSize())];
-        imencode(".jpg", croppedimage, outData);
-
-        for(BoundingBox currentFace: recognizedBoxes) {
-
-            Recognition recognition = new Recognition(1, "Thejas", (float)1,
-                    new BoxPosition((float) (currentFace.getX()),
-                            (float) (currentFace.getY()),
-                            (float) currentFace.getWidth(),
-                            (float) currentFace.getHeight()));
-//            frame.recognitions.add(recognition);
-
-            System.out.println("Recognition location X: " + recognition.getLocation().getLeft() + ", Height:" + recognition.getLocation().getTop());
-
-            outData= new ImageUtil().labelFace(outData, recognition);
-        }
-
-        Mat outputImage = imdecode(new Mat(outData), IMREAD_UNCHANGED);
-
-//        File outputfile = new File("./camera-recorder/src/main/resources/detected_face.jpg");
-//        ImageIO.write(bufferedImage, "jpg", outputfile);
-
-
-        imwrite("./camera-recorder/src/main/resources/detected_face.jpg", outputImage);
+                log.info("reached");
+                log.info("qr info is: " + qrVal);
+            }
     }
 }
-

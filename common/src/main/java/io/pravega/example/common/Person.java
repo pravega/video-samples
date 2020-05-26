@@ -6,7 +6,6 @@ package io.pravega.example.common;
 
 public class Person {
     public String id;
-//    public String name;
 
     public float[] embedding;
 
