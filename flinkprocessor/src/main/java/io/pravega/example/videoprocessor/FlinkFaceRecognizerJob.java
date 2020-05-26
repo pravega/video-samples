@@ -159,8 +159,13 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             // Partition the embeddings database within this stream.
             BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcStateDescriptor);
 
+
+
             // Run facial recognition on incoming video frames
             DataStream<VideoFrame> facesRecognized = videoFramePerCamera
+                    .map(frame -> {
+                        frame.embeddings = cognizeFaces();
+                        return videoFrames;})
                     .connect(bcedTransactions)
                     .process(new FaceRecognizerProcessor());
 
