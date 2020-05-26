@@ -152,6 +152,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
             // Schema of the embeddings database in state
+            // mapping is person-Id to embedding
             MapStateDescriptor<String, Embedding> bcStateDescriptor =
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 

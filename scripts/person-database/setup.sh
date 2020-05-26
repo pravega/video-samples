@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ROOT_DIR='/home/vidyat/Desktop/video-samples'
+ROOT_DIR="$(dirname $0)/../.."
 TMP_DIR='/tmp/person-database-0.1.0'
 
 $ROOT_DIR/gradlew person-database:distTar

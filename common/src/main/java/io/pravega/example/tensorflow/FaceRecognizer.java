@@ -13,6 +13,7 @@ package io.pravega.example.tensorflow;
 
 import io.pravega.example.common.Embedding;
 import io.pravega.example.common.VideoFrame;
+import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
@@ -42,14 +43,13 @@ public class FaceRecognizer implements Serializable, Closeable {
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
     private static final double THRESHOLD = 0.97;
 
-    private static FaceRecognizer single_instance;
     private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;
 
     public FaceRecognizer() {
-        log.info("TFObjectDetector: initializing TensorFlow");
+        log.info("FaceRecognizer: initializing TensorFlow");
         final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
 
@@ -79,7 +79,9 @@ public class FaceRecognizer implements Serializable, Closeable {
     public void warmup() throws Exception {
         log.info("warmup: BEGIN");
         final long t0 = System.currentTimeMillis();
-        detectFaces(imageUtil.createBlankJpeg(1280, 720));
+        InputStream image = FaceRecognizer.class.getResourceAsStream("/ben_afflek_input_2.jpg");
+        byte[] data = IOUtils.toByteArray(image);
+        detectFaces(data);
         log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
     }
 
@@ -126,7 +128,7 @@ public class FaceRecognizer implements Serializable, Closeable {
     /**
      * Extract the embeddings for the current face
      *
-     * @param face used to extract the embeddings
+     * @param face in JPG format used to extract the embeddings
      * @return embeddings in a float array
      */
     public float[] embeddFace(byte[] face) {
@@ -169,7 +171,7 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param cropBox  The location in the image to crop
-     * @param faceData The data of the image
+     * @param faceData The data of the image in jpeg format
      * @return data of the image isolated to the cropped area
      */
     public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
@@ -287,7 +289,6 @@ public class FaceRecognizer implements Serializable, Closeable {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
 
-            System.out.println(cvarrToMat(grayImage));
 
             // Identify location of the faces
             faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());

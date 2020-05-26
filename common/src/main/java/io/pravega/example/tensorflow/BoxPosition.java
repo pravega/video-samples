@@ -10,8 +10,6 @@
  */
 package io.pravega.example.tensorflow;
 
-import javax.swing.*;
-
 /**
  * Class to store the position of the bounding boxes
  */
@@ -33,8 +31,6 @@ public class BoxPosition {
         this.top = top;
         this.width = width;
         this.height = height;
-
-//        init();
     }
 
     public BoxPosition(final BoxPosition boxPosition) {

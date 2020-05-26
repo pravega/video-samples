@@ -116,7 +116,6 @@ public class CameraRecorder implements Runnable {
                     capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
                     // drop frames to adjust speed of camera recorder
-//                    System.out.println("Current time diff is" + (timestamp - lastTimestamp));
                     if (dropFrames && timestamp - lastTimestamp < 1000 / getConfig().getFramesPerSec()) {
                         log.debug("Dropping captured frame to maintain desired frames per second");
                         continue;

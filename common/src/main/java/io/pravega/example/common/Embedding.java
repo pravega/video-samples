@@ -9,8 +9,8 @@ import java.sql.Timestamp;
 public class Embedding {
     public String personId;
     public float[] embeddingValue;
-    public String imageName;
-    public Timestamp timestamp;
+    public String imageName; // Identifier of images used to produce embedding
+    public Timestamp timestamp; // Time at which this embedding was captured to be added to database
 
     public Embedding(String personId, float[] embeddingValue, String imageName, Timestamp timestamp) {
         this.personId = personId;
