@@ -22,7 +22,6 @@ import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
 import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.FaceRecognizer;
-import io.pravega.example.tensorflow.TFObjectDetector;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -40,8 +39,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
-
-// set --parallelism=1
 
 /**
  * This job populates the embeddings database.
@@ -204,43 +201,43 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             throw new RuntimeException(e);
         }
     }
-}
 
-
-/**
- * A map function that uses TensorFlow.
- * The TensorFlow Session cannot be serialized so it is declared transient and
- * initialized in open().
- */
-class FaceRecognizerMapFunction extends RichMapFunction<VideoFrame, VideoFrame> {
-    final private static Logger log = LoggerFactory.getLogger(FlinkObjectDetectorJob.TFObjectDetectorMapFunction.class);
-    private transient FaceRecognizer recognizer;
 
     /**
-     * The first execution takes 6 minutes on a V100.
-     * We warmup in open() so that map() does not timeout.
+     * A map function that uses TensorFlow.
+     * The TensorFlow Session cannot be serialized so it is declared transient and
+     * initialized in open().
      */
-    @Override
-    public void open(Configuration parameters) throws Exception {
-        recognizer = new FaceRecognizer();
-        recognizer.warmup();
-    }
+    static class FaceRecognizerMapFunction extends RichMapFunction<VideoFrame, VideoFrame> {
+        final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunction.class);
+        private transient FaceRecognizer recognizer;
 
-    @Override
-    public void close() {
-        recognizer.close();
-    }
-
-    @Override
-    public VideoFrame map(VideoFrame frame) throws Exception {
-        log.info("map: BEGIN: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
-        frame.recognizedBoxes = recognizer.locateFaces(frame.data);
-        for(BoundingBox faceLocation: frame.recognizedBoxes) {
-            Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
-            byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
-            frame.embeddings.add(recognizer.embeddFace(currentFaceData));
+        /**
+         * The first execution takes 6 minutes on a V100.
+         * We warmup in open() so that map() does not timeout.
+         */
+        @Override
+        public void open(Configuration parameters) throws Exception {
+            recognizer = new FaceRecognizer();
+            recognizer.warmup();
         }
-        log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
-        return frame;
+
+        @Override
+        public void close() {
+            recognizer.close();
+        }
+
+        @Override
+        public VideoFrame map(VideoFrame frame) throws Exception {
+            log.info("map: BEGIN: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
+            frame.recognizedBoxes = recognizer.locateFaces(frame.data);
+            for (BoundingBox faceLocation : frame.recognizedBoxes) {
+                Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
+                byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
+                frame.embeddings.add(recognizer.embeddFace(currentFaceData));
+            }
+            log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
+            return frame;
+        }
     }
 }
