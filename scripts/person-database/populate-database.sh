@@ -1,9 +1,10 @@
 #!/bin/bash
 
 
-ROOT_DIR='/home/vidyat/Desktop/video-samples'
-IMAGES_DIR='/home/vidyat/Desktop/video-samples/images/person-database'
+ROOT_DIR="$(dirname $0)/../.."
+IMAGES_DIR="${ROOT_DIR}/images/person-database"
 
+ls ${IMAGES_DIR}
 for dir in "${IMAGES_DIR}"/*; do
 #    echo $dir
     PERSON_NAME="$(basename "$dir")"

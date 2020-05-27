@@ -13,6 +13,7 @@ package io.pravega.example.tensorflow;
 
 import io.pravega.example.common.Embedding;
 import io.pravega.example.common.VideoFrame;
+import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
@@ -78,7 +79,9 @@ public class FaceRecognizer implements Serializable, Closeable {
     public void warmup() throws Exception {
         log.info("warmup: BEGIN");
         final long t0 = System.currentTimeMillis();
-        detectFaces(imageUtil.createBlankJpeg(1280, 720));
+        InputStream image = FaceRecognizer.class.getResourceAsStream("/ben_afflek_input_2.jpg");
+        byte[] data = IOUtils.toByteArray(image);
+        locateFaces(data);
         log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
     }
 
@@ -88,44 +91,25 @@ public class FaceRecognizer implements Serializable, Closeable {
     }
 
     /**
-     * @param origFrame          The video frame with data of faces
-     * @param embeddingsDatabase The facial embeddings to compare with the faces in video frame
-     * @return This returns a video frame with boxes and labels identifying the faces recognized
-     * @throws Exception
+     *
+     * @param badgeId identifier for the face
+     * @param faceLocation location of the face
+     * @return a label representing location and identifier for face
      */
-    public VideoFrame recognizeFaces(VideoFrame origFrame, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) throws Exception {
-        // Identifies the location of faces on video frame
-        VideoFrame frame = origFrame;
-        log.info("length of frame is:" + frame.data.length);
-        frame.recognizedBoxes = this.detectFaces(frame.data);
+    public Recognition getLabel(String badgeId, BoundingBox faceLocation) {
+        Recognition recognition = new Recognition(1, badgeId, (float) 1,
+                new BoxPosition((float) (faceLocation.getX()),
+                        (float) (faceLocation.getY()),
+                        (float) (faceLocation.getWidth()),
+                        (float) (faceLocation.getHeight())));
 
-        Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
-
-        for (int i = 0; i < frame.recognizedBoxes.size(); i++) {
-            BoundingBox currentFace = frame.recognizedBoxes.get(i);
-            byte[] croppedFace = cropFace(currentFace, imageMat);
-
-            // Extract the embeddings for the current face
-            frame.embeddings.add(embeddFace(croppedFace));
-
-            // Compare with face embeddings in the database to identify the face and label
-            String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
-            Recognition recognition = new Recognition(1, match, (float) 1,
-                    new BoxPosition((float) (currentFace.getX()),
-                            (float) (currentFace.getY()),
-                            (float) (currentFace.getWidth()),
-                            (float) (currentFace.getHeight())));
-            frame.recognitions.add(recognition);
-            ImageUtil util = new ImageUtil();
-            frame.data = util.labelFace(frame.data, recognition);
-        }
-        return frame;
+        return recognition;
     }
 
     /**
      * Extract the embeddings for the current face
      *
-     * @param face image in JPEG format used to extract the embeddings
+     * @param face in JPG format used to extract the embeddings
      * @return embeddings in a float array
      */
     public float[] embeddFace(byte[] face) {
@@ -168,7 +152,7 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param cropBox  The location in the image to crop
-     * @param faceData The data of the image
+     * @param faceData The data of the image in jpeg format
      * @return data of the image isolated to the cropped area
      */
     public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
@@ -235,10 +219,10 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param frameData data that represents the image with faces
-     * @return location of the detected faces
+     * @return location of the faces
      * @throws Exception
      */
-    public List<BoundingBox> detectFaces(byte[] frameData) throws Exception {
+    public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try {
             Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
             CvArr inputImage = new IplImage(imageMat);
@@ -285,6 +269,7 @@ public class FaceRecognizer implements Serializable, Closeable {
             if (Math.round(height * 0.2f) > 0) {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
+
 
             // Identify location of the faces
             faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());

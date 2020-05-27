@@ -10,13 +10,17 @@
  */
 package io.pravega.example.videoprocessor;
 
+import io.pravega.example.common.VideoFrame;
+import io.pravega.example.tensorflow.FaceRecognizer;
 import io.pravega.example.tensorflow.TFObjectDetector;
+import org.apache.commons.io.IOUtils;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
@@ -31,5 +35,4 @@ public class ObjectDetectorTests {
         byte[] outBytes = new TFObjectDetector().detect(inBytes).getJpegBytes();
         Files.write((new File("detected_test_truck.jpg")).toPath(), outBytes);
     }
-
 }

@@ -71,9 +71,7 @@ public class PersonDatabase implements Runnable {
             String transactionType = getConfig().gettransactionType();
             String imageName = "";
 
-            Date date = new Date();
-            long time = date.getTime();
-            Timestamp timestamp = new Timestamp(time);
+            Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 
             // Decode the image.
             BufferedImage originalImage = null;
@@ -81,14 +79,10 @@ public class PersonDatabase implements Runnable {
 
             byte[] imageData = null;
             if (transactionType.equals("add")) {
-                try {
-                    File imageFile = new File(getConfig().getimagePath());
-                    imageName = imageFile.getName();
-                    originalImage = ImageIO.read(imageFile);
-                    ImageIO.write(originalImage, "jpg", baos);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                File imageFile = new File(getConfig().getimagePath());
+                imageName = imageFile.getName();
+                originalImage = ImageIO.read(imageFile);
+                ImageIO.write(originalImage, "jpg", baos);
                 imageData = baos.toByteArray();
                 log.info("imageName={}", imageName);
             }

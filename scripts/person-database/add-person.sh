@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ROOT_DIR='/home/vidyat/Desktop/video-samples'
+ROOT_DIR="$(dirname $0)/../.."
 
 for i in "$@"
 do

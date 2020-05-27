@@ -32,27 +32,22 @@ public class Transaction implements Serializable {
         this.timestamp = timestamp;
     }
 
-    @JsonProperty("personId")
     public String getPersonId() {
         return this.personId;
     }
 
-    @JsonProperty("imageName")
     public String getImageName() {
         return this.imageName;
     }
 
-    @JsonProperty("imageData")
     public byte[] getImageData() {
         return this.imageData;
     }
 
-    @JsonProperty("transactionType")
     public String getTransactionType() {
         return this.transactionType;
     }
 
-    @JsonProperty("timestamp")
     public Timestamp getTimestamp() {
         return this.timestamp;
     }

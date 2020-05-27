@@ -21,7 +21,9 @@ import io.pravega.example.common.Transaction;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
+import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.FaceRecognizer;
+import org.apache.flink.api.common.functions.RichMapFunction;
 import io.pravega.example.tensorflow.QRCode;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -40,6 +42,7 @@ import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
+import org.bytedeco.opencv.opencv_core.Mat;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -56,6 +59,9 @@ import java.util.Optional;
 
 import static java.lang.Math.max;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imencode;
+
+import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
 // set --parallelism=1
 
@@ -205,8 +211,15 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("assignTimestampsAndWatermarksTransaction");
             transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
 
+            final DataStream<VideoFrame> videoFrameEmbeddings = videoFrames
+                    .map(new FaceRecognizerMapFunction())
+                    .uid("videoFrameEmbeddings")
+                    .name("videoFrameEmbeddings");
+            videoFrameEmbeddings.printToErr().uid("videoFrameEmbeddings-print").name("videoFrameEmbeddings-print");
+
+
             // For each camera and window, get the most recent frame.
-            final DataStream<VideoFrame> lastVideoFramePerCamera = videoFrames
+            final DataStream<VideoFrame> lastVideoFramePerCamera = videoFrameEmbeddings
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
                     .window(TumblingEventTimeWindows.of(Time.milliseconds(periodMs)))
                     .maxBy("timestamp")
@@ -263,6 +276,8 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
             // Schema of the embeddings database in state
+            // mapping is person-Id to embedding
+            MapStateDescriptor<String, Embedding> bcStateDescriptor =
             MapStateDescriptor<String, Embedding> bcEmbeddingsStateDescriptor =
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
@@ -306,19 +321,42 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             throw new RuntimeException(e);
         }
     }
-}
 
-final class MapBadgesToVideoFrame implements MapFunction<VideoFrame, VideoFrame>, Serializable {
 
-    private Iterable lastBadges;
+/**
+ * A map function that uses TensorFlow.
+ * The TensorFlow Session cannot be serialized so it is declared transient and
+ * initialized in open().
+ */
+static class FaceRecognizerMapFunction extends RichMapFunction<VideoFrame, VideoFrame> {
+    final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunction.class);
+    private transient FaceRecognizer recognizer;
 
-    public MapBadgesToVideoFrame(Iterable lastBadges) {
-        this.lastBadges = lastBadges;
+    /**
+     * The first execution takes 6 minutes on a V100.
+     * We warmup in open() so that map() does not timeout.
+     */
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        recognizer = new FaceRecognizer();
+        recognizer.warmup();
+    }
+
+    @Override
+    public void close() {
+        recognizer.close();
     }
 
     @Override
     public VideoFrame map(VideoFrame frame) throws Exception {
-        frame.lastBadges = this.lastBadges;
+        log.info("map: BEGIN: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
+        frame.recognizedBoxes = recognizer.locateFaces(frame.data);
+        for(BoundingBox faceLocation: frame.recognizedBoxes) {
+            Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
+            byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
+            frame.embeddings.add(recognizer.embeddFace(currentFaceData));
+        }
+        log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
         return frame;
     }
 }
