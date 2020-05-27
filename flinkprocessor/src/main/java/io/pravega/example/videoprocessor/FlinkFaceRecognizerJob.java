@@ -249,6 +249,8 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             // 5 sec window
             // alerts: unknown person, recognized but no badge, qr code but doesnt exist in embeddings database
 
+            // broadcast the list of qr codes onto qr stream, and store list of qr codes into videoframe
+
             final DataStream<VideoFrame>  videoFrameBadges = lastVideoFramePerCamera
                     .map(frame -> {
                         frame.lastBadges = lastBadges;
