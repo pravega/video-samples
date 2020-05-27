@@ -91,36 +91,11 @@ public class FaceRecognizer implements Serializable, Closeable {
     }
 
     /**
-     * @param origFrame          The video frame with data of faces
-     * @param embeddingsDatabase The facial embeddings to compare with the faces in video frame
-     * @return This returns a video frame with boxes and labels identifying the faces recognized
-     * @throws Exception
+     *
+     * @param badgeId identifier for the face
+     * @param faceLocation location of the face
+     * @return a label representing location and identifier for face
      */
-    public VideoFrame recognizeFaces(VideoFrame origFrame, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) throws Exception {
-        // Identifies the location of faces on video frame
-        VideoFrame frame = origFrame;
-        log.info("length of frame is:" + frame.data.length);
-        frame.recognizedBoxes = this.locateFaces(frame.data);
-
-        Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
-
-        for (int i = 0; i < frame.recognizedBoxes.size(); i++) {
-            BoundingBox currentFace = frame.recognizedBoxes.get(i);
-            byte[] croppedFace = cropFace(currentFace, imageMat);
-
-            // Extract the embeddings for the current face
-            frame.embeddings.add(embeddFace(croppedFace));
-
-            // Compare with face embeddings in the database to identify the face and label
-            String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
-            Recognition recognition = getLabel(match, currentFace);
-            frame.recognitions.add(recognition);
-            ImageUtil util = new ImageUtil();
-            frame.data = util.labelFace(frame.data, recognition);
-        }
-        return frame;
-    }
-
     public Recognition getLabel(String badgeId, BoundingBox faceLocation) {
         Recognition recognition = new Recognition(1, badgeId, (float) 1,
                 new BoxPosition((float) (faceLocation.getX()),
