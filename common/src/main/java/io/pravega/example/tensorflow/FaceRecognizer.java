@@ -81,7 +81,7 @@ public class FaceRecognizer implements Serializable, Closeable {
         final long t0 = System.currentTimeMillis();
         InputStream image = FaceRecognizer.class.getResourceAsStream("/ben_afflek_input_2.jpg");
         byte[] data = IOUtils.toByteArray(image);
-        detectFaces(data);
+        locateFaces(data);
         log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
     }
 
@@ -100,7 +100,7 @@ public class FaceRecognizer implements Serializable, Closeable {
         // Identifies the location of faces on video frame
         VideoFrame frame = origFrame;
         log.info("length of frame is:" + frame.data.length);
-        frame.recognizedBoxes = this.detectFaces(frame.data);
+        frame.recognizedBoxes = this.locateFaces(frame.data);
 
         Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
 
@@ -113,16 +113,22 @@ public class FaceRecognizer implements Serializable, Closeable {
 
             // Compare with face embeddings in the database to identify the face and label
             String match = matchEmbedding(frame.embeddings.get(i), embeddingsDatabase);
-            Recognition recognition = new Recognition(1, match, (float) 1,
-                    new BoxPosition((float) (currentFace.getX()),
-                            (float) (currentFace.getY()),
-                            (float) (currentFace.getWidth()),
-                            (float) (currentFace.getHeight())));
+            Recognition recognition = getLabel(match, currentFace);
             frame.recognitions.add(recognition);
             ImageUtil util = new ImageUtil();
             frame.data = util.labelFace(frame.data, recognition);
         }
         return frame;
+    }
+
+    public Recognition getLabel(String badgeId, BoundingBox faceLocation) {
+        Recognition recognition = new Recognition(1, badgeId, (float) 1,
+                new BoxPosition((float) (faceLocation.getX()),
+                        (float) (faceLocation.getY()),
+                        (float) (faceLocation.getWidth()),
+                        (float) (faceLocation.getHeight())));
+
+        return recognition;
     }
 
     /**
@@ -238,10 +244,10 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param frameData data that represents the image with faces
-     * @return location of the detected faces
+     * @return location of the faces
      * @throws Exception
      */
-    public List<BoundingBox> detectFaces(byte[] frameData) throws Exception {
+    public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try {
             Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
             CvArr inputImage = new IplImage(imageMat);

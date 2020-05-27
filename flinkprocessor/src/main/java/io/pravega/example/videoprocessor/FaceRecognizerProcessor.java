@@ -5,6 +5,8 @@ import io.pravega.example.common.Transaction;
 import io.pravega.example.common.VideoFrame;
 import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.FaceRecognizer;
+import io.pravega.example.tensorflow.ImageUtil;
+import io.pravega.example.tensorflow.Recognition;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -55,10 +57,18 @@ public class FaceRecognizerProcessor
                 .getBroadcastState(this.embeddingsDesc)
                 .immutableEntries();
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
+        ImageUtil imageUtil = new ImageUtil();
 
-        VideoFrame outputFrame = recognizer.recognizeFaces(frame, embeddingsIterator);
-        outputFrame.hash = outputFrame.calculateHash();
-        out.collect(outputFrame);
+        for(int i=0; i < frame.recognizedBoxes.size(); i++) {
+            BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
+            float[] currEmbedding = frame.embeddings.get(i);
+            String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator);
+            Recognition recognition = recognizer.getLabel(match, currFaceLocation);
+            frame.data = imageUtil.labelFace(frame.data, recognition);
+        }
+
+        frame.hash = frame.calculateHash();
+        out.collect(frame);
     }
 
     @Override
@@ -68,7 +78,7 @@ public class FaceRecognizerProcessor
         log.info("trying to add element");
 
         if (transaction.transactionType.equals("add")) {
-            List<BoundingBox> recognizedBoxes = recognizer.detectFaces(transaction.imageData);
+            List<BoundingBox> recognizedBoxes = recognizer.locateFaces(transaction.imageData);
 
             Mat imageMat = imdecode(new Mat(transaction.imageData), IMREAD_UNCHANGED);
 
