@@ -7,6 +7,7 @@ import java.util.Map;
 
 import javax.imageio.ImageIO;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
@@ -32,7 +33,7 @@ public class QRCode {
 
         // Example QRCode production
         JsonObject identification = new JsonObject();
-        identification.addProperty("Id", 1);
+        identification.addProperty("Id", "Thejas.Vidyasagar@dell.com");
 
         String qrCodeData = identification.toString();
         String filePath = "./common/src/main/resources/QRCode.png";
@@ -46,8 +47,16 @@ public class QRCode {
         createQRCode(qrCodeData, filePath, charset, 200, 200);
         System.out.println("QR Code image created successfully!");
 
+        String readValue = readQRCode(imageBytes);
         System.out.println("Data read from QR Code: "
-                + readQRCode(imageBytes));
+                + readValue);
+
+        Gson g = new Gson();
+        JsonObject json = g.fromJson(readValue, JsonObject.class);
+
+        String id = json.get("Id").getAsString();
+
+        System.out.println(id);
     }
 
     /**

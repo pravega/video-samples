@@ -23,10 +23,7 @@ import org.tensorflow.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
@@ -48,7 +45,9 @@ public class FaceRecognizer implements Serializable, Closeable {
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;
 
-    public FaceRecognizer() {
+    private final File file;
+
+    public FaceRecognizer() throws IOException {
         log.info("FaceRecognizer: initializing TensorFlow");
         final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
@@ -73,6 +72,34 @@ public class FaceRecognizer implements Serializable, Closeable {
                         graphBuilder.constant("scale", SCALE));
         imageUtil = new ImageUtil();
         log.info("FaceRecognizer: done initializing TensorFlow; duration = {} ms", System.currentTimeMillis() - t0);
+
+
+        // import face detection model
+        String resource = "/haarcascade_frontalface_alt.xml";
+        URL classifier = getClass().getResource(resource);
+
+        // Accesses the jar file to get resources
+        if (classifier.getProtocol().equals("jar")) {
+            InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
+            file = File.createTempFile("haarcascase_frontalface_alt", ".tmp");
+            OutputStream out = new FileOutputStream(file);
+            int read;
+            byte[] bytes = new byte[1024];
+
+            while ((read = input.read(bytes)) != -1) {
+                out.write(bytes, 0, read);
+            }
+            out.close();
+            file.deleteOnExit();
+        } else {
+            //this will probably work in your IDE, but not from a JAR
+            file = new File(classifier.getFile());
+            file.deleteOnExit();
+        }
+
+        if (!file.exists()) {
+            throw new RuntimeException("Error: File " + file + " not found!");
+        }
 
     }
 
@@ -179,14 +206,22 @@ public class FaceRecognizer implements Serializable, Closeable {
      * @param embeddingsDatabase The database of facial embeddings to compare to
      * @return The name of the person the embedding matches with in the embeddings database
      */
-    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase) {
+    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase, Set<String> badgeList) {
         String match = "Unknown";
         double minDiff = 1.0;
 
+
+        log.info("BadgeList while matching:{}", badgeList);
         while (embeddingsDatabase.hasNext()) {
             Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
             String personId = embeddingEntry.getKey();
             Embedding embedding = embeddingEntry.getValue();
+
+            // only match with badges scanned
+            if(badgeList != null && !badgeList.contains(personId)) {
+                log.info("badge list has something, so skip this comparison");
+                continue;
+            }
 
             log.info("Current embedding considered is " + embedding.personId);
 
@@ -231,32 +266,6 @@ public class FaceRecognizer implements Serializable, Closeable {
 
             cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
             cvEqualizeHist(grayImage, grayImage);
-
-            File file;
-            String resource = "/haarcascade_frontalface_alt.xml";
-            URL classifier = getClass().getResource(resource);
-
-            // Accesses the jar file to get resources
-            if (classifier.getProtocol().equals("jar")) {
-                InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
-                file = File.createTempFile("tempfile", ".tmp");
-                OutputStream out = new FileOutputStream(file);
-                int read;
-                byte[] bytes = new byte[1024];
-
-                while ((read = input.read(bytes)) != -1) {
-                    out.write(bytes, 0, read);
-                }
-                out.close();
-                file.deleteOnExit();
-            } else {
-                //this will probably work in your IDE, but not from a JAR
-                file = new File(classifier.getFile());
-            }
-
-            if (!file.exists()) {
-                throw new RuntimeException("Error: File " + file + " not found!");
-            }
 
             String classifierPath = file.getAbsolutePath();
             CascadeClassifier faceCascade = new CascadeClassifier();

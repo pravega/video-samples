@@ -56,7 +56,7 @@ public class AppConfiguration {
         enableCheckpoint = getParams().getBoolean("enableCheckpoint", true);
         enableOperatorChaining = getParams().getBoolean("enableOperatorChaining", true);
         enableRebalance = getParams().getBoolean("rebalance", true);
-        maxOutOfOrdernessMs = getParams().getLong("maxOutOfOrdernessMs", 1000);
+        maxOutOfOrdernessMs = getParams().getLong("maxOutOfOrdernessMs", 10000);
     }
 
     @Override

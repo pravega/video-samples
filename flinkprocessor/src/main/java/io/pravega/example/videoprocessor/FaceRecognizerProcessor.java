@@ -9,6 +9,8 @@ import io.pravega.example.tensorflow.ImageUtil;
 import io.pravega.example.tensorflow.Recognition;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction;
 import org.apache.flink.util.Collector;
@@ -19,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
@@ -29,18 +32,21 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 public class FaceRecognizerProcessor
         extends KeyedBroadcastProcessFunction<String, VideoFrame, Transaction, VideoFrame> {
 
-    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+    private final Logger log = LoggerFactory.getLogger(FaceRecognizerProcessor.class);
 
     FaceRecognizer recognizer;
 
     // broadcast state descriptor
     MapStateDescriptor<String, Embedding> embeddingsDesc;
 
+//    ValueState<Set> badgeListState;
+
     @Override
     public void open(Configuration conf) throws Exception {
         // initialize keyed state
         embeddingsDesc =
                 new MapStateDescriptor<String, Embedding>("embeddingBroadcastState", String.class, Embedding.class);
+
         recognizer = new FaceRecognizer();
         recognizer.warmup();
 
@@ -56,13 +62,23 @@ public class FaceRecognizerProcessor
         Iterable<Map.Entry<String, Embedding>> embeddigsIterable = ctx
                 .getBroadcastState(this.embeddingsDesc)
                 .immutableEntries();
+
+        log.info("BadgeList originally is null:{}", frame.lastBadges == null);
+
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
         ImageUtil imageUtil = new ImageUtil();
 
         for(int i=0; i < frame.recognizedBoxes.size(); i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
             float[] currEmbedding = frame.embeddings.get(i);
-            String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator);
+            String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator, frame.lastBadges);
+
+            if(!match.equals("Unknown") && frame.lastBadges != null) {
+                match += ": PASSED";
+            } else {
+                match += ": FAILED";
+            }
+
             Recognition recognition = recognizer.getLabel(match, currFaceLocation);
             frame.data = imageUtil.labelFace(frame.data, recognition);
         }

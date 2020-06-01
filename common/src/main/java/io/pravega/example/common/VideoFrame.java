@@ -46,7 +46,7 @@ public class VideoFrame implements Serializable {
     public KittiSensorReading kittiSensorReadings;
     public List<Recognition> recognitions = new ArrayList<>();
     public ExtendedEventPointer sourceEventPointer;
-    public Iterable lastBadges = new ArrayList();
+    public Set lastBadges = null;
 
     @JsonIgnore
     public EventReadMetadata eventReadMetadata;
@@ -107,9 +107,7 @@ public class VideoFrame implements Serializable {
                 ", eventReadMetadata=" + eventReadMetadata +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
                 ", embeddings=" + embeddings.toString() +
-                ", lastBadges=" + StreamSupport
-                .stream(lastBadges.spliterator(), false)
-                .collect(Collectors.toList()) +
+                ", lastBadges=" + lastBadges +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }
