@@ -3,10 +3,7 @@ package io.pravega.example.videoprocessor;
 import io.pravega.example.common.Embedding;
 import io.pravega.example.common.Transaction;
 import io.pravega.example.common.VideoFrame;
-import io.pravega.example.tensorflow.BoundingBox;
-import io.pravega.example.tensorflow.FaceRecognizer;
-import io.pravega.example.tensorflow.ImageUtil;
-import io.pravega.example.tensorflow.Recognition;
+import io.pravega.example.tensorflow.*;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -31,7 +28,8 @@ public class FaceRecognizerProcessor
 
     private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
 
-    FaceRecognizer recognizer;
+    private static EmbeddingsComparator embeddingsComp;
+    private static FaceRecognizer recognizer;
 
     // broadcast state descriptor
     MapStateDescriptor<String, Embedding> embeddingsDesc;
@@ -41,9 +39,11 @@ public class FaceRecognizerProcessor
         // initialize keyed state
         embeddingsDesc =
                 new MapStateDescriptor<String, Embedding>("embeddingBroadcastState", String.class, Embedding.class);
+
+        embeddingsComp = new EmbeddingsComparator();
+
         recognizer = new FaceRecognizer();
         recognizer.warmup();
-
     }
 
     @Override
@@ -62,8 +62,8 @@ public class FaceRecognizerProcessor
         for(int i=0; i < frame.recognizedBoxes.size(); i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
             float[] currEmbedding = frame.embeddings.get(i);
-            String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator);
-            Recognition recognition = recognizer.getLabel(match, currFaceLocation);
+            String match = embeddingsComp.matchEmbedding(currEmbedding, embeddingsIterator);
+            Recognition recognition = embeddingsComp.getLabel(match, currFaceLocation);
             frame.data = imageUtil.labelFace(frame.data, recognition);
         }
 
