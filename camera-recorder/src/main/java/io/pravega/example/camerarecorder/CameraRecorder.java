@@ -100,7 +100,8 @@ public class CameraRecorder implements Runnable {
                  EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName(),
                          new ByteBufferSerializer(),
-                         EventWriterConfig.builder().build())) {
+                         EventWriterConfig.builder().build())
+                ) {
 
                 ObjectMapper mapper = new ObjectMapper();
                 OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
@@ -145,6 +146,7 @@ public class CameraRecorder implements Runnable {
 
                     // Write to Pravega.
                     CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
+//                    future = pravegaWriterCopy.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
 
                     // Show our frame in the preview window..
                     if (cFrame.isVisible()) {
