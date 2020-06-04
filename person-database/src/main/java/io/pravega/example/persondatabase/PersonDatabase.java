@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 
@@ -87,8 +88,8 @@ public class PersonDatabase implements Runnable {
                 log.info("imageName={}", imageName);
             }
 
-            Transaction transaction = new Transaction(personId, imageName, imageData, transactionType, timestamp);
-            log.info("transaction={}", transaction);
+            Transaction transaction = new Transaction(personId, imageName, imageData, transactionType, timestamp, new ArrayList<float[]>());
+            log.info("calculating embedding for transaction={}", transaction);
 
             ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(transaction));
 

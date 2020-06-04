@@ -26,10 +26,9 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 public class FaceRecognizerProcessor
         extends KeyedBroadcastProcessFunction<String, VideoFrame, Transaction, VideoFrame> {
 
-    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+    private final Logger log = LoggerFactory.getLogger(FaceRecognizerProcessor.class);
 
     private static EmbeddingsComparator embeddingsComp;
-    private static FaceRecognizer recognizer;
 
     // broadcast state descriptor
     MapStateDescriptor<String, Embedding> embeddingsDesc;
@@ -41,14 +40,6 @@ public class FaceRecognizerProcessor
                 new MapStateDescriptor<String, Embedding>("embeddingBroadcastState", String.class, Embedding.class);
 
         embeddingsComp = new EmbeddingsComparator();
-
-        recognizer = new FaceRecognizer();
-        recognizer.warmup();
-    }
-
-    @Override
-    public void close() {
-        recognizer.close();
     }
 
     @Override
@@ -61,7 +52,7 @@ public class FaceRecognizerProcessor
 
         for(int i=0; i < frame.recognizedBoxes.size(); i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
-            float[] currEmbedding = frame.embeddings.get(i);
+            float[] currEmbedding = frame.embeddingValues.get(i);
             String match = embeddingsComp.matchEmbedding(currEmbedding, embeddingsIterator);
             Recognition recognition = embeddingsComp.getLabel(match, currFaceLocation);
             frame.data = imageUtil.labelFace(frame.data, recognition);
@@ -75,20 +66,10 @@ public class FaceRecognizerProcessor
     public void processBroadcastElement(Transaction transaction, Context ctx, Collector<VideoFrame> out) throws Exception {
         BroadcastState<String, Embedding> bcState = ctx.getBroadcastState(embeddingsDesc);
 
-        log.info("trying to add element");
-
         if (transaction.transactionType.equals("add")) {
-            List<BoundingBox> recognizedBoxes = recognizer.locateFaces(transaction.imageData);
-
-            Mat imageMat = imdecode(new Mat(transaction.imageData), IMREAD_UNCHANGED);
-
-            for (int i = 0; i < recognizedBoxes.size(); i++) {
-                BoundingBox currentFace = recognizedBoxes.get(i);
-                byte[] croppedFace = recognizer.cropFace(currentFace, imageMat);
-                float[] embeddingValues = recognizer.embeddFace(croppedFace);
+            for (int i = 0; i < transaction.embeddingValues.size(); i++) {
+                float[] embeddingValues = transaction.embeddingValues.get(i);
                 Embedding embedding = new Embedding(transaction.personId, embeddingValues, transaction.imageName, transaction.timestamp);
-
-                log.info("add embedding: " + embedding);
 
                 // add the new embedding to database
                 bcState.put(transaction.personId, embedding);

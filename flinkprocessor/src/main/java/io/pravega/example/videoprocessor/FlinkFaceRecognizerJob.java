@@ -37,6 +37,8 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
@@ -143,6 +145,11 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("assignTimestampsAndWatermarksSensor");
             transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
 
+            // Calculate embeddings for image data in transactions
+            final DataStream<Transaction> transactionEmbeddings = transactionsWithTimestamps
+                    .map(new FaceRecognizerMapFunctionTransaction())
+                    .uid("TransactionEmbeddings")
+                    .name("transactionEmbeddings");
 
             // For each camera and window, get the most recent frame.
             final DataStream<VideoFrame> lastVideoFramePerCamera = videoFrames
@@ -154,12 +161,12 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
 
             // This is calculating the embeddings for the located face in the videoframe.
             final DataStream<VideoFrame> videoFrameEmbeddings = lastVideoFramePerCamera
-                    .map(new FaceRecognizerMapFunction())
+                    .map(new FaceRecognizerMapFunctionVideoFrame())
                     .uid("videoFrameEmbeddings")
                     .name("videoFrameEmbeddings");
             videoFrameEmbeddings.printToErr().uid("videoFrameEmbeddings-print").name("videoFrameEmbeddings-print");
 
-            final KeyedStream<VideoFrame, Integer> videoFramePerCamera = lastVideoFramePerCamera
+            final KeyedStream<VideoFrame, Integer> videoFramePerCamera = videoFrameEmbeddings
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
             // Schema of the embeddings database in state
@@ -169,11 +176,11 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
             // Partition the embeddings database within this stream.
-            BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcStateDescriptor);
+            BroadcastStream<Transaction> bcedTransactions = transactionEmbeddings.broadcast(bcStateDescriptor);
 
             // This process tries to match faces on video frame with faces represented in embeddings database, and labels
             // the recognized faces
-            DataStream<VideoFrame> facesRecognized = videoFrameEmbeddings
+            DataStream<VideoFrame> facesRecognized = videoFramePerCamera
                     .connect(bcedTransactions)
                     .process(new FaceRecognizerProcessor());
 
@@ -210,8 +217,8 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
      * The TensorFlow Session cannot be serialized so it is declared transient and
      * initialized in open().
      */
-    static class FaceRecognizerMapFunction extends RichMapFunction<VideoFrame, VideoFrame> {
-        final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunction.class);
+    static class FaceRecognizerMapFunctionVideoFrame extends RichMapFunction<VideoFrame, VideoFrame> {
+        final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunctionVideoFrame.class);
         private transient FaceRecognizer recognizer;
 
         /**
@@ -236,10 +243,51 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             for (BoundingBox faceLocation : frame.recognizedBoxes) {
                 Mat imageMat = imdecode(new Mat(frame.data), IMREAD_UNCHANGED);
                 byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
-                frame.embeddings.add(recognizer.embeddFace(currentFaceData));
+                frame.embeddingValues.add(recognizer.embeddFace(currentFaceData));
             }
             log.info("map: END: camera={}, frameNumber={}", frame.camera, frame.frameNumber);
             return frame;
+        }
+    }
+
+    /**
+     * A map function that uses TensorFlow and pre-trained facenet model to locate the faces in images within transactions, and
+     * store the embeddings for the faces located.
+     * The TensorFlow Session cannot be serialized so it is declared transient and
+     * initialized in open().
+     */
+    static class FaceRecognizerMapFunctionTransaction extends RichMapFunction<Transaction, Transaction> {
+        final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunctionTransaction.class);
+        private transient FaceRecognizer recognizer;
+
+        /**
+         * The first execution takes 6 minutes on a V100.
+         * We warmup in open() so that map() does not timeout.
+         */
+        @Override
+        public void open(Configuration parameters) throws Exception {
+            recognizer = new FaceRecognizer();
+            recognizer.warmup();
+        }
+
+        @Override
+        public void close() {
+            recognizer.close();
+        }
+
+        @Override
+        public Transaction map(Transaction tran) throws Exception {
+            if(tran.transactionType.equals("add")) {
+                log.info("map: BEGIN:tran={}",tran);
+                List<BoundingBox> recognizedBoxes = recognizer.locateFaces(tran.imageData);
+                for (BoundingBox faceLocation : recognizedBoxes) {
+                    Mat imageMat = imdecode(new Mat(tran.imageData), IMREAD_UNCHANGED);
+                    byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
+                    log.info("tran embedding is:{}", recognizer.embeddFace(currentFaceData));
+                    tran.embeddingValues.add(recognizer.embeddFace(currentFaceData));
+                }
+            }
+            return tran;
         }
     }
 }
