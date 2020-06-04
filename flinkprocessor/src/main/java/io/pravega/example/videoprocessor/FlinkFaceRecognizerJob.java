@@ -106,7 +106,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             final StreamExecutionEnvironment env = initializeFlinkStreaming();
 
             createStream(getConfig().getInputStreamConfig());
-//            createStream(getConfig().getPersonDatabaseStreamConfig());
+            createStream(getConfig().getPersonDatabaseStreamConfig());
             createStream(getConfig().getOutputStreamConfig());
             createStream(getConfig().getBadgeStreamConfig());
 
@@ -121,7 +121,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getInputStreamConfig().getStream(), startStreamCut, endStreamCut)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
-                    .withMaxOutstandingCheckpointRequest(6)
                     .build();
             final DataStream<ChunkedVideoFrame> inChunkedVideoFrames = env
                     .addSource(flinkPravegaReader)
@@ -159,7 +158,6 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getBadgeStreamConfig().getStream(), startStreamCutBadge, endStreamCutBadge)
                     .withDeserializationSchema(new ChunkedVideoFrameDeserializationSchema())
-                    .withMaxOutstandingCheckpointRequest(6)
                     .build();
             final DataStream<ChunkedVideoFrame> chunkedVideoFrameBadges = env
                     .addSource(flinkPravegaReaderBadge)
@@ -191,31 +189,30 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             // Create non-video person database transaction datastream.
             //
 
-//            final FlinkPravegaReader<Transaction> flinkPravegaReaderTransactions = FlinkPravegaReader.<Transaction>builder()
-//                    .withPravegaConfig(getConfig().getPravegaConfig())
-//                    .forStream(getConfig().getPersonDatabaseStreamConfig().getStream())
-//                    .withDeserializationSchema(new JsonDeserializationSchema<>(Transaction.class))
-//                    .withMaxOutstandingCheckpointRequest(6)
-//                    .build();
-//            final DataStream<Transaction> personDatabaseTransactions = env
-//                    .addSource(flinkPravegaReaderTransactions)
-//                    .uid("transaction")
-//                    .name("transaction");
-//            personDatabaseTransactions.printToErr().uid("personDatabaseTransactions-print").name("personDatabaseTransactions-print");
-//
-//            // Assign timestamps and watermarks based on timestamp in each chunk.
-//            final DataStream<Transaction> transactionsWithTimestamps = personDatabaseTransactions
-//                    .assignTimestampsAndWatermarks(
-//                            new BoundedOutOfOrdernessTimestampExtractor<Transaction>(
-//                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
-//                                @Override
-//                                public long extractTimestamp(Transaction element) {
-//                                    return element.timestamp.getTime();
-//                                }
-//                            })
-//                    .uid("assignTimestampsAndWatermarksTransaction")
-//                    .name("assignTimestampsAndWatermarksTransaction");
-//            transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
+            final FlinkPravegaReader<Transaction> flinkPravegaReaderTransactions = FlinkPravegaReader.<Transaction>builder()
+                    .withPravegaConfig(getConfig().getPravegaConfig())
+                    .forStream(getConfig().getPersonDatabaseStreamConfig().getStream())
+                    .withDeserializationSchema(new JsonDeserializationSchema<>(Transaction.class))
+                    .build();
+            final DataStream<Transaction> personDatabaseTransactions = env
+                    .addSource(flinkPravegaReaderTransactions)
+                    .uid("transaction")
+                    .name("transaction");
+            personDatabaseTransactions.printToErr().uid("personDatabaseTransactions-print").name("personDatabaseTransactions-print");
+
+            // Assign timestamps and watermarks based on timestamp in each chunk.
+            final DataStream<Transaction> transactionsWithTimestamps = personDatabaseTransactions
+                    .assignTimestampsAndWatermarks(
+                            new BoundedOutOfOrdernessTimestampExtractor<Transaction>(
+                                    Time.milliseconds(getConfig().getMaxOutOfOrdernessMs())) {
+                                @Override
+                                public long extractTimestamp(Transaction element) {
+                                    return element.timestamp.getTime();
+                                }
+                            })
+                    .uid("assignTimestampsAndWatermarksTransaction")
+                    .name("assignTimestampsAndWatermarksTransaction");
+            transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
 
 
 
@@ -227,55 +224,38 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .uid("lastVideoFramePerCamera")
                     .name("lastVideoFramePerCamera");
             lastVideoFramePerCamera.printToErr().uid("lastVideoFramePerCamera-print").name("lastVideoFramePerCamera-print");
-//
-//            final DataStream<VideoFrame> videoFrameEmbeddings = lastVideoFramePerCamera
-////                    .map(new FaceRecognizerMapFunction())
-//                    .map(x -> x)
-//                    .uid("videoFrameEmbeddings")
-//                    .name("videoFrameEmbeddings");
-//            videoFrameEmbeddings.printToErr().uid("videoFrameEmbeddings-print").name("videoFrameEmbeddings-print");
 
-
-//            StateTtlConfig ttlConfig = StateTtlConfig
-//                    .newBuilder(org.apache.flink.api.common.time.Time.seconds(1))
-//                    .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
-//                    .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
-//                    .build();
-
-            ValueStateDescriptor<Set> badgesScannedStateDescriptor = new ValueStateDescriptor<>("badgesScanned", Set.class);
-//            badgesScannedStateDescriptor.enableTimeToLive(ttlConfig);
-
+            final DataStream<VideoFrame> videoFrameEmbeddings = lastVideoFramePerCamera
+                    .map(new FaceRecognizerMapFunction())
+                    .uid("videoFrameEmbeddings")
+                    .name("videoFrameEmbeddings");
+            videoFrameEmbeddings.printToErr().uid("videoFrameEmbeddings-print").name("videoFrameEmbeddings-print");
 
             // For each camera and window, get the most recent badges processed within 5 sec.
             final DataStream<Set> lastBadges = videoFrameBadges
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera)
                     .window(SlidingEventTimeWindows.of(Time.seconds(5), Time.seconds(1)))
-//                    .trigger(EventTimeTrigger.create())
                     .process(new ProcessWindowFunction<VideoFrame, Set, Integer, TimeWindow>() {
                         @Override
                         public void process(Integer integer, Context context, Iterable<VideoFrame> elements, Collector<Set> out) throws Exception {
-//                            Set<String> result = new HashSet<>();
-//
-//                            elements.forEach(element -> {
-//                                String qrVal = null;
-//                                String id = null;
-//                                try {
-//                                    qrVal = badgeProcessor.readQRCode(element.data);
-//                                    Gson parser = new Gson();
-//                                    JsonObject json = parser.fromJson(qrVal, JsonObject.class);
-//                                    id = json.get("Id").getAsString();
-//                                    result.add(id);
-//                                } catch (IOException e) {
-//                                    e.printStackTrace();
-//                                } catch (NotFoundException e) {
-//                                    // skip if not found
-//                                }
-//                            });
-//
-//                            if(result.size() > 0) {
-//                                out.collect(result);
-//                            }
-                            out.collect(new HashSet());
+                            Set<String> result = new HashSet<>();
+
+                            elements.forEach(element -> {
+                                String qrVal = null;
+                                String id = null;
+                                try {
+                                    qrVal = badgeProcessor.readQRCode(element.data);
+                                    Gson parser = new Gson();
+                                    JsonObject json = parser.fromJson(qrVal, JsonObject.class);
+                                    id = json.get("Id").getAsString();
+                                    result.add(id);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                } catch (NotFoundException e) {
+                                    // skip if not found
+                                }
+                            });
+                            out.collect(result);
                         }
                     })
                     .uid("lastBadgesPerCamera")
@@ -289,7 +269,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
 
             // broadcast the list of qr codes onto qr stream, and store list of qr codes into videoframe
 
-            final KeyedStream<VideoFrame, Integer> videoFramePerCamera = lastVideoFramePerCamera
+            final KeyedStream<VideoFrame, Integer> videoFramePerCamera = videoFrameEmbeddings
                     .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
 //            final KeyedStream<Set, Integer> badgesKeyed = lastBadges
@@ -308,25 +288,25 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
 //                    .connect(badgesKeyed)
 //                    .process(new BadgesCoProcessor());
 
-//            KeyedStream<VideoFrame, Integer> keyedBadges = badgesProcessed
-//                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
+            KeyedStream<VideoFrame, Integer> keyedBadges = badgesProcessed
+                    .keyBy((KeySelector<VideoFrame, Integer>) value -> value.camera);
 
             // Schema of the embeddings database in state
             // mapping is person-Id to embedding
-//            MapStateDescriptor<String, Embedding> bcEmbeddingsStateDescriptor =
-//                    new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
+            MapStateDescriptor<String, Embedding> bcEmbeddingsStateDescriptor =
+                    new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
 
             // Partition the embeddings database within this stream.
-//            BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcEmbeddingsStateDescriptor);
+            BroadcastStream<Transaction> bcedTransactions = transactionsWithTimestamps.broadcast(bcEmbeddingsStateDescriptor);
 
             // Run facial recognition on incoming video frames
-//            DataStream<VideoFrame> facesRecognized = keyedBadges
-//                    .connect(bcedTransactions)
-//                    .process(new FaceRecognizerProcessor());
+            DataStream<VideoFrame> facesRecognized = keyedBadges
+                    .connect(bcedTransactions)
+                    .process(new FaceRecognizerProcessor());
 
             // Split output video frames into chunks of 8 MiB or less.
-            final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = badgesProcessed
+            final DataStream<ChunkedVideoFrame> outChunkedVideoFrames = facesRecognized
                     .flatMap(new VideoFrameChunker(getConfig().getChunkSizeBytes()))
                     .uid("VideoFrameChunker")
                     .name("VideoFrameChunker");
