@@ -9,8 +9,6 @@ import io.pravega.example.tensorflow.ImageUtil;
 import io.pravega.example.tensorflow.Recognition;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction;
 import org.apache.flink.util.Collector;
@@ -21,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
@@ -37,14 +34,14 @@ public class FaceRecognizerProcessor
     FaceRecognizer recognizer;
 
     // broadcast state descriptor
-    MapStateDescriptor<String, Embedding> embeddingsDesc;
+    MapStateDescriptor<String, Embedding> embeddingsDatabaseDesc; // mapped from personId to Embedding
 
 //    ValueState<Set> badgeListState;
 
     @Override
     public void open(Configuration conf) throws Exception {
         // initialize keyed state
-        embeddingsDesc =
+        embeddingsDatabaseDesc =
                 new MapStateDescriptor<String, Embedding>("embeddingBroadcastState", String.class, Embedding.class);
 
         recognizer = new FaceRecognizer();
@@ -60,10 +57,8 @@ public class FaceRecognizerProcessor
     @Override
     public void processElement(VideoFrame frame, ReadOnlyContext ctx, Collector<VideoFrame> out) throws Exception {
         Iterable<Map.Entry<String, Embedding>> embeddigsIterable = ctx
-                .getBroadcastState(this.embeddingsDesc)
+                .getBroadcastState(this.embeddingsDatabaseDesc)
                 .immutableEntries();
-
-        log.info("BadgeList originally is null:{}", frame.lastBadges == null);
 
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
         ImageUtil imageUtil = new ImageUtil();
@@ -89,7 +84,7 @@ public class FaceRecognizerProcessor
 
     @Override
     public void processBroadcastElement(Transaction transaction, Context ctx, Collector<VideoFrame> out) throws Exception {
-        BroadcastState<String, Embedding> bcState = ctx.getBroadcastState(embeddingsDesc);
+        BroadcastState<String, Embedding> bcState = ctx.getBroadcastState(embeddingsDatabaseDesc);
 
         log.info("trying to add element");
 
@@ -103,8 +98,6 @@ public class FaceRecognizerProcessor
                 byte[] croppedFace = recognizer.cropFace(currentFace, imageMat);
                 float[] embeddingValues = recognizer.embeddFace(croppedFace);
                 Embedding embedding = new Embedding(transaction.personId, embeddingValues, transaction.imageName, transaction.timestamp);
-
-                log.info("add embedding: " + embedding);
 
                 // add the new embedding to database
                 bcState.put(transaction.personId, embedding);

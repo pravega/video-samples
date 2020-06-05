@@ -280,6 +280,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
 
             BroadcastStream<Set> bcedBadges = lastBadges.broadcast(bcBadgesStateDescriptor);
 
+            // store last few badges scanned in video frames
             DataStream<VideoFrame> badgesProcessed = videoFramePerCamera
                     .connect(bcedBadges)
                     .process(new BadgesProcessor());

@@ -110,10 +110,8 @@ public class VideoPlayer implements Runnable {
                         final VideoFrame videoFrame = new VideoFrame(chunkedVideoFrame);
                         if (videoFrame.camera == getConfig().getCamera()) {
                             videoFrame.validateHash();
-                            log.info("data length is " + videoFrame.data.length);
                             final Mat pngMat = new Mat(new BytePointer(videoFrame.data));
                             final Mat mat = opencv_imgcodecs.imdecode(pngMat, opencv_imgcodecs.IMREAD_UNCHANGED);
-                            log.info("mat length is " + mat.dims());
                             final Frame frame = converter.convert(mat);
                             cFrame.showImage(frame);
                         }

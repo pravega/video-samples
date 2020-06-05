@@ -210,8 +210,6 @@ public class FaceRecognizer implements Serializable, Closeable {
         String match = "Unknown";
         double minDiff = 1.0;
 
-
-        log.info("BadgeList while matching:{}", badgeList);
         while (embeddingsDatabase.hasNext()) {
             Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
             String personId = embeddingEntry.getKey();
@@ -223,10 +221,8 @@ public class FaceRecognizer implements Serializable, Closeable {
                 continue;
             }
 
-            log.info("Current embedding considered is " + embedding.personId);
-
             double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
-            log.info("distance with " + personId + " is " + diff);
+//            log.info("distance with " + personId + " is " + diff);
 
             // Matches if within threshold
             if (diff < THRESHOLD && diff < minDiff) {
@@ -270,7 +266,7 @@ public class FaceRecognizer implements Serializable, Closeable {
             String classifierPath = file.getAbsolutePath();
             CascadeClassifier faceCascade = new CascadeClassifier();
             boolean modelLoaded = faceCascade.load(classifierPath);
-            log.info("facial detection model load: " + modelLoaded);
+//            log.info("facial detection model load: " + modelLoaded);
 
             RectVector faces = new RectVector();
             int absoluteFaceSize = 0;
