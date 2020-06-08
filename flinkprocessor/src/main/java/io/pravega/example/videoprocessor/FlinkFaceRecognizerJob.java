@@ -14,10 +14,7 @@ import io.pravega.client.stream.StreamCut;
 import io.pravega.connectors.flink.FlinkPravegaReader;
 import io.pravega.connectors.flink.FlinkPravegaWriter;
 import io.pravega.connectors.flink.PravegaWriterMode;
-import io.pravega.example.common.ChunkedVideoFrame;
-import io.pravega.example.common.Embedding;
-import io.pravega.example.common.Transaction;
-import io.pravega.example.common.VideoFrame;
+import io.pravega.example.common.*;
 import io.pravega.example.flinkprocessor.AbstractJob;
 import io.pravega.example.flinkprocessor.JsonDeserializationSchema;
 import io.pravega.example.tensorflow.BoundingBox;
@@ -37,13 +34,15 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.imdecode;
 
 /**
- * This job populates the embeddings database.
+ * This job matches scanned faces to known recorded faces for facial recognition by labelling recognized faces
+ * and locating recognized faces.
  */
 public class FlinkFaceRecognizerJob extends AbstractJob {
     private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.class);
@@ -117,9 +116,8 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("ChunkedVideoFrameReassembler");
 
             //
-            // Create non-video person database transaction datastream.
+            // Create person database transaction datastream.
             //
-
             final FlinkPravegaReader<Transaction> flinkPravegaReaderTransactions = FlinkPravegaReader.<Transaction>builder()
                     .withPravegaConfig(getConfig().getPravegaConfig())
                     .forStream(getConfig().getPersonDatabaseStreamConfig().getStream())
@@ -131,7 +129,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .name("transaction");
             personDatabaseTransactions.printToErr().uid("personDatabaseTransactions-print").name("personDatabaseTransactions-print");
 
-            // Assign timestamps and watermarks based on timestamp in each chunk.
+            // Assign timestamps and watermarks based on timestamp in each event.
             final DataStream<Transaction> transactionsWithTimestamps = personDatabaseTransactions
                     .assignTimestampsAndWatermarks(
                             new BoundedOutOfOrdernessTimestampExtractor<Transaction>(
@@ -146,7 +144,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             transactionsWithTimestamps.printToErr().uid("transactionsWithTimestamps-print").name("transactionsWithTimestamps-print");
 
             // Calculate embeddings for image data in transactions
-            final DataStream<Transaction> transactionEmbeddings = transactionsWithTimestamps
+            final DataStream<EmbeddingsTransaction> transactionEmbeddings = transactionsWithTimestamps
                     .map(new FaceRecognizerMapFunctionTransaction())
                     .uid("TransactionEmbeddings")
                     .name("transactionEmbeddings");
@@ -159,7 +157,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
                     .uid("lastVideoFramePerCamera")
                     .name("lastVideoFramePerCamera");
 
-            // This is calculating the embeddings for the located face in the videoframe.
+            // This is calculating the embeddings for the located faces in the videoframe.
             final DataStream<VideoFrame> videoFrameEmbeddings = lastVideoFramePerCamera
                     .map(new FaceRecognizerMapFunctionVideoFrame())
                     .uid("videoFrameEmbeddings")
@@ -175,11 +173,11 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
             MapStateDescriptor<String, Embedding> bcStateDescriptor =
                     new MapStateDescriptor<>("embeddingBroadcastState", String.class, Embedding.class);
 
-            // Partition the embeddings database within this stream.
-            BroadcastStream<Transaction> bcedTransactions = transactionEmbeddings.broadcast(bcStateDescriptor);
+            // broadcast the embeddings database to all sub-tasks.
+            BroadcastStream<EmbeddingsTransaction> bcedTransactions = transactionEmbeddings.broadcast(bcStateDescriptor);
 
-            // This process tries to match faces on video frame with faces represented in embeddings database, and labels
-            // the recognized faces
+            // This process tries to match faces on video frame with faces represented in embeddings database, labels
+            // the recognized faces, and maintains embeddings database
             DataStream<VideoFrame> facesRecognized = videoFramePerCamera
                     .connect(bcedTransactions)
                     .process(new FaceRecognizerProcessor());
@@ -256,7 +254,7 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
      * The TensorFlow Session cannot be serialized so it is declared transient and
      * initialized in open().
      */
-    static class FaceRecognizerMapFunctionTransaction extends RichMapFunction<Transaction, Transaction> {
+    static class FaceRecognizerMapFunctionTransaction extends RichMapFunction<Transaction, EmbeddingsTransaction> {
         final private static Logger log = LoggerFactory.getLogger(FlinkFaceRecognizerJob.FaceRecognizerMapFunctionTransaction.class);
         private transient FaceRecognizer recognizer;
 
@@ -276,18 +274,19 @@ public class FlinkFaceRecognizerJob extends AbstractJob {
         }
 
         @Override
-        public Transaction map(Transaction tran) throws Exception {
-            if(tran.transactionType.equals("add")) {
-                log.info("map: BEGIN:tran={}",tran);
+        public EmbeddingsTransaction map(Transaction tran) throws Exception {
+            EmbeddingsTransaction embTran = new EmbeddingsTransaction(tran.personId, tran.imageName, tran.imageData, tran.transactionType, tran.timestamp, new ArrayList<float[]>());
+            if (tran.transactionType.equals("add")) {
+                log.info("map: BEGIN:tran={}", tran);
                 List<BoundingBox> recognizedBoxes = recognizer.locateFaces(tran.imageData);
                 for (BoundingBox faceLocation : recognizedBoxes) {
-                    Mat imageMat = imdecode(new Mat(tran.imageData), IMREAD_UNCHANGED);
+                    Mat imageMat = imdecode(new Mat(embTran.imageData), IMREAD_UNCHANGED);
                     byte[] currentFaceData = recognizer.cropFace(faceLocation, imageMat);
-                    log.info("tran embedding is:{}", recognizer.embeddFace(currentFaceData));
-                    tran.embeddingValues.add(recognizer.embeddFace(currentFaceData));
+                    embTran.embeddingValues.add(recognizer.embeddFace(currentFaceData));
+                    embTran.imageData = null; // data not needed anymore, since embeddings are calculated
                 }
             }
-            return tran;
+            return embTran;
         }
     }
 }

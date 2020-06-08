@@ -10,30 +10,28 @@ import java.util.Arrays;
 import java.util.List;
 
 /*
- *   This class represents the schema for interacting with the Embeddings database
+ *   Stores and serializes JPEG images in stream.
  * */
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Transaction implements Serializable {
     public String personId;
     public String imageName;
-    public byte[] imageData;
+    public byte[] imageData;    // JPEG image
     public String transactionType;
     public Timestamp timestamp;
-    public List<float[]> embeddingValues = new ArrayList<float[]>();
 
 
     public Transaction() {
 
     }
 
-    public Transaction(String personId, String imageName, byte[] imageData, String transactionType, Timestamp timestamp, List<float[]> embeddingValues) {
+    public Transaction(String personId, String imageName, byte[] imageData, String transactionType, Timestamp timestamp) {
         this.personId = personId;
         this.imageName = imageName;
         this.imageData = imageData;
         this.transactionType = transactionType;
         this.timestamp = timestamp;
-        this.embeddingValues = embeddingValues;
     }
 
     public String getPersonId() {
@@ -56,8 +54,6 @@ public class Transaction implements Serializable {
         return this.timestamp;
     }
 
-    public List<float[]> getEmbeddingValues() { return this.embeddingValues; }
-
     public String toString() {
         String dataStr = "null";
         int dataLength = 0;
@@ -76,6 +72,6 @@ public class Transaction implements Serializable {
                 "imageName={" + imageName + "}, " +
                 "transactionType={" + transactionType + "}, " +
                 "data(" + dataLength + ")={" + dataStr + "}, " +
-                "timestamp={" + timestamp.toGMTString() + "}, ";
+                "timestamp={" + timestamp.toGMTString() + "}";
     }
 }

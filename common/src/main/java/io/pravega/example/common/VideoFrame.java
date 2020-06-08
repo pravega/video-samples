@@ -105,7 +105,7 @@ public class VideoFrame implements Serializable {
                 ", sourceEventPointer=" + sourceEventPointer +
                 ", eventReadMetadata=" + eventReadMetadata +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
-                ", embeddings=" + embeddingValues.toString() +
+                ", embeddingValues=" + embeddingValues.toString() +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

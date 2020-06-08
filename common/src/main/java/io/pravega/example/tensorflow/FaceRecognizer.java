@@ -34,7 +34,7 @@ import static org.bytedeco.opencv.global.opencv_imgproc.*;
 import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 /**
- * ObjectDetector class to detect and recognize faces using pre-trained models with TensorFlow Java API.
+ * Class to detect and recognize faces using pre-trained models with TensorFlow Java API.
  */
 public class FaceRecognizer implements Serializable, Closeable {
     // Params used for image processing
@@ -135,8 +135,8 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param cropBox  The location in the image to crop
-     * @param faceData The data of the image in jpeg format
-     * @return data of the image isolated to the cropped area
+     * @param faceData The data of the image in uncompressed bitmap format
+     * @return jpeg format data of the image isolated to the cropped area
      */
     public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
         Rect cropArea = new Rect((int) cropBox.getX(), (int) cropBox.getY(), (int) cropBox.getWidth(), (int) cropBox.getHeight());
@@ -158,7 +158,7 @@ public class FaceRecognizer implements Serializable, Closeable {
     }
 
     /**
-     * @param frameData data that represents the image with faces
+     * @param frameData data that represents the jpeg image with faces
      * @return location of the faces
      * @throws Exception
      */
