@@ -63,19 +63,18 @@ public class FaceRecognizerProcessor
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
         ImageUtil imageUtil = new ImageUtil();
 
-        for(int i=0; i < frame.recognizedBoxes.size(); i++) {
+        for(int i=0; i < frame.recognizedBoxes.size() && frame.lastBadges != null; i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
             float[] currEmbedding = frame.embeddings.get(i);
             String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator, frame.lastBadges);
 
-            if(!match.equals("Unknown") && frame.lastBadges != null) {
-                match += ": PASSED";
+            Recognition recognition;
+            if(!match.equals("Unknown")) {
+                recognition = recognizer.getLabel(match, currFaceLocation);
             } else {
-                match += ": FAILED";
+                recognition = recognizer.getLabel(match, currFaceLocation);
             }
-
-            Recognition recognition = recognizer.getLabel(match, currFaceLocation);
-            frame.data = imageUtil.labelFace(frame.data, recognition);
+            frame.data = imageUtil.labelFace(frame.data, recognition, !match.equals("Unknown"));
         }
 
         frame.hash = frame.calculateHash();

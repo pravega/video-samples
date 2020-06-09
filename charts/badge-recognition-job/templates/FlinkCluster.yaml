@@ -17,8 +17,8 @@ spec:
       accessModes: [ ReadWriteOnce ]
       resources:
         requests:
-          storage: 2Gi
-      storageClassName: standard
+          storage: 5Gi
+      storageClassName: nfs   # use nfs to avoid affinity issues - TODO: change back to standard
   storage:
     volumeSource:
       persistentVolumeClaim:

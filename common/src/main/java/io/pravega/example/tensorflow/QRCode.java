@@ -33,7 +33,7 @@ public class QRCode {
 
         // Example QRCode production
         JsonObject identification = new JsonObject();
-        identification.addProperty("Id", "Thejas.Vidyasagar@dell.com");
+        identification.addProperty("Id", "Thejas.Vidyasagar");
 
         String qrCodeData = identification.toString();
         String filePath = "./common/src/main/resources/QRCode.png";

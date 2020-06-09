@@ -77,13 +77,15 @@ public class ImageUtil {
         return bytes;
     }
 
-    public byte[] labelFace(final byte[] image, final Recognition recognition) {
+    public byte[] labelFace(final byte[] image, final Recognition recognition, boolean passed) {
         byte[] bytes = null;
         BufferedImage bufferedImage = createImageFromBytes(image);
-        float scaleX = (float) bufferedImage.getWidth() / (float) 416;
-        float scaleY = (float) bufferedImage.getHeight() / (float) 416;
         Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
-        graphics.setColor(Color.green);
+        if(passed) {
+            graphics.setColor(Color.green);
+        } else {
+            graphics.setColor(Color.red);
+        }
 
         BoxPosition box = recognition.getLocation();
         //set font

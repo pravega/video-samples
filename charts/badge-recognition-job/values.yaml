@@ -1,0 +1,28 @@
+appParameters:
+  checkpointIntervalMs: 9000
+  enableOperatorChaining: "true"
+  framesPerSec: 30.0
+  input-minNumSegments: 1
+  input-startAtTail: "true"
+  input-stream: face-detection-raw
+  badge-stream: face-detection-raw-copy
+  person-database-stream: person-database-transaction
+  maxOutOfOrdernessMs: 10
+  output-minNumSegments: 1
+  output-stream: face-detection-detected
+  readerParallelism: 1
+flinkVersion: 1.9.1
+imageRef:
+  name: cuda10.0flink1.9.1
+mainClass: io.pravega.example.videoprocessor.FlinkFaceRecognizerJob
+mavenCoordinate:
+  artifact: flinkprocessor
+  group: io.pravega.example.video
+  version: 0.1.0
+parallelism: 1
+taskManager:
+  cpu: 1000m
+  heap: 500m
+  memory: 2G
+  replicas: 1
+  taskSlots: 1
