@@ -19,6 +19,8 @@ import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tensorflow.*;
+import org.tensorflow.framework.ConfigProto;
+import org.tensorflow.framework.GPUOptions;
 
 import java.io.*;
 import java.net.URL;
@@ -51,11 +53,18 @@ public class FaceRecognizer implements Serializable, Closeable {
         log.info("FaceRecognizer: initializing TensorFlow");
         final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
+	
+	final ConfigProto config = ConfigProto.newBuilder()
+                .setGpuOptions(GPUOptions.newBuilder()
+                        .setAllowGrowth(true)
+                        .setPerProcessGpuMemoryFraction(1.0/16.0)
+                        .build()
+                ).build();
 
         byte[] GRAPH_DEF = IOUtil.readAllBytesOrExit(graphFile);
         Graph graph = new Graph();
         graph.importGraphDef(GRAPH_DEF);
-        session = new Session(graph);
+        session = new Session(graph, config.toByteArray());
         GraphBuilder graphBuilder = new GraphBuilder(graph);
 
         // Pipeline for JPEG decoding
