@@ -17,6 +17,7 @@ import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
 import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.PravegaAppConfiguration;
 import io.pravega.example.common.PravegaUtil;
 import io.pravega.example.common.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
@@ -94,6 +95,7 @@ public class CameraRecorderTwoStreams implements Runnable {
 
             // Create Pravega stream.
             PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
+            PravegaUtil.createStream(getConfig().getClientConfig(), new PravegaAppConfiguration.StreamConfig("examples","OUTPUT_"));
 
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
                         getConfig().getOutputStreamConfig().getStream().getScope(),
