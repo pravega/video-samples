@@ -42,7 +42,8 @@ public class FaceRecognizer implements Serializable, Closeable {
     private static final float SCALE = 255f;
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
 
-    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+    private static final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;

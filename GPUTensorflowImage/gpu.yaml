@@ -1,0 +1,13 @@
+apiVersion: flink.nautilus.dellemc.com/v1beta1
+kind: ClusterFlinkImage
+metadata:
+  name: cuda10.0flink1.7.2
+spec:
+  apiversion: v1
+  docker:
+    image: 024626128611.dkr.ecr.us-west-2.amazonaws.com/desa-lab-sulfur/cuda-flink:cuda10.0flink1.7.2
+    resources:
+      limits:
+        nvidia.com/gpu: 1 # requesting 1 GPUs
+    pullPolicy: Always
+  flinkVersion: 1.7.2

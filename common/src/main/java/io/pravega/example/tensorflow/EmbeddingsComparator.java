@@ -35,6 +35,7 @@ public class EmbeddingsComparator {
                 // Matches if within threshold
                 if (diff < THRESHOLD && diff < minDiff) {
                     match = personId;
+                    minDiff = diff;
                 }
             }
         }
