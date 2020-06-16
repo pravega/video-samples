@@ -21,8 +21,8 @@ mavenCoordinate:
   version: 0.1.0
 parallelism: 1
 taskManager:
-  cpu: 3000m
-  heap: 2000m
-  memory: 6G
+  cpu: 1000m
+  heap: 6000m
+  memory: 3G
   replicas: 1
   taskSlots: 1
