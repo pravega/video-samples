@@ -58,8 +58,7 @@ RUN set -ex; \
 		echo '#!/usr/bin/env bash'; \
 		echo 'set -Eeuo pipefail'; \
 		echo 'ls $JAVA_HOME'; \
-		echo 'mkdir $JAVA_HOME/lib/security'; \
-		echo 'cp $JAVA_HOME/jre/lib/security/ $JAVA_HOME/lib -r'; \
+		echo 'cp $JAVA_HOME/jre/lib/ $JAVA_HOME/lib -r'; \
 		echo 'if ! [ -d "$JAVA_HOME" ]; then echo >&2 "error: missing JAVA_HOME environment variable"; exit 1; fi'; \
 	# 8-jdk uses "$JAVA_HOME/jre/lib/security/cacerts" and 8-jre and 11+ uses "$JAVA_HOME/lib/security/cacerts" directly (no "jre" directory)
 		echo 'cacertsFile=; for f in "$JAVA_HOME/lib/security/cacerts" "$JAVA_HOME/jre/lib/security/cacerts"; do if [ -e "$f" ]; then echo "f = $f" && cacertsFile="$f" && echo "cacertsFile=$cacertsFile"; break; fi; done'; \

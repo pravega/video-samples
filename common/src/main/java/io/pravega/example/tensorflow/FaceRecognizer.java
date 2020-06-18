@@ -263,7 +263,8 @@ public class FaceRecognizer implements Serializable, Closeable {
      * @throws Exception
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
-        try (Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
+        try (Mat rawMat = new Mat(frameData);
+                Mat imageMat = imdecode(rawMat, IMREAD_UNCHANGED);
              CvArr inputImage = new IplImage(imageMat);
              RectVector faces = new RectVector();
 
