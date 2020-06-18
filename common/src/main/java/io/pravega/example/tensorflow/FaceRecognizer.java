@@ -286,11 +286,12 @@ public class FaceRecognizer implements Serializable, Closeable {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
 
-//            Size faceSize = size.height(absoluteFaceSize);
+            Size faceSize = new Size(absoluteFaceSize, absoluteFaceSize);
+            Size emptySize = new Size();
 //            faceSize = faceSize.width(absoluteFaceSize);
 
             // Identify location of the faces
-            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
+            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, emptySize);
 
             List<BoundingBox> recognizedBoxes = new ArrayList<>();
 
@@ -309,11 +310,12 @@ public class FaceRecognizer implements Serializable, Closeable {
 
             log.info("recognized faces are {}", recognizedBoxes);
 
+            faceSize.close();
+            emptySize.close();
+
             return recognizedBoxes;
         } catch (Exception e) {
             throw new Exception(e);
-        } finally {
-
         }
     }
 }
