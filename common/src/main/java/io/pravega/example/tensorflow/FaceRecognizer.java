@@ -264,7 +264,9 @@ public class FaceRecognizer implements Serializable, Closeable {
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try (Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
-             CvArr inputImage = new IplImage(imageMat);) {
+             CvArr inputImage = new IplImage(imageMat);
+             RectVector faces = new RectVector();
+             ) {
 
 
             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
@@ -277,7 +279,6 @@ public class FaceRecognizer implements Serializable, Closeable {
             boolean modelLoaded = faceCascade.load(classifierPath);
 //            log.info("facial detection model load: " + modelLoaded);
 
-            RectVector faces = new RectVector();
             int absoluteFaceSize = 0;
             int height = grayImage.arrayHeight();
             if (Math.round(height * 0.2f) > 0) {
