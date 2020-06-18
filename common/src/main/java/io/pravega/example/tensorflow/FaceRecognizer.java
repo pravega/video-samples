@@ -266,16 +266,21 @@ public class FaceRecognizer implements Serializable, Closeable {
         try (Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
              CvArr inputImage = new IplImage(imageMat);
              RectVector faces = new RectVector();
+
+             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
+
+             CascadeClassifier faceCascade = new CascadeClassifier();
+
+
+             Size size = new Size();
              ) {
 
 
-            CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
 
             cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
             cvEqualizeHist(grayImage, grayImage);
 
             String classifierPath = file.getAbsolutePath();
-            CascadeClassifier faceCascade = new CascadeClassifier();
             boolean modelLoaded = faceCascade.load(classifierPath);
 //            log.info("facial detection model load: " + modelLoaded);
 
@@ -285,9 +290,11 @@ public class FaceRecognizer implements Serializable, Closeable {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
 
+            Size faceSize = size.height(absoluteFaceSize);
+            faceSize = faceSize.width(absoluteFaceSize);
 
             // Identify location of the faces
-            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
+            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, size);
 
             List<BoundingBox> recognizedBoxes = new ArrayList<>();
 
@@ -304,9 +311,13 @@ public class FaceRecognizer implements Serializable, Closeable {
                 recognizedBoxes.add(currentBox);
             }
 
+            faceSize.close();
+
             return recognizedBoxes;
         } catch (Exception e) {
             throw new Exception(e);
+        } finally {
+
         }
     }
 }
