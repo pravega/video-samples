@@ -63,7 +63,8 @@ public class FaceRecognizerProcessor
         Iterator<Map.Entry<String, Embedding>> embeddingsIterator = embeddigsIterable.iterator();
         ImageUtil imageUtil = new ImageUtil();
 
-        for(int i=0; i < frame.recognizedBoxes.size() && frame.lastBadges != null; i++) {
+//        for(int i=0; i < frame.recognizedBoxes.size() && frame.lastBadges != null; i++) {
+        for(int i=0; i < frame.recognizedBoxes.size(); i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
             float[] currEmbedding = frame.embeddings.get(i);
             String match = recognizer.matchEmbedding(currEmbedding, embeddingsIterator, frame.lastBadges);

@@ -231,11 +231,12 @@ public class FaceRecognizer implements Serializable, Closeable {
             }
 
             double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
-//            log.info("distance with " + personId + " is " + diff);
+            log.info("distance with " + personId + " is " + diff);
 
             // Matches if within threshold
             if (diff < THRESHOLD && diff < minDiff) {
                 match = personId;
+                minDiff = diff;
             }
         }
 
@@ -264,20 +265,17 @@ public class FaceRecognizer implements Serializable, Closeable {
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try (Mat rawMat = new Mat(frameData);
-                Mat imageMat = imdecode(rawMat, IMREAD_UNCHANGED);
-             CvArr inputImage = new IplImage(imageMat);
-             RectVector faces = new RectVector();
-
-             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
 
              CascadeClassifier faceCascade = new CascadeClassifier();
 
+             RectVector faces = new RectVector();
 
-             Size size = new Size();
-             ) {
+             Mat imageMat = imdecode(rawMat, IMREAD_UNCHANGED);
+             CvArr inputImage = new IplImage(imageMat);
 
+             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
 
-
+        ) {
             cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
             cvEqualizeHist(grayImage, grayImage);
 
@@ -291,11 +289,11 @@ public class FaceRecognizer implements Serializable, Closeable {
                 absoluteFaceSize = Math.round(height * 0.2f);
             }
 
-            Size faceSize = size.height(absoluteFaceSize);
-            faceSize = faceSize.width(absoluteFaceSize);
+//            Size faceSize = size.height(absoluteFaceSize);
+//            faceSize = faceSize.width(absoluteFaceSize);
 
             // Identify location of the faces
-            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, size);
+            faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, new Size(absoluteFaceSize, absoluteFaceSize), new Size());
 
             List<BoundingBox> recognizedBoxes = new ArrayList<>();
 
@@ -312,7 +310,7 @@ public class FaceRecognizer implements Serializable, Closeable {
                 recognizedBoxes.add(currentBox);
             }
 
-            faceSize.close();
+            log.info("recognized faces are {}", recognizedBoxes);
 
             return recognizedBoxes;
         } catch (Exception e) {
