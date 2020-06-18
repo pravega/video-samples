@@ -15,6 +15,6 @@ out/
 __pycache__
 common/src/main/resources/tiny-yolo-voc.pb
 keycloak.json
-
+.kube
 jupyterhub/secret.yaml
 *-local.sh

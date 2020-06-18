@@ -164,10 +164,9 @@ public class FaceRecognizer implements Serializable, Closeable {
      * @throws Exception
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
-        try {
-            Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
+        try(Mat imageMat = imdecode(new Mat(frameData), IMREAD_UNCHANGED);
             CvArr inputImage = new IplImage(imageMat);
-
+        ) {
             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
 
             cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
