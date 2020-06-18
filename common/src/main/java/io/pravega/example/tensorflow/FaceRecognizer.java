@@ -176,6 +176,7 @@ public class FaceRecognizer implements Serializable, Closeable {
                         .feed("phase_train", preprocessedPhaseTrainTensor)
                         .fetch("embeddings")
                         .run();
+                assert detectorOutputs.size() == 1;
                 try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
                     final float[] outputTensor = new float[(int) resultTensor.shape()[1]];
                     final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
