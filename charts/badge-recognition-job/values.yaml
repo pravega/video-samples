@@ -11,6 +11,7 @@ appParameters:
   output-minNumSegments: 1
   output-stream: face-detection-detected
   readerParallelism: 1
+  maxOutOfOrdernessMs: 10
 flinkVersion: 1.9.1
 imageRef:
   name: cuda10.0flink1.9.1-2
