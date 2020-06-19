@@ -12,7 +12,6 @@ package io.pravega.example.tensorflow;
 
 
 import io.pravega.example.common.Embedding;
-import io.pravega.example.common.VideoFrame;
 import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
@@ -168,20 +167,22 @@ public class FaceRecognizer implements Serializable, Closeable {
                     .run();
             assert imagePreprocessorOutputs.size() == 1;
 
-            try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class);
-                 final Tensor<Boolean> preprocessedPhaseTrainTensor = Tensor.create(false).expect(Boolean.class)) {
-                final List<Tensor<?>> detectorOutputs = session
-                        .runner()
-                        .feed("input", preprocessedInputTensor)
-                        .feed("phase_train", preprocessedPhaseTrainTensor)
-                        .fetch("embeddings")
-                        .run();
-                assert detectorOutputs.size() == 1;
-                try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
-                    final float[] outputTensor = new float[(int) resultTensor.shape()[1]];
-                    final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
-                    resultTensor.writeTo(floatBuffer);
-                    return outputTensor;
+            try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class)) {
+                try (final Tensor<?> preprocessedPhaseTrainTensor = Tensor.create(false);
+                     ) {
+                    final List<Tensor<?>> detectorOutputs = session
+                            .runner()
+                            .feed("input", preprocessedInputTensor)
+                            .feed("phase_train", preprocessedPhaseTrainTensor)
+                            .fetch("embeddings")
+                            .run();
+                    assert detectorOutputs.size() == 1;
+                    try (final Tensor<Float> resultTensor = detectorOutputs.get(0).expect(Float.class)) {
+                        final float[] outputTensor = new float[(int) resultTensor.shape()[1]];
+                        final FloatBuffer floatBuffer = FloatBuffer.wrap(outputTensor);
+                        resultTensor.writeTo(floatBuffer);
+                        return outputTensor;
+                    }
                 }
             }
         }
