@@ -89,16 +89,17 @@ public class FaceRecognizer implements Serializable, Closeable {
         // Accesses the jar file to get resources
         if (classifier.getProtocol().equals("jar")) {
             file = File.createTempFile("haarcascase_frontalface_alt", ".tmp");
-            try(InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
-                OutputStream out = new FileOutputStream(file);
+            try(InputStream input = FaceRecognizer.class.getResourceAsStream(resource)
             ){
-                int read;
-                byte[] bytes = new byte[1024];
+                try (OutputStream out = new FileOutputStream(file)) {
 
-                while ((read = input.read(bytes)) != -1) {
-                    out.write(bytes, 0, read);
+                    int read;
+                    byte[] bytes = new byte[1024];
+
+                    while ((read = input.read(bytes)) != -1) {
+                        out.write(bytes, 0, read);
+                    }
                 }
-                out.close();
                 file.deleteOnExit();
             }
         } else {
@@ -168,7 +169,7 @@ public class FaceRecognizer implements Serializable, Closeable {
             assert imagePreprocessorOutputs.size() == 1;
 
             try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class)) {
-                try (final Tensor<?> preprocessedPhaseTrainTensor = Tensor.create(false);
+                try (final Tensor<?> preprocessedPhaseTrainTensor = Tensor.create(false)
                      ) {
                     final List<Tensor<?>> detectorOutputs = session
                             .runner()
@@ -266,59 +267,68 @@ public class FaceRecognizer implements Serializable, Closeable {
      * @throws Exception when failed
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
-        try (CascadeClassifier faceCascade = new CascadeClassifier();
+        try (CascadeClassifier faceCascade = new CascadeClassifier()
+            ) {
 
-             RectVector faces = new RectVector();
+            List<BoundingBox> recognizedBoxes;
+            try (RectVector faces = new RectVector()) {
 
-             Mat rawMat = new Mat(frameData);
-             Mat imageMat = imdecode(rawMat, IMREAD_UNCHANGED);
-             CvArr inputImage = new IplImage(imageMat);
+                Mat imageMat;
+                try (Mat rawMat = new Mat(frameData)) {
+                    imageMat = imdecode(rawMat, IMREAD_UNCHANGED);
+                }
+                CvArr grayImage;
+                try (CvArr inputImage = new IplImage(imageMat)) {
 
-             CvArr grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1); //converting image to grayscale
-        ) {
-            cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
-            cvEqualizeHist(grayImage, grayImage);
+                    //converting image to grayscale
+                    grayImage = cvCreateImage(cvGetSize(inputImage), 8, 1);
 
-            String classifierPath = file.getAbsolutePath();
-            boolean modelLoaded = faceCascade.load(classifierPath);
+
+                    cvCvtColor(inputImage, grayImage, COLOR_BGR2GRAY); // Convert image to grayscale
+                }
+                cvEqualizeHist(grayImage, grayImage);
+
+                String classifierPath = file.getAbsolutePath();
+                faceCascade.load(classifierPath);
 //            log.info("facial detection model load: " + modelLoaded);
 
-            int absoluteFaceSize = 0;
-            int height = grayImage.arrayHeight();
-            if (Math.round(height * 0.2f) > 0) {
-                absoluteFaceSize = Math.round(height * 0.2f);
-            }
-
-            List<BoundingBox> recognizedBoxes = new ArrayList<>();
-
-            try(Size faceSize = new Size(absoluteFaceSize, absoluteFaceSize);
-                Size emptySize = new Size();) {
-
-//            faceSize = faceSize.width(absoluteFaceSize);
-
-                // Identify location of the faces
-                faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, emptySize);
-
-
-                for (int i = 0; i < faces.size(); i++) {
-                    try(
-                            Rect currRect = faces.get(i);
-                    ) {
-
-                        double boxX = Math.max(currRect.x() - 10, 0);
-                        double boxY = Math.max(currRect.y() - 10, 0);
-                        double boxWidth = Math.min(currRect.width() + 20, imageMat.arrayWidth() - boxX);
-                        double boxHeight = Math.min(currRect.height() + 20, imageMat.arrayHeight() - boxY);
-                        double boxConfidence = -1.0;
-                        double[] boxClasses = new double[1];
-
-                        BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
-
-                        recognizedBoxes.add(currentBox);
-                    }
+                int absoluteFaceSize = 0;
+                int height = grayImage.arrayHeight();
+                if (Math.round(height * 0.2f) > 0) {
+                    absoluteFaceSize = Math.round(height * 0.2f);
                 }
 
-                log.info("recognized faces are {}", recognizedBoxes);
+                recognizedBoxes = new ArrayList<>();
+
+                try (Size faceSize = new Size(absoluteFaceSize, absoluteFaceSize);
+                     Size emptySize = new Size()) {
+
+    //            faceSize = faceSize.width(absoluteFaceSize);
+
+                    // Identify location of the faces
+                    faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, emptySize);
+
+
+                    for (int i = 0; i < faces.size(); i++) {
+                        try (
+                                Rect currRect = faces.get(i)
+                        ) {
+
+                            double boxX = Math.max(currRect.x() - 10, 0);
+                            double boxY = Math.max(currRect.y() - 10, 0);
+                            double boxWidth = Math.min(currRect.width() + 20, imageMat.arrayWidth() - boxX);
+                            double boxHeight = Math.min(currRect.height() + 20, imageMat.arrayHeight() - boxY);
+                            double boxConfidence = -1.0;
+                            double[] boxClasses = new double[1];
+
+                            BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+
+                            recognizedBoxes.add(currentBox);
+                        }
+                    }
+
+                    log.info("recognized faces are {}", recognizedBoxes);
+                }
             }
 
             return recognizedBoxes;
