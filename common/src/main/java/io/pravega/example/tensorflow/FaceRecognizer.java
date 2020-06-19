@@ -52,13 +52,16 @@ public class FaceRecognizer implements Serializable, Closeable {
         log.info("FaceRecognizer: initializing TensorFlow");
         final long t0 = System.currentTimeMillis();
         InputStream graphFile = FaceRecognizer.class.getResourceAsStream("/facenet.pb");       // Pre-trained model
-	
-	final ConfigProto config = ConfigProto.newBuilder()
-                .setGpuOptions(GPUOptions.newBuilder()
-                        .setAllowGrowth(true)
-                        .setPerProcessGpuMemoryFraction(1.0/16.0)
-                        .build()
-                ).build();
+
+        System.setProperty("org.bytedeco.javacpp.maxphysicalbytes", "0");
+        System.setProperty("org.bytedeco.javacpp.maxbytes", "0");
+
+        final ConfigProto config = ConfigProto.newBuilder()
+                    .setGpuOptions(GPUOptions.newBuilder()
+                            .setAllowGrowth(true)
+                            .setPerProcessGpuMemoryFraction(1.0/16.0)
+                            .build()
+                    ).build();
 
         byte[] GRAPH_DEF = IOUtil.readAllBytesOrExit(graphFile);
         Graph graph = new Graph();
