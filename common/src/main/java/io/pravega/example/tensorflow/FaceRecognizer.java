@@ -89,17 +89,19 @@ public class FaceRecognizer implements Serializable, Closeable {
 
         // Accesses the jar file to get resources
         if (classifier.getProtocol().equals("jar")) {
-            InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
             file = File.createTempFile("haarcascase_frontalface_alt", ".tmp");
-            OutputStream out = new FileOutputStream(file);
-            int read;
-            byte[] bytes = new byte[1024];
+            try(InputStream input = FaceRecognizer.class.getResourceAsStream(resource);
+                OutputStream out = new FileOutputStream(file);
+            ){
+                int read;
+                byte[] bytes = new byte[1024];
 
-            while ((read = input.read(bytes)) != -1) {
-                out.write(bytes, 0, read);
+                while ((read = input.read(bytes)) != -1) {
+                    out.write(bytes, 0, read);
+                }
+                out.close();
+                file.deleteOnExit();
             }
-            out.close();
-            file.deleteOnExit();
         } else {
             //this will probably work in your IDE, but not from a JAR
             file = new File(classifier.getFile());
@@ -133,13 +135,11 @@ public class FaceRecognizer implements Serializable, Closeable {
      * @return a label representing location and identifier for face
      */
     public Recognition getLabel(String badgeId, BoundingBox faceLocation) {
-        Recognition recognition = new Recognition(1, badgeId, (float) 1,
+        return new Recognition(1, badgeId, (float) 1,
                 new BoxPosition((float) (faceLocation.getX()),
                         (float) (faceLocation.getY()),
                         (float) (faceLocation.getWidth()),
                         (float) (faceLocation.getHeight())));
-
-        return recognition;
     }
 
     /**
@@ -262,7 +262,7 @@ public class FaceRecognizer implements Serializable, Closeable {
     /**
      * @param frameData data that represents the image with faces
      * @return location of the faces
-     * @throws Exception
+     * @throws Exception when failed
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try (CascadeClassifier faceCascade = new CascadeClassifier();
@@ -300,16 +300,21 @@ public class FaceRecognizer implements Serializable, Closeable {
 
 
                 for (int i = 0; i < faces.size(); i++) {
-                    double boxX = Math.max(faces.get(i).x() - 10, 0);
-                    double boxY = Math.max(faces.get(i).y() - 10, 0);
-                    double boxWidth = Math.min(faces.get(i).width() + 20, imageMat.arrayWidth() - boxX);
-                    double boxHeight = Math.min(faces.get(i).height() + 20, imageMat.arrayHeight() - boxY);
-                    double boxConfidence = -1.0;
-                    double[] boxClasses = new double[1];
+                    try(
+                            Rect currRect = faces.get(i);
+                    ) {
 
-                    BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+                        double boxX = Math.max(currRect.x() - 10, 0);
+                        double boxY = Math.max(currRect.y() - 10, 0);
+                        double boxWidth = Math.min(currRect.width() + 20, imageMat.arrayWidth() - boxX);
+                        double boxHeight = Math.min(currRect.height() + 20, imageMat.arrayHeight() - boxY);
+                        double boxConfidence = -1.0;
+                        double[] boxClasses = new double[1];
 
-                    recognizedBoxes.add(currentBox);
+                        BoundingBox currentBox = new BoundingBox(boxX, boxY, boxWidth, boxHeight, boxConfidence, boxClasses);
+
+                        recognizedBoxes.add(currentBox);
+                    }
                 }
 
                 log.info("recognized faces are {}", recognizedBoxes);
