@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2019 Dell Inc., or its subsidiaries. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ */
+
+plugins {
+    id 'java'
+    id 'application'
+}
+
+
+group = "io.pravega.example"
+version = samplesVersion
+archivesBaseName = "person-database"
+description = "person-database"
+mainClassName = "io.pravega.example.persondatabase.PersonDatabase"
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+
+dependencies {
+    compile project(':common')
+    compile project(':video-player')
+    compile "org.slf4j:slf4j-api:${slf4jApiVersion}"
+    compile "ch.qos.logback:logback-classic:${logbackVersion}"
+    compile "ch.qos.logback:logback-core:${logbackVersion}"
+    compile "net.logstash.logback:logstash-logback-encoder:${logstashLogbackEncoderVersion}"
+//    compile "org.bytedeco:javacv-platform:1.5.1"
+    compile "io.pravega:pravega-client:${pravegaVersion}"
+    if (includePravegaCredentials.toBoolean()) {
+        compile "io.pravega:pravega-keycloak-client:${pravegaCredentialsVersion}"
+    }
+    testCompile "junit:junit:${junitVersion}"
+}
+
+run {
+    if ( project.hasProperty('jvmArgs') ) {
+        jvmArgs = (project.jvmArgs.replace("\n", "").split(",") as List)
+    }
+
+}
+
+distributions {
+    main {
+        baseName = archivesBaseName
+        contents {
+            into("lib") {
+                from jar
+                from(project.configurations.runtime)
+            }
+        }
+    }
+}
+
+

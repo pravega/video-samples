@@ -1,10 +1,10 @@
 apiVersion: flink.nautilus.dellemc.com/v1beta1
 kind: ClusterFlinkImage
 metadata:
-  name: cuda10.0flink1.9.1
+  name: cuda10.0flink1.9.1-2
 spec:
   apiversion: v1
   docker:
-    image: pvthejas/flinkcuda:cuda10.0flink1.9.1
+    image: pvthejas/flinkcuda:cuda10.0flink1.9.1-2
     pullPolicy: IfNotPresent
   flinkVersion: 1.9.1

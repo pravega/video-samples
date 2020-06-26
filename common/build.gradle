@@ -8,6 +8,9 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
+
+apply plugin: 'java-library'
+
 apply plugin: "java"
 apply plugin: "maven-publish"
 
@@ -22,6 +25,17 @@ dependencies {
     compile "io.pravega:pravega-connectors-flink-${flinkShortVersion}_${flinkScalaVersion}:${pravegaFlinkConnectorVersion}"
     compile "org.apache.flink:flink-streaming-java_${flinkScalaVersion}:${flinkVersion}"
     compile "org.apache.flink:flink-streaming-scala_${flinkScalaVersion}:${flinkVersion}"
+    compile "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+    compile "org.bytedeco:javacv-platform:1.5.1"
+
+//    13.1 works without custom image
+    compile group: 'org.tensorflow', name: 'tensorflow', version: '1.15.0'
+    compile group: 'org.tensorflow', name: 'libtensorflow', version: '1.15.0'
+    compile group: 'org.tensorflow', name: 'proto', version: '1.15.0'
+
+//  QR Code scanner and generator
+    compile "com.google.zxing:core:3.3.0"
+    compile 'com.google.zxing:javase:3.3.0'
 
     compile group: 'org.tensorflow', name: 'tensorflow', version: tensorflowVersion
     compile group: 'org.tensorflow', name: 'libtensorflow', version: tensorflowVersion

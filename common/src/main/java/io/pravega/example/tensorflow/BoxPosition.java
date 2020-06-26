@@ -22,13 +22,15 @@ public class BoxPosition {
     private float width;
     private float height;
 
+    public BoxPosition() {
+        this(0,0,0,0);
+    }
+
     public BoxPosition(float left, float top, float width, float height) {
         this.left = left;
         this.top = top;
         this.width = width;
         this.height = height;
-
-        init();
     }
 
     public BoxPosition(final BoxPosition boxPosition) {

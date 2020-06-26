@@ -123,13 +123,13 @@ public class CameraRecorder implements Runnable {
 
                     log.info("frameNumber={}, timestamp={}, capturedFrame={}", frameNumber, timestamp, capturedFrame);
 
-                    // Convert captured frame to PNG.
-                    BytePointer pngBytePointer = new BytePointer();
-                    opencv_imgcodecs.imencode(".png", mat,  pngBytePointer);
-                    log.info("pngBytePointer={}", pngBytePointer);
-                    byte[] pngByteArray = pngBytePointer.getStringBytes();
+                    // Convert captured frame to JPEG.
+                    BytePointer jpgBytePointer = new BytePointer();
+                    opencv_imgcodecs.imencode(".jpg", mat,  jpgBytePointer);
+                    log.info("jpgBytePointer={}", jpgBytePointer);
+                    byte[] jpgByteArray = jpgBytePointer.getStringBytes();
                     if (false) {
-                        Files.write((new File(String.format("capture-%05d.png", frameNumber))).toPath(), pngByteArray);
+                        Files.write((new File(String.format("capture-%05d.jpg", frameNumber))).toPath(), jpgByteArray);
                     }
 
                     // Create VideoFrame. We assume that it fits in a single chunk (< 1 MB).
@@ -138,7 +138,7 @@ public class CameraRecorder implements Runnable {
                     videoFrame.ssrc = ssrc;
                     videoFrame.timestamp = new Timestamp(timestamp);
                     videoFrame.frameNumber = frameNumber;
-                    videoFrame.data = pngByteArray;
+                    videoFrame.data = jpgByteArray;
                     videoFrame.hash = videoFrame.calculateHash();
                     ChunkedVideoFrame chunkedVideoFrame = new ChunkedVideoFrame(videoFrame);
                     ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(chunkedVideoFrame));
