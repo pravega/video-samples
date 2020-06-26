@@ -123,7 +123,7 @@ public class FaceRecognizer implements Serializable, Closeable {
     public void warmup() throws Exception {
         log.info("warmup: BEGIN");
         final long t0 = System.currentTimeMillis();
-        InputStream image = FaceRecognizer.class.getResourceAsStream("/funny-baby-face.jpg");
+        InputStream image = FaceRecognizer.class.getResourceAsStream("/placeholder-face.jpg");
         byte[] data = IOUtils.toByteArray(image);
         locateFaces(data);
         log.info("warmup: END; duration={} ms", System.currentTimeMillis() - t0);
