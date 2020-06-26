@@ -12,6 +12,7 @@ package io.pravega.example.tensorflow;
 
 
 import io.pravega.example.common.Embedding;
+import io.pravega.example.common.VideoFrame;
 import org.apache.commons.io.IOUtils;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_objdetect.CascadeClassifier;
@@ -24,7 +25,10 @@ import org.tensorflow.framework.GPUOptions;
 import java.io.*;
 import java.net.URL;
 import java.nio.FloatBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
@@ -32,16 +36,16 @@ import static org.bytedeco.opencv.global.opencv_imgproc.*;
 import static org.bytedeco.opencv.global.opencv_objdetect.CASCADE_SCALE_IMAGE;
 
 /**
- * ObjectDetector class to detect and recognize faces using pre-trained models with TensorFlow Java API.
+ * Class to detect and recognize faces using pre-trained models with TensorFlow Java API.
  */
 public class FaceRecognizer implements Serializable, Closeable {
     // Params used for image processing
     private static final int IMAGE_DIMENSION = 160;
     private static final float SCALE = 255f;
     private static final String JPEG_BYTES_PLACEHOLDER_NAME = "image";
-    private static final double THRESHOLD = 0.97;
 
-    private final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+    private static final Logger log = LoggerFactory.getLogger(FaceRecognizer.class);
+
     private final Session session;
     private final Output<Float> imagePreprocessingOutput;
     private final ImageUtil imageUtil;
@@ -114,7 +118,6 @@ public class FaceRecognizer implements Serializable, Closeable {
         if (!file.exists()) {
             throw new RuntimeException("Error: File " + file + " not found!");
         }
-
     }
 
     public void warmup() throws Exception {
@@ -194,8 +197,8 @@ public class FaceRecognizer implements Serializable, Closeable {
 
     /**
      * @param cropBox  The location in the image to crop
-     * @param faceData The data of the image in jpeg format
-     * @return data of the image isolated to the cropped area
+     * @param faceData The data of the image in uncompressed bitmap format
+     * @return jpeg format data of the image isolated to the cropped area
      */
     public byte[] cropFace(BoundingBox cropBox, Mat faceData) {
         Rect cropArea = new Rect((int) cropBox.getX(), (int) cropBox.getY(), (int) cropBox.getWidth(), (int) cropBox.getHeight());
@@ -216,58 +219,12 @@ public class FaceRecognizer implements Serializable, Closeable {
         return outData;
     }
 
-    /**
-     * @param otherEmbedding     The current facial embedding found in the image
-     * @param embeddingsDatabase The database of facial embeddings to compare to
-     * @return The name of the person the embedding matches with in the embeddings database
-     */
-    public String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase, Set<String> badgeList) {
-        String match = "Unknown";
-        double minDiff = 1.0;
 
-        while (embeddingsDatabase.hasNext()) {
-            Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
-            String personId = embeddingEntry.getKey();
-            Embedding embedding = embeddingEntry.getValue();
-
-            // only match with badges scanned
-            if(badgeList != null && !badgeList.contains(personId)) {
-                log.info("badge list has something, so skip this comparison");
-                continue;
-            }
-
-            double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
-            log.info("distance with " + personId + " is " + diff);
-
-            // Matches if within threshold
-            if (diff < THRESHOLD && diff < minDiff) {
-                match = personId;
-                minDiff = diff;
-            }
-        }
-
-        return match;
-    }
 
     /**
-     * @param origEmbedding  The data for a facial embedding
-     * @param otherEmbedding The data for another facial embedding
-     * @return The difference between the facial embeddings
-     */
-    public double compareEmbeddings(float[] origEmbedding, float[] otherEmbedding) {
-        double sumDiffSq = 0;
-
-        for (int i = 0; i < origEmbedding.length; i++) {
-            sumDiffSq += Math.pow(origEmbedding[i] - otherEmbedding[i], 2);
-        }
-
-        return Math.sqrt(sumDiffSq);
-    }
-
-    /**
-     * @param frameData data that represents the image with faces
+     * @param frameData data that represents the jpeg image with faces
      * @return location of the faces
-     * @throws Exception when failed
+     * @throws Exception
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try (CascadeClassifier faceCascade = new CascadeClassifier()

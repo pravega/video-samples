@@ -17,6 +17,41 @@ public class EmbeddingsComparator {
     /**
      * @param otherEmbedding     The current facial embedding found in the image
      * @param embeddingsDatabase The database of facial embeddings to compare to
+     * @param badgeList List of badges scanned
+     * @return The name of the person the embedding matches with in the embeddings database
+     */
+    public static String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Embedding>> embeddingsDatabase, Set<String> badgeList) {
+        String match = "Unknown";
+        double minDiff = 1.0;
+
+        while (embeddingsDatabase.hasNext()) {
+            Map.Entry<String, Embedding> embeddingEntry = embeddingsDatabase.next();
+            String personId = embeddingEntry.getKey();
+            Embedding embedding = embeddingEntry.getValue();
+
+            // only match with badges scanned
+            if(badgeList != null && !badgeList.contains(personId)) {
+                log.info("badge list has something, so skip this comparison");
+                continue;
+            }
+
+            double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
+            log.info("distance with " + personId + " is " + diff);
+
+            // Matches if within threshold
+            if (diff < THRESHOLD && diff < minDiff) {
+                match = personId;
+                minDiff = diff;
+            }
+        }
+
+        return match;
+    }
+
+
+    /**
+     * @param otherEmbedding     The current facial embedding found in the image
+     * @param embeddingsDatabase The database of facial embeddings to compare to
      * @return The name of the person the embedding matches with in the embeddings database
      */
     public static String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Set<Embedding>>> embeddingsDatabase) {
@@ -42,6 +77,7 @@ public class EmbeddingsComparator {
 
         return match;
     }
+
 
     /**
      * @param origEmbedding  The data for a facial embedding
