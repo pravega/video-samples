@@ -57,7 +57,7 @@ public class FaceRecognizerProcessor
         for (int i = 0; i < frame.recognizedBoxes.size() && frame.lastBadges != null; i++) {
             BoundingBox currFaceLocation = frame.recognizedBoxes.get(i);
             float[] currEmbedding = frame.embeddingValues.get(i);
-            String match = EmbeddingsComparator.matchEmbedding(currEmbedding, embeddingsIterator);
+            String match = EmbeddingsComparator.matchEmbedding(currEmbedding, embeddingsIterator, frame.lastBadges);
             Recognition recognition;
             if(!match.equals("Unknown")) {
                 recognition = EmbeddingsComparator.getLabel(match, currFaceLocation);

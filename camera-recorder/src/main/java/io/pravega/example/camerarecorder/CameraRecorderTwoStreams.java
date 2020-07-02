@@ -98,17 +98,17 @@ public class CameraRecorderTwoStreams implements Runnable {
             PravegaUtil.createStream(getConfig().getClientConfig(), new PravegaAppConfiguration.StreamConfig("examples","OUTPUT_"));
 
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
-                        getConfig().getOutputStreamConfig().getStream().getScope(),
-                        getConfig().getClientConfig());
+                    getConfig().getOutputStreamConfig().getStream().getScope(),
+                    getConfig().getClientConfig());
                  EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName(),
                          new ByteBufferSerializer(),
                          EventWriterConfig.builder().build());
                  EventStreamWriter<ByteBuffer> pravegaWriterCopy = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName() + "-copy",
-                    new ByteBufferSerializer(),
-                    EventWriterConfig.builder().build())
-                ) {
+                         new ByteBufferSerializer(),
+                         EventWriterConfig.builder().build())
+            ) {
 
                 ObjectMapper mapper = new ObjectMapper();
                 OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
