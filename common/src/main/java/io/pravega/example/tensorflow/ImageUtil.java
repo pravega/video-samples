@@ -36,7 +36,8 @@ public class ImageUtil {
 
     /**
      * Label image with classes and predictions given by the ThensorFLow
-     * @param image buffered image to label
+     *
+     * @param image        buffered image to label
      * @param recognitions list of recognized objects
      * @return JPEG image in a byte array
      */
@@ -49,7 +50,7 @@ public class ImageUtil {
         Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
         graphics.setColor(Color.green);
 
-        for (Recognition recognition: recognitions) {
+        for (Recognition recognition : recognitions) {
             BoxPosition box = recognition.getScaledLocation(scaleX, scaleY);
             //set font
             Font myFont = new Font("Courier New", 1, 17);
@@ -57,10 +58,37 @@ public class ImageUtil {
             //draw text
             graphics.drawString(recognition.getTitle() + " " + recognition.getConfidence(), box.getLeft(), box.getTop() - 7);
             // draw bounding box
-            graphics.drawRect(box.getLeftInt(),box.getTopInt(), box.getWidthInt(), box.getHeightInt());
+            graphics.drawRect(box.getLeftInt(), box.getTopInt(), box.getWidthInt(), box.getHeightInt());
         }
 
-        graphics.dispose();
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(bufferedImage, "jpg", baos);
+            bytes = baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            graphics.dispose();
+        }
+
+
+        return bytes;
+    }
+
+    public byte[] labelFace(final byte[] image, final Recognition recognition) {
+        byte[] bytes = null;
+        BufferedImage bufferedImage = createImageFromBytes(image);
+        Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
+        graphics.setColor(Color.green);
+
+        BoxPosition box = recognition.getLocation();
+        //set font
+        Font myFont = new Font("Courier New", 1, 14);
+        graphics.setFont(myFont);
+        //draw text
+        graphics.drawString(recognition.getTitle(), box.getLeft(), box.getTop() - 7);
+        // draw bounding box
+        graphics.drawRect(box.getLeftInt(), box.getTopInt(), box.getWidthInt(), box.getHeightInt());
 
         try
         {
@@ -107,6 +135,8 @@ public class ImageUtil {
             bytes = baos.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            graphics.dispose();
         }
 
         LOGGER.info("labelImage: END");
@@ -132,13 +162,14 @@ public class ImageUtil {
 
     /**
      * Saves image into target file name
-     * @param image to save
+     *
+     * @param image  to save
      * @param target file name to save image
      * @return location of the saved image
      */
     public String saveImage(final BufferedImage image, final String target) {
         try {
-            ImageIO.write(image,"jpg", new File(target));
+            ImageIO.write(image, "jpg", new File(target));
             return target;
         } catch (IOException ex) {
             LOGGER.error("Unagle to save image {}!", target);

@@ -53,7 +53,7 @@ public class VideoFrame implements Serializable {
 
     public List<BoundingBox> recognizedBoxes = new ArrayList<BoundingBox>();
 
-    public List<float[]> embeddings = new ArrayList<float[]>();
+    public List<float[]> embeddingValues = new ArrayList<float[]>();
 
     public VideoFrame() {
     }
@@ -71,7 +71,7 @@ public class VideoFrame implements Serializable {
         this.sourceEventPointer = frame.sourceEventPointer;
         this.eventReadMetadata = frame.eventReadMetadata;
         this.recognizedBoxes = frame.recognizedBoxes;
-        this.embeddings = frame.embeddings;
+        this.embeddingValues = frame.embeddingValues;
         this.lastBadges = frame.lastBadges;
     }
 
@@ -106,7 +106,7 @@ public class VideoFrame implements Serializable {
                 ", sourceEventPointer=" + sourceEventPointer +
                 ", eventReadMetadata=" + eventReadMetadata +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
-                ", embeddings=" + embeddings.toString() +
+                ", embeddingValues=" + embeddingValues.toString() +
                 ", lastBadges=" + lastBadges +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";

@@ -15,7 +15,7 @@ out/
 __pycache__
 common/src/main/resources/tiny-yolo-voc.pb
 keycloak.json
-
+.kube
 jupyterhub/secret.yaml
 *-local.sh
-camera-recorder/src/main/java/io/pravega/example/camerarecorder/Test.java
+

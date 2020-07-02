@@ -5,17 +5,19 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgn
 
 import java.io.Serializable;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /*
- *   This class represents the schema for interacting with the Embeddings database
+ *   Stores and serializes JPEG images in stream.
  * */
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Transaction implements Serializable {
     public String personId;
     public String imageName;
-    public byte[] imageData;
+    public byte[] imageData;    // JPEG image
     public String transactionType;
     public Timestamp timestamp;
 

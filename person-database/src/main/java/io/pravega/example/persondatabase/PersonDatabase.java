@@ -1,5 +1,6 @@
 package io.pravega.example.persondatabase;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.StreamManager;
@@ -16,14 +17,12 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 
 /*
-    This class adds data to the embeddings database using input
+    This class adds face images to the known face database using input jpeg images with faces in them.
  */
 
 public class PersonDatabase implements Runnable {
@@ -65,6 +64,7 @@ public class PersonDatabase implements Runnable {
                      EventWriterConfig.builder().build())) {
 
             ObjectMapper mapper = new ObjectMapper();
+            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
             // args
             String personId = getConfig().getpersonId();
@@ -73,7 +73,7 @@ public class PersonDatabase implements Runnable {
 
             Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 
-            // Decode the image.
+            // Decode the jpeg image.
             BufferedImage originalImage = null;
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -88,7 +88,7 @@ public class PersonDatabase implements Runnable {
             }
 
             Transaction transaction = new Transaction(personId, imageName, imageData, transactionType, timestamp);
-            log.info("transaction={}", transaction);
+            log.info("Transaction={}", transaction);
 
             ByteBuffer jsonBytes = ByteBuffer.wrap(mapper.writeValueAsBytes(transaction));
 
