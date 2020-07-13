@@ -6,6 +6,7 @@
 *.log
 .nfs*
 build/
+scripts/linux-amd64/*
 ca-certificates/*
 !ca-certificates/README.txt
 data/

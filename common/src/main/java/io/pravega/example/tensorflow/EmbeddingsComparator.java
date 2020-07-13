@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This class allows to build labels, compare face embeddings and compare embeddings
+ * This class allows to build labels, and compare embeddings
  */
 public class EmbeddingsComparator {
     private static final Logger log = LoggerFactory.getLogger(EmbeddingsComparator.class);

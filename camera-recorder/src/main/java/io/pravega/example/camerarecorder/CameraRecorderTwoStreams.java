@@ -40,7 +40,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Reads video images from a web cam and writes them to a Pravega stream.
+ * Reads video images from a web cam and writes them to two Pravega streams.
  */
 public class CameraRecorderTwoStreams implements Runnable {
     private static Logger log = LoggerFactory.getLogger(CameraRecorderTwoStreams.class);
@@ -119,7 +119,6 @@ public class CameraRecorderTwoStreams implements Runnable {
 
                 Mat mat = new Mat();
 
-//                OpenCVFrameConverter.ToIplImage converterToImage = new OpenCVFrameConverter.ToIplImage();
                 while (cap.read(mat)) {
                     capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
@@ -155,16 +154,10 @@ public class CameraRecorderTwoStreams implements Runnable {
                     CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
                     future = pravegaWriterCopy.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
 
-
-//                    future = pravegaWriterCopy.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
-
                     // Show our frame in the preview window..
                     if (cFrame.isVisible()) {
                         cFrame.showImage(capturedFrame);
                     }
-
-                    // Make sure frame has been durably persisted to Pravega.
-//                    future.get();
 
                     frameNumber++;
                     lastTimestamp = timestamp;

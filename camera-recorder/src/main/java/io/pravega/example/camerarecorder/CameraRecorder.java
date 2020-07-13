@@ -112,7 +112,6 @@ public class CameraRecorder implements Runnable {
 
                 Mat mat = new Mat();
 
-//                OpenCVFrameConverter.ToIplImage converterToImage = new OpenCVFrameConverter.ToIplImage();
                 while (cap.read(mat)) {
                     capturedFrame = converterToMat.convert(mat);
                     long timestamp = System.currentTimeMillis();
@@ -146,15 +145,11 @@ public class CameraRecorder implements Runnable {
 
                     // Write to Pravega.
                     CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
-//                    future = pravegaWriterCopy.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
 
                     // Show our frame in the preview window..
                     if (cFrame.isVisible()) {
                         cFrame.showImage(capturedFrame);
                     }
-
-                    // Make sure frame has been durably persisted to Pravega.
-//                    future.get();
 
                     frameNumber++;
                     lastTimestamp = timestamp;

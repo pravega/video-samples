@@ -64,7 +64,6 @@ public class QRCode {
      * @param qrCodeData data that is needed to be converted into a QR code
      * @param filePath location where the QR code needs to be stored
      * @param charset which type of charset needs to be used for input data
-//     * @param hintMap configuration of QR code generator
      * @param qrCodeheight height of the QR code
      * @param qrCodewidth width of the QR code
      * @throws WriterException
@@ -86,7 +85,6 @@ public class QRCode {
                 new BufferedImageLuminanceSource(
                         ImageIO.read(new ByteArrayInputStream(imageBytes)))));
         Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
-//        Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap, hintMap);
         return qrCodeResult.getText();
     }
 }
