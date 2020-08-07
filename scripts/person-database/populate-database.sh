@@ -14,7 +14,7 @@ for dir in "${IMAGES_DIR}"/*; do
       FILE_NAME="$(basename "$file")"
       if [ "${FILE_NAME}" != "*" ]; then
         echo "${FILE_NAME}"
-        "${ROOT_DIR}"/scripts/person-database/add-person.sh --personId="${PERSON_NAME}" --imagePath="${file}"
+        . "${ROOT_DIR}"/scripts/person-database/add-person.sh --personId="${PERSON_NAME}" --imagePath="${file}"
       fi
     done
 done

@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.*;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
@@ -176,7 +177,7 @@ public class FaceRecognizer implements Serializable, Closeable {
 
             try (final Tensor<Float> preprocessedInputTensor = imagePreprocessorOutputs.get(0).expect(Float.class)) {
                 try (final Tensor<?> preprocessedPhaseTrainTensor = Tensor.create(false)
-                ) {
+                     ) {
                     final List<Tensor<?>> detectorOutputs = session
                             .runner()
                             .feed("input", preprocessedInputTensor)
@@ -219,12 +220,10 @@ public class FaceRecognizer implements Serializable, Closeable {
         return outData;
     }
 
-
-
     /**
      * @param frameData data that represents the jpeg image with faces
      * @return location of the faces
-     * @throws Exception
+     * @throws Exception when face is not scanned properly
      */
     public List<BoundingBox> locateFaces(byte[] frameData) throws Exception {
         try (CascadeClassifier faceCascade = new CascadeClassifier()
@@ -262,8 +261,6 @@ public class FaceRecognizer implements Serializable, Closeable {
 
                 try (Size faceSize = new Size(absoluteFaceSize, absoluteFaceSize);
                      Size emptySize = new Size()) {
-
-                    //            faceSize = faceSize.width(absoluteFaceSize);
 
                     // Identify location of the faces
                     faceCascade.detectMultiScale(cvarrToMat(grayImage), faces, 1.1, 2, CASCADE_SCALE_IMAGE, faceSize, emptySize);

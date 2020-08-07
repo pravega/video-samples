@@ -1,17 +1,18 @@
 FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu18.04
 
-RUN apt-get update 
 
-RUN apt-get upgrade -y && \
-    apt install openjdk-8-jdk -y && \
-    apt-get clean
-# Install dependencies
 RUN set -ex; \
-  apt-get update; \
-  apt-get -y install wget  libsnappy1v5 gcc; \
-  rm -rf /var/lib/apt/lists/*
+    apt-get update; \
+    apt-get upgrade -y && \
+    apt install openjdk-8-jre  wget  libsnappy1v5 gcc ca-certificates p11-kit -y && \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*;
+
 # Grab gosu for easy step-down from root
 ENV GOSU_VERSION 1.7
+ENV JAVA_HOME /usr/lib/jvm/java-1.8.0-openjdk-amd64
+#ENV PATH $JAVA_HOME/bin:$PATH
+
 RUN set -ex; \
   wget -nv -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)"; \
   wget -nv -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture).asc"; \
@@ -29,7 +30,7 @@ RUN set -ex; \
   chmod +x /usr/local/bin/gosu; \
   gosu nobody true
 # Configure Flink version
-ENV FLINK_VERSION=1.7.2 \
+ENV FLINK_VERSION=1.9.1 \
     HADOOP_SCALA_VARIANT=scala_2.12
 # Prepare environment
 ENV FLINK_HOME=/opt/flink
@@ -39,17 +40,36 @@ RUN groupadd --system --gid=9999 flink && \
 WORKDIR $FLINK_HOME
 ENV FLINK_URL_FILE_PATH=flink/flink-${FLINK_VERSION}/flink-${FLINK_VERSION}-bin-${HADOOP_SCALA_VARIANT}.tgz
 # Not all mirrors have the .asc files
-ENV FLINK_TGZ_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=${FLINK_URL_FILE_PATH} \
-    FLINK_ASC_URL=https://www.apache.org/dist/${FLINK_URL_FILE_PATH}.asc
+ENV FLINK_TGZ_URL=https://archive.apache.org/dist/${FLINK_URL_FILE_PATH} \
+    FLINK_ASC_URL=https://archive.apache.org/dist/${FLINK_URL_FILE_PATH}.asc
+
 # For GPG verification instead of relying on key servers
 COPY KEYS /KEYS
 # Install Flink
 RUN set -ex; \
-  wget -nv -O flink.tgz "$FLINK_TGZ_URL"; \
+  wget -nv -O flink.tgz "$FLINK_TGZ_URL" --no-check-certificate; \
   tar -xf flink.tgz --strip-components=1; \
   rm flink.tgz; \
   \
   chown -R flink:flink .;
+
+RUN set -ex; \
+	{ \
+		echo '#!/usr/bin/env bash'; \
+		echo 'set -Eeuo pipefail'; \
+		echo 'ls $JAVA_HOME'; \
+		echo 'cp $JAVA_HOME/jre/lib/ $JAVA_HOME/lib -r'; \
+		echo 'if ! [ -d "$JAVA_HOME" ]; then echo >&2 "error: missing JAVA_HOME environment variable"; exit 1; fi'; \
+	# 8-jdk uses "$JAVA_HOME/jre/lib/security/cacerts" and 8-jre and 11+ uses "$JAVA_HOME/lib/security/cacerts" directly (no "jre" directory)
+		echo 'cacertsFile=; for f in "$JAVA_HOME/lib/security/cacerts" "$JAVA_HOME/jre/lib/security/cacerts"; do if [ -e "$f" ]; then echo "f = $f" && cacertsFile="$f" && echo "cacertsFile=$cacertsFile"; break; fi; done'; \
+		echo 'if [ -z "$cacertsFile" ] || ! [ -f "$cacertsFile" ]; then echo >&2 "error: failed to find cacerts file in $JAVA_HOME"; exit 1; fi'; \
+		echo 'trust extract --overwrite --format=java-cacerts --filter=ca-anchors --purpose=server-auth "$cacertsFile"'; \
+	} > /etc/ca-certificates/update.d/docker-openjdk; \
+	chmod +x /etc/ca-certificates/update.d/docker-openjdk; \
+	/etc/ca-certificates/update.d/docker-openjdk; \
+	# https://github.com/docker-library/openjdk/issues/331#issuecomment-498834472
+	find "$JAVA_HOME/lib" -name '*.so' -exec dirname '{}' ';' | sort -u > /etc/ld.so.conf.d/docker-openjdk.conf; \
+	ldconfig;
 
 COPY ./libtensorflow_framework.so.1 /usr/lib/x86_64-linux-gnu/
 

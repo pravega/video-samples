@@ -23,6 +23,8 @@ if [[ -n $1 ]]; then
     tail -1 "$1"
 fi
 
+echo "controller url is ${CONTROLLER_URL}"
+
 export PERSON_DATABASE_OPTS="-DpersonId=${personId} -DimagePath=${imagePath} -DtransactionType=add -DPRAVEGA_SCOPE=examples
  -DOUTPUT_STREAM_NAME=person-database-transaction -DPRAVEGA_CONTROLLER_URI=${CONTROLLER_URL} -DIS_CREATE_SCOPE=false"
 

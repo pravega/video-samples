@@ -8,6 +8,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * This class allows to build labels, and compare embeddings
+ */
 public class EmbeddingsComparator {
     private static final Logger log = LoggerFactory.getLogger(EmbeddingsComparator.class);
 
@@ -26,6 +29,42 @@ public class EmbeddingsComparator {
             Map.Entry<String, Set<Embedding>> embeddingEntry = embeddingsDatabase.next();
             String personId = embeddingEntry.getKey();
             Set<Embedding> embeddingSet = embeddingEntry.getValue();
+
+            log.info("Current embedding considered is for {}", personId);
+
+            for (Embedding embedding : embeddingSet) {
+                double diff = compareEmbeddings(embedding.embeddingValue, otherEmbedding);
+                // Matches if within threshold
+                if (diff < THRESHOLD && diff < minDiff) {
+                    match = personId;
+                    minDiff = diff;
+                }
+            }
+        }
+
+        return match;
+    }
+
+    /**
+     * @param otherEmbedding     The current facial embedding found in the image
+     * @param embeddingsDatabase The database of facial embeddings to compare to
+     * @param badgeList List of badges scanned to compare scanned face to
+     * @return The name of the person the embedding matches with in the embeddings database and badges scanned
+     */
+    public static String matchEmbedding(float[] otherEmbedding, Iterator<Map.Entry<String, Set<Embedding>>> embeddingsDatabase, Set<String> badgeList) {
+        String match = "Unknown";
+        double minDiff = 1.0;
+
+        while (embeddingsDatabase.hasNext()) {
+            Map.Entry<String, Set<Embedding>> embeddingEntry = embeddingsDatabase.next();
+            String personId = embeddingEntry.getKey();
+            Set<Embedding> embeddingSet = embeddingEntry.getValue();
+
+            // only match with badges scanned
+            if(badgeList != null && !badgeList.contains(personId)) {
+                log.info("badge list has something, so skip this comparison");
+                continue;
+            }
 
             log.info("Current embedding considered is for {}", personId);
 

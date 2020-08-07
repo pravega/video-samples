@@ -17,15 +17,17 @@ import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.impl.ByteBufferSerializer;
 import io.pravega.example.common.ChunkedVideoFrame;
+import io.pravega.example.common.PravegaAppConfiguration;
 import io.pravega.example.common.PravegaUtil;
 import io.pravega.example.common.VideoFrame;
 import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacv.*;
+import org.bytedeco.javacv.CanvasFrame;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.global.opencv_videoio;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_videoio.VideoCapture;
-import org.bytedeco.videoinput.videoInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,21 +40,21 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Reads video images from a web cam and writes them to a Pravega stream.
+ * Reads video images from a web cam and writes them to two Pravega streams.
  */
-public class CameraRecorder implements Runnable {
-    private static Logger log = LoggerFactory.getLogger(CameraRecorder.class);
+public class CameraRecorderTwoStreams implements Runnable {
+    private static Logger log = LoggerFactory.getLogger(CameraRecorderTwoStreams.class);
 
     private final AppConfiguration config;
 
     public static void main(String... args) {
         AppConfiguration config = new AppConfiguration(args);
         log.info("config: {}", config);
-        Runnable app = new CameraRecorder(config);
+        Runnable app = new CameraRecorderTwoStreams(config);
         app.run();
     }
 
-    public CameraRecorder(AppConfiguration appConfiguration) {
+    public CameraRecorderTwoStreams(AppConfiguration appConfiguration) {
         config = appConfiguration;
     }
 
@@ -93,15 +95,20 @@ public class CameraRecorder implements Runnable {
 
             // Create Pravega stream.
             PravegaUtil.createStream(getConfig().getClientConfig(), getConfig().getOutputStreamConfig());
+            PravegaUtil.createStream(getConfig().getClientConfig(), new PravegaAppConfiguration.StreamConfig("examples","OUTPUT_"));
 
             try (EventStreamClientFactory clientFactory = EventStreamClientFactory.withScope(
-                        getConfig().getOutputStreamConfig().getStream().getScope(),
-                        getConfig().getClientConfig());
+                    getConfig().getOutputStreamConfig().getStream().getScope(),
+                    getConfig().getClientConfig());
                  EventStreamWriter<ByteBuffer> pravegaWriter = clientFactory.createEventWriter(
                          getConfig().getOutputStreamConfig().getStream().getStreamName(),
                          new ByteBufferSerializer(),
+                         EventWriterConfig.builder().build());
+                 EventStreamWriter<ByteBuffer> pravegaWriterCopy = clientFactory.createEventWriter(
+                         getConfig().getOutputStreamConfig().getStream().getStreamName() + "-copy",
+                         new ByteBufferSerializer(),
                          EventWriterConfig.builder().build())
-                ) {
+            ) {
 
                 ObjectMapper mapper = new ObjectMapper();
                 OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
@@ -145,6 +152,7 @@ public class CameraRecorder implements Runnable {
 
                     // Write to Pravega.
                     CompletableFuture<Void> future = pravegaWriter.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
+                    future = pravegaWriterCopy.writeEvent(Integer.toString(videoFrame.camera), jsonBytes);
 
                     // Show our frame in the preview window..
                     if (cFrame.isVisible()) {

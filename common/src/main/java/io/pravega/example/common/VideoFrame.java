@@ -13,17 +13,16 @@ package io.pravega.example.common;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonIgnore;
 import io.pravega.example.tensorflow.BoundingBox;
 import io.pravega.example.tensorflow.Recognition;
+import org.bytedeco.opencv.opencv_core.RectVector;
 
 import java.io.Serializable;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * A class for storing a single video frame.
@@ -47,6 +46,7 @@ public class VideoFrame implements Serializable {
     public KittiSensorReading kittiSensorReadings;
     public List<Recognition> recognitions = new ArrayList<>();
     public ExtendedEventPointer sourceEventPointer;
+    public Set lastBadges = null;
 
     @JsonIgnore
     public EventReadMetadata eventReadMetadata;
@@ -72,6 +72,7 @@ public class VideoFrame implements Serializable {
         this.eventReadMetadata = frame.eventReadMetadata;
         this.recognizedBoxes = frame.recognizedBoxes;
         this.embeddingValues = frame.embeddingValues;
+        this.lastBadges = frame.lastBadges;
     }
 
     @Override
@@ -106,6 +107,7 @@ public class VideoFrame implements Serializable {
                 ", eventReadMetadata=" + eventReadMetadata +
                 ", recognizedBoxes=" + recognizedBoxes.toString() +
                 ", embeddingValues=" + embeddingValues.toString() +
+                ", lastBadges=" + lastBadges +
                 ", data(" + dataLength + ")=" + dataStr +
                 "}";
     }

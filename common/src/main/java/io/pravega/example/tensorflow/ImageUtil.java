@@ -90,6 +90,45 @@ public class ImageUtil {
         // draw bounding box
         graphics.drawRect(box.getLeftInt(), box.getTopInt(), box.getWidthInt(), box.getHeightInt());
 
+        try
+        {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(bufferedImage, "jpg", baos);
+            bytes = baos.toByteArray();
+        }
+        catch (IOException e)
+        {
+            throw  new RuntimeException(e);
+        }
+
+
+        return bytes;
+    }
+
+    public byte[] labelFace(final byte[] image, final Recognition recognition, boolean passed) {
+        byte[] bytes = null;
+        BufferedImage bufferedImage = createImageFromBytes(image);
+        Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
+        if(passed) {
+            graphics.setColor(Color.green);
+        } else {
+            graphics.setColor(Color.red);
+        }
+
+        BoxPosition box = recognition.getLocation();
+        //set font
+        Font myFont = new Font("Courier New", 1, 14);
+        graphics.setFont(myFont);
+        //draw text
+
+        System.out.println(recognition.getTitle());
+        graphics.drawString(recognition.getTitle(), box.getLeft(), box.getTop() - 7);
+        // draw bounding box
+        System.out.println("Recognition location X: " + box.getLeftInt() + ", Height:" + box.getTopInt());
+        graphics.drawRect(box.getLeftInt(),box.getTopInt(), box.getWidthInt(), box.getHeightInt());
+
+        graphics.dispose();
+
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(bufferedImage, "jpg", baos);

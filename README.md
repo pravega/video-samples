@@ -322,6 +322,132 @@ See [Jupyter Hub](jupyterhub/README.md).
 
 See [Chunking](chunking.md).
 
-# References
+# Object Detection
 
+![object-detection-arch](images/object-detection-arch.png)
+
+This is for running the object detection application on SDP. YOLO model and Tensorflow are being used for object detection.
+
+## Running on IntelliJ
+
+Assuming you have the CameraRecorder, and VideoPlayer running, run the FlinkObjectDetectorJob using following parameters:
+
+```
+--controller
+tcp://127.0.0.1:9090
+--scope
+examples
+--input-stream
+examples-raw
+--output-stream
+examples-detected
+--CAMERA
+3
+--startAtTail
+true
+```
+
+## Running on SDP
+
+Refer to **Running the Examples in SDP** and update the file to use **object-detector-job**
+
+# Facial Recognition and Authentication
+
+The object detection use case has been extended to facial recognition and authentication. This involves managing a in-memory database of valid personnel, and matching scanned badges with records and recognized face. This creates a multi-factor authentication system which is more secure.
+
+## Components
+- Adding personnel: Personnel records can be added to in-memory database to match with scanned badges and faces.
+![adding-personnel](images/add_personnel.png)
+
+- Pass Case: Upon matching a scanned badge and face to existing personnel records, passes the the authenticated system.
+![pass-case](images/pass_face_recognition.png)
+
+- Fail Case: Upon matching a scanned badge and face to existing personnel records, fails the the authenticated system. Can be modified to take specific actions to deal with failing authentication. 
+![fail-case](images/fail_face_recognition.png)
+
+
+
+## Running on SDP and IntelliJ
+
+Run CameraRecorderTwoStreams if you only have a single webcam as show below: 
+```
+export PRAVEGA_SCOPE=examples
+export OUTPUT_STREAM_NAME=face-detection-raw
+export PRAVEGA_CONTROLLER_URI=tcp://YOUR_COUNTROLLER_URI:9090
+export IS_CREATE_SCOPE=false
+export CAMERA=3
+export CAMERA_DEVICE_NUMBER=0
+export FRAMES_PER_SEC=3
+```
+
+Else run CameraRecorder with updated stream name for each webcam used in the charts
+
+For a Facial Recognition App, run with following parameters for FlinkFaceRecognizerJob on IntelliJ:
+```
+--controller
+tcp://CONTROLLER_URI:9090
+--scope
+examples
+--input-stream
+STREAM_NAME_FACE_WEBCAM
+--output-stream
+face-detection-detected
+--person-database-stream
+person-database-transaction
+--CAMERA
+3
+--startAtTail
+true
+--readerParallelism
+1
+--parallelism
+1
+--checkpointIntervalMs
+10000
+```
+Note: Make sure to update CONTROLLER_URI, and STREAM_NAME_FACE_WEBCAM with stream name for webcam that scans faces.
+
+
+For a Facial Recognition with authentication, run with following parameters for BadgeSecurityJob on IntelliJ:
+```
+--controller
+tcp://CONTROLLER_URI:9090
+--scope
+examples
+--input-stream
+STREAM_NAME_FACE_WEBCAM
+--output-stream
+face-detection-detected
+--person-database-stream
+person-database-transaction
+--badge-stream
+STREAM_NAME_BADGE_WEBCAM
+--CAMERA
+3
+--startAtTail
+true
+--readerParallelism
+1
+--parallelism
+1
+--checkpointIntervalMs
+10000
+--maxOutOfOrdernessMs
+10
+```
+Note: Make sure to update CONTROLLER_URI, and STREAM_NAME_FACE_WEBCAM with stream name for webcam that scans faces, and STREAM_NAME_BADGE_WEBCAM with stream name for webcam that scans badges.
+
+To add valid personnel records into the face recogniton job, run the following:
+
+```
+cd video-samples
+. ./scripts/person-database/setup.sh
+./scripts/person-database/populate-database.sh
+```
+In **setup.sh**, you can update the controller to reflect whether it is running on SDP or locally. More images of valid personnel can be added to ``./images/person-database`` with the name of person as folder name, and images of the person within.
+
+To run on SDP, refer to **Running the Examples in SDP** and update the file to use **face-recognizer-job** for face recognition, or update the file to use **badge-recognition-job** for facial recognition with authentication
+
+
+# References
 - <http://pravega.io/>
