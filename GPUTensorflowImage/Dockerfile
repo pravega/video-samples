@@ -73,6 +73,12 @@ RUN set -ex; \
 
 COPY ./libtensorflow_framework.so.1 /usr/lib/x86_64-linux-gnu/
 
+# Add optional libraries into Flink classpath
+RUN mkdir -p ${FLINK_HOME}/plugins/s3-fs-presto \
+ && mkdir -p ${FLINK_HOME}/plugins/s3-fs-hadoop \
+ && ln -fs ${FLINK_HOME}/opt/flink-s3-fs-presto-${FLINK_VERSION}.jar ${FLINK_HOME}/plugins/s3-fs-presto \
+ && ln -fs ${FLINK_HOME}/opt/flink-s3-fs-hadoop-${FLINK_VERSION}.jar ${FLINK_HOME}/plugins/s3-fs-hadoop
+
 # Configure container
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
