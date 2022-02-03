@@ -1,6 +1,10 @@
 
 # Pravega Video Samples
 
+## ATTENTION - THIS REPOSITORY IS OBSOLETE
+
+## This repository and the techniques demonstrated in it are obsolete. Those interested in video with Pravega should refer to https://github.com/pravega/gstreamer-pravega.
+
 ## Overview
 
 ![grid-sample](images/video-samples-diagram.png)
